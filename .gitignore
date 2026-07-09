@@ -1,0 +1,12 @@
+# Build output: objects, the archive, PRGs, test transcripts.
+build/
+
+# The suite's scratch SD card. build.ps1 -Test empties it, and the tests
+# write everything they read.
+test/fsroot/*
+!test/fsroot/.gitkeep
+
+# Third-party, not ours to redistribute. See README.md for where to get them.
+emulator/
+doc/*.pdf
+doc/*.md
