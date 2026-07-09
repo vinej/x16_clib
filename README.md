@@ -23,17 +23,36 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/tile.h` | tilemap cells, layer config, 12-bit hardware scroll |
 | `x16/sprite.h` | all 128 hardware sprites |
 | `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham |
-| `x16/verafx.h` | VERA FX: hardware 16x16 multiply, 4x-speed fills |
+| `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines and filled triangles** |
 | `x16/psg.h` | the 16-voice PSG |
 | `x16/ym.h` | the YM2151 FM chip |
-| `x16/pcm.h` | the PCM FIFO |
+| `x16/pcm.h` | the PCM FIFO, and **AFLOW-driven streaming** |
 | `x16/input.h` | joystick, mouse, keyboard |
-| `x16/irq.h` | VSYNC frame counter and IRQ hook |
-| `x16/bank.h` | banked RAM, with boundary-crossing copies |
+| `x16/irq.h` | VSYNC frame counter, **raster interrupts, hardware sprite collision** |
+| `x16/bank.h` | banked RAM, boundary-crossing copies, **a whole-bank allocator** |
+| `x16/mem.h` | **KERNAL block ops: fill, copy, CRC-16, and LZSA2 depacking** |
 | `x16/load.h` | load and save, including straight into VRAM |
 | `x16/fixed.h` | 8.8 fixed point, 16x16 multiply |
 | `x16/collide.h` | 8- and 16-bit bounding-box overlap |
 | `x16/float.h` | a binding to the ROM's floating point library |
+
+Four of those are things the machine can do that nothing else exposes to
+C. `x16_mem_decompress()` is an **LZSA2 depacker sitting in ROM**, and
+because KERNAL block operations do not increment an address in
+`$9F00-$9FFF`, it unpacks a compressed asset **straight into video
+memory**:
+
+```c
+x16_vera_addr0(X16_INC_1, X16_VRAM_SPRITE_DATA);
+x16_mem_decompress(tiles_lzsa, X16_VERA_DATA0);   /* no staging buffer */
+```
+
+`x16_irq_line_install()` gives raster splits, and `x16_sprite_collisions()`
+reads VERA's own collision hardware instead of comparing rectangles in
+software. `x16_fx_line()` and `x16_fx_triangle()` hand the Bresenham error
+to VERA, leaving the CPU one store per pixel. `x16_pcm_stream_start()`
+plays a buffer longer than the 4 KB FIFO, refilled from the AFLOW
+interrupt.
 
 What it deliberately does **not** port: the assembly library's `int16`,
 `int32`, `number` and `bits` modules. C already has `int`, `long`,
@@ -169,6 +188,34 @@ path that denormalises a normal FAC. The real unary minus is `fp_negop`.
 **`x16_key_peek()`'s character is unspecified when the queue is empty.**
 Only the count is meaningful.
 
+**VERA's `$9F28` is IRQ_LINE on write and SCANLINE on read**, so the
+raster line you programmed can never be read back. `IEN` is two registers
+in one, too: bit 7 is IRQ_LINE's bit 8 (read and write), bit 6 is
+SCANLINE's bit 8 (read-only). That is what makes `tsb`/`trb` on `IEN`
+safe -- their read-modify-write only ever puts bit 6 back, and bit 6
+ignores writes.
+
+**A carry survives an FX operation.** Writing an increment register seeds
+the subpixel accumulator to half a pixel but leaves the position's carry
+bit alone, whatever the FX reference implies. Draw a filled triangle and
+then a line, and the line's first minor-axis step is eaten unless X_POS is
+zeroed explicitly. `x16_fx_line()` does. (A line after a line does *not*
+reproduce it -- only the polygon filler, which steps two edge accumulators
+twice per row, leaves the carry set.)
+
+**AFLOW cannot be acknowledged.** It clears only by refilling the FIFO, so
+a refiller that runs out of data must disable AFLOW in `IEN` or the
+interrupt storms forever. This is also why `x16_irq_remove()` stops a
+stream: with the handler unhooked, nothing would ever clear it.
+
+**A C interrupt callback would corrupt the zero page**, because cc65's
+compiled code uses `sp`, `sreg`, `ptr1-4`, `tmp1-4` and `regbank`, and the
+code it interrupted owns all of them mid-expression. cc65's own
+interruptor mechanism does not save them. So this library does: 42 bytes,
+about 950 cycles, and only when a callback is installed. That is what lets
+a raster handler be written in C, and call any `x16_*` routine, rather
+than being usually-correct.
+
 **`x16_f_to_str()` copies.** The ROM writes its answer into `$0100`, the
 bottom of the stack page. The raw ROM call's buffer would not survive the
 next deep call; the wrapper copies it into yours before returning.
@@ -176,30 +223,43 @@ next deep call; the wrapper copies it into yours before returning.
 ## Tests
 
 ```powershell
-.\build.ps1 -Test
+.\build.ps1 -Test              # headless: 112 tests in a few seconds
+.\build.ps1 -Test -Windowed    # with video: 118, nothing skipped but one
 ```
 
-89 tests on the real emulated machine, headless, in a few seconds. Every
-test drives the library one way and verifies through an **independent
-path** -- write through a library call on port 0, read back with cc65's
-`vpeek()` -- so a bug in the address plumbing cannot hide behind itself.
-Any `FAIL`, a pass count that disagrees with the total, a missing `DONE`
-line, or a 60-second timeout fails the build with a real exit code.
+Every test drives the library one way and verifies through an
+**independent path** -- write through a library call on port 0, read back
+with cc65's `vpeek()` -- so a bug in the address plumbing cannot hide
+behind itself. Any `FAIL`, a pass count that disagrees with the total, a
+missing `DONE` line, or a timeout fails the build with a real exit code.
 
-Seven of them pin bugs that were found and fixed in the assembly library,
+**Run it both ways.** Headless `-testbench` has no video, so VERA raises
+neither VSYNC nor a raster interrupt and the CPU takes no IRQ at all. Six
+tests therefore skip -- and say so rather than passing quietly. Each uses
+the KERNAL's jiffy clock as an independent oracle, to tell "no interrupts
+here at all" (skip) apart from "the interrupt ran and our handler did not"
+(a real failure). `-Windowed` opens a display at real speed and every one
+of them runs.
+
+That distinction is not academic. A shim that clobbers a handler's address
+is invisible to any headless test, because the vector is only dereferenced
+when the interrupt fires.
+
+Several tests exist to pin bugs found and fixed in the assembly library,
 so a regression cannot slip back in: `FS_VLOAD` (the bank must reach
 `LOAD`'s `.A`, not the secondary address), `F_NEG` (`fp_negfac` is not a
 negate), `F_FROM_U8` (`fp_float` is signed), `GFX_CLEAR` (checks the
 *last* pixel, since a truncated count clears only the top 35 rows),
 `PAL_LOAD_ZERO`, `SPRITE_SIZE_PAL_MASK`, and `IRQ_PRESERVES_IFLAG`.
 
-Two tests `SKIP` under the headless testbench, and say so rather than
-passing quietly. `VSYNC_COUNTER` cannot run because `-testbench` has no
-video and so raises no VSYNC; it uses the KERNAL's jiffy clock as an
-independent oracle to tell "no interrupts here at all" (skip) apart from
-"interrupts ran and our counter did not" (a real failure). `JOY_PRESENT`
-skips because the emulator reports every joystick absent, the keyboard
-included.
+Others pin hardware behaviour that is easy to get wrong and impossible to
+notice: `FX_LINE_CARRY` draws a triangle before a line, because that is
+the only sequence that leaves the FX accumulator's carry set;
+`IRQ_LINE_AT_300` proves the raster line landed by asking the beam where
+it is, since IRQ_LINE cannot be read back; `IRQ_ZP_PRESERVED` parks a
+sentinel in the scratch block and lets an interrupt handler overwrite it;
+`PCM_STREAM_EXHAUST` plays a real buffer to its end and checks the refill
+interrupt disarmed itself.
 
 ### The ABI tests
 

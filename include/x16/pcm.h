@@ -46,8 +46,43 @@ void __fastcall__ x16_pcm_put (unsigned char sample);
 
 /* Push a block. Does not throttle -- meant for priming an empty FIFO
 ** with up to 4 KB. Bytes written past a full FIFO are discarded, so pace
-** a longer stream yourself with x16_pcm_full().
+** a longer stream yourself with x16_pcm_full(), or use the streamer below.
 */
 void __fastcall__ x16_pcm_write (const void *src, unsigned int count);
+
+/* ---------------------------------------------------------------------
+ * AFLOW-driven streaming.
+ *
+ * x16_pcm_write() cannot play anything longer than the FIFO's 4 KB.
+ * Streaming works the way the hardware intends: VERA raises AFLOW when
+ * the FIFO drops below a quarter full, and the interrupt refills it.
+ *
+ *      x16_pcm_ctrl(X16_PCM_VOLUME(15));
+ *      x16_pcm_stream_start(samples, sizeof samples, 64);
+ *      while (x16_pcm_stream_active()) { ...do other work... }
+ *
+ * The FIFO is primed before the DAC starts, so playback cannot underrun
+ * at t=0. Requires enabled interrupts; the CINV hook installs itself.
+ *
+ * Note that x16_irq_remove() stops a stream: with the handler unhooked,
+ * AFLOW has nothing to acknowledge it and would assert the IRQ line
+ * forever.
+ * ------------------------------------------------------------------ */
+
+/* `rate` is 0-128, as for x16_pcm_rate(); 0 primes without playing. Set
+** the format and volume with x16_pcm_ctrl() first.
+*/
+void __fastcall__ x16_pcm_stream_start (const void *data, unsigned int count,
+                                        unsigned char rate);
+
+/* Stop refilling. Whatever is already queued keeps playing; call
+** x16_pcm_reset() for immediate silence.
+*/
+void x16_pcm_stream_stop (void);
+
+/* 1 while data remains to hand over. It reaches 0 once the last byte is
+** in the FIFO -- which may still be playing.
+*/
+unsigned char x16_pcm_stream_active (void);
 
 #endif /* X16_PCM_H */

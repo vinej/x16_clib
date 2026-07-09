@@ -29,6 +29,11 @@
         .export         _x16_pcm_put
         .export         _x16_pcm_write
 
+; Cross-module: audio/pcmstream.s starts the DAC through this. Streaming
+; lives in its own object so that a program using only pcm_put() does not
+; drag the IRQ module in behind it.
+        .export         pcm_rate
+
 PCM_FIFO_EMPTY  = %01000000
 PCM_FIFO_RESET  = %10000000     ; on write
 PCM_16BIT       = %00100000

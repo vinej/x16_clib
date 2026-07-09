@@ -38,6 +38,7 @@
 #include <x16/bank.h>
 #include <x16/load.h>
 #include <x16/float.h>
+#include <x16/mem.h>
 #include <time.h>
 
 /* Scratch VRAM, well clear of the text screen ($1B000), the default
@@ -679,6 +680,156 @@ static void test_fx_clear(void)
             "FX_CLEAR");
 }
 
+/* Hardware Bresenham. Both endpoints must be exact, and nothing may land
+** at the transpose of the start point -- which is where a swapped x/y
+** shim would put the line.
+*/
+static void test_fx_line(void)
+{
+    unsigned char i, ok = 1;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 2560);          /* rows 0..7 */
+
+    x16_fx_line(0, 0, 7, 0, 0xC1);      /* horizontal */
+    x16_fx_line(20, 0, 27, 7, 0xC2);    /* diagonal */
+    x16_fx_line(60, 0, 53, 7, 0xC3);    /* anti-diagonal */
+    x16_fx_line(100, 0, 103, 7, 0xC4);  /* y-major slant */
+
+    for (i = 0; i < 8; ++i) {
+        if (vpeek(PIXEL(i, 0)) != 0xC1) ok = 0;         /* the whole run */
+        if (vpeek(PIXEL(20 + i, i)) != 0xC2) ok = 0;    /* every step */
+        if (vpeek(PIXEL(60 - i, i)) != 0xC3) ok = 0;
+    }
+    ok = ok && vpeek(PIXEL(8, 0)) == 0x00;              /* stopped on time */
+    ok = ok && vpeek(PIXEL(21, 0)) == 0x00;             /* not a transpose */
+
+    /* A y-major slant draws one pixel per row; only the endpoints are
+    ** pinned, because the interior is VERA's rounding, not ours.
+    */
+    ok = ok && vpeek(PIXEL(100, 0)) == 0xC4 &&
+               vpeek(PIXEL(103, 7)) == 0xC4;
+
+    t_check(ok, "FX_LINE");
+}
+
+/* THE CARRY TRAP.
+**
+** Writing the increment seeds the subpixel accumulator to half a pixel,
+** but leaves the position's carry bit alone -- whatever the FX reference
+** implies. So a line drawn straight after another whose slope did not
+** land on a whole pixel inherits that carry, and its FIRST minor-axis
+** step is eaten: the line starts one pixel off the diagonal and never
+** recovers.
+**
+** What actually leaves a carry is the POLYGON filler, not another line:
+** it steps two edge accumulators twice per row. A line after a line does
+** not reproduce it, which is why FX_LINE above stays green even with the
+** guard removed. So: a slant, then a triangle, then a clean 45-degree
+** diagonal whose every pixel is checked.
+**
+** Remove the `stz VERA_FX_X_POS_*` from fx_line and this is the one test
+** that goes red.
+*/
+static void test_fx_line_carry(void)
+{
+    static const x16_point ta = { 200, 0 };
+    static const x16_point tb = { 213, 0 };
+    static const x16_point tc = { 203, 6 };
+    unsigned char i, ok = 1;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 2560);
+
+    /* Three ways to leave the accumulator dirty, then a clean diagonal. */
+    x16_fx_line(100, 0, 103, 7, 0xE1);          /* slope 3/7 */
+    x16_fx_triangle(&ta, &tb, &tc, 0xE3);       /* poly: two edge accumulators */
+    x16_fx_line(140, 0, 147, 7, 0xE2);          /* now a clean 1:1 diagonal */
+
+    for (i = 0; i < 8; ++i) {
+        if (vpeek(PIXEL(140 + i, i)) != 0xE2) ok = 0;
+    }
+    t_check(ok, "FX_LINE_CARRY");
+}
+
+/* A vertical and a single-pixel line: the minor delta is zero, so the FX
+** helper is bypassed and port 1's increment does the walking.
+*/
+static void test_fx_line_axis(void)
+{
+    unsigned char i, ok = 1;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 2560);
+
+    x16_fx_line(10, 0, 10, 7, 0xD1);    /* vertical */
+    x16_fx_line(200, 3, 200, 3, 0xD2);  /* a point */
+
+    for (i = 0; i < 8; ++i) {
+        if (vpeek(PIXEL(10, i)) != 0xD1) ok = 0;
+    }
+    ok = ok && vpeek(PIXEL(11, 0)) == 0x00 &&
+               vpeek(PIXEL(200, 3)) == 0xD2;
+
+    t_check(ok, "FX_LINE_AXIS");
+}
+
+/* Spans verified against the emulator. Right triangle, flat top edge. */
+static void test_fx_triangle(void)
+{
+    static const x16_point a = { 10, 5 };
+    static const x16_point b = { 30, 5 };
+    static const x16_point c = { 10, 25 };
+    unsigned char ok;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 9600);          /* rows 0..29 */
+
+    x16_fx_triangle(&a, &b, &c, 0xAA);
+
+    ok = vpeek(PIXEL(9, 5)) == 0x00 &&          /* left of it */
+         vpeek(PIXEL(10, 5)) == 0xAA &&         /* top row runs 10..29 */
+         vpeek(PIXEL(29, 5)) == 0xAA &&
+         vpeek(PIXEL(30, 5)) == 0x00 &&         /* (30,5) is outside */
+         vpeek(PIXEL(19, 15)) == 0xAA &&        /* row 15 runs 10..19 */
+         vpeek(PIXEL(20, 15)) == 0x00 &&
+         vpeek(PIXEL(10, 24)) == 0xAA &&        /* last drawn row: one pixel */
+         vpeek(PIXEL(11, 24)) == 0x00 &&
+         vpeek(PIXEL(10, 25)) == 0x00;          /* half-open: row y2 empty */
+
+    t_check(ok, "FX_TRIANGLE");
+}
+
+/* A general triangle with the vertices deliberately out of order: the
+** bottom one first, then the top, then the middle. fx_triangle sorts.
+*/
+static void test_fx_triangle_unsorted(void)
+{
+    static const x16_point bottom = { 45, 20 };
+    static const x16_point top = { 40, 0 };
+    static const x16_point middle = { 60, 10 };
+    unsigned char ok;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 9600);
+
+    x16_fx_triangle(&bottom, &top, &middle, 0xAB);
+
+    ok = vpeek(PIXEL(40, 0)) == 0xAB &&         /* apex */
+         vpeek(PIXEL(41, 0)) == 0x00 &&
+         vpeek(PIXEL(41, 9)) == 0x00 &&         /* row 9 runs 42..58 */
+         vpeek(PIXEL(42, 9)) == 0xAB &&
+         vpeek(PIXEL(58, 9)) == 0xAB &&
+         vpeek(PIXEL(59, 9)) == 0x00 &&
+         vpeek(PIXEL(43, 13)) == 0xAB &&        /* row 13 runs 43..54 */
+         vpeek(PIXEL(54, 13)) == 0xAB &&
+         vpeek(PIXEL(55, 13)) == 0x00 &&
+         vpeek(PIXEL(45, 19)) == 0xAB &&        /* last row: one pixel */
+         vpeek(PIXEL(45, 20)) == 0x00;          /* half-open bottom */
+
+    t_check(ok, "FX_TRIANGLE_UNSORTED");
+}
+
 /* Every FX routine must leave FX_CTRL and DCSEL at 0. Leaving Addr1 Mode
 ** set silently changes VRAM addressing for everyone downstream, so this
 ** checks a plain fill still works right after a multiply.
@@ -746,6 +897,238 @@ static void test_irq_preserves_iflag(void)
     x16_irq_remove();
 
     t_check((status_after_install & 0x04) != 0, "IRQ_PRESERVES_IFLAG");
+}
+
+/* ------------------------------------------------------------------ */
+/* raster and sprite-collision interrupts                              */
+/* ------------------------------------------------------------------ */
+
+/* VERA's base is $9F20. IEN is $9F26; $9F28 is IRQ_LINE on WRITE but
+** SCANLINE on READ, so the line you programmed can never be read back.
+**
+** IEN is two registers in one, too: bit 7 is IRQ_LINE's bit 8 (read and
+** write), while bit 6 is SCANLINE's bit 8 (read-only). That is why tsb
+** and trb on IEN are safe -- their read-modify-write only ever puts bit 6
+** back, and bit 6 ignores writes.
+*/
+#define VERA_IEN_REG      (*(volatile unsigned char *)0x9F26)
+#define VERA_SCANLINE_L   (*(volatile unsigned char *)0x9F28)
+#define VERA_IEN_LINE8    0x80
+#define VERA_IEN_SCAN8    0x40
+
+static void dummy_line_handler(void) { }
+static void dummy_sprcol_handler(unsigned char groups) { (void)groups; }
+
+/* Line 300 is $12C, so its bit 8 is set and rides in IEN bit 7. Line 100
+** has bit 8 clear, so installing it must PUT THAT BIT BACK -- an install
+** that only ever set it would leave line 100 firing at line 356.
+**
+** The low byte cannot be checked here (write-only). IRQ_LINE_AT_SCANLINE
+** below proves it landed, by asking the beam.
+*/
+static void test_irq_line_regs(void)
+{
+    unsigned char ien_hi, ien_lo, after;
+
+    x16_irq_line_install(300, dummy_line_handler);
+    ien_hi = VERA_IEN_REG;
+
+    x16_irq_line_install(100, dummy_line_handler);
+    ien_lo = VERA_IEN_REG;
+
+    x16_irq_line_remove();
+    after = VERA_IEN_REG;
+
+    x16_irq_remove();
+
+    t_check((ien_hi & VERA_IEN_LINE8) != 0 && (ien_hi & 0x02) != 0 &&
+            (ien_lo & VERA_IEN_LINE8) == 0 && (ien_lo & 0x02) != 0 &&
+            (after & 0x02) == 0,        /* LINE disabled again */
+            "IRQ_LINE_REGS");
+}
+
+static void test_sprcol_regs(void)
+{
+    unsigned char on, off;
+
+    x16_irq_sprcol_install(dummy_sprcol_handler);
+    on = VERA_IEN_REG;
+    x16_irq_sprcol_remove();
+    off = VERA_IEN_REG;
+
+    x16_irq_remove();
+
+    t_check((on & 0x04) != 0 && (off & 0x04) == 0, "SPRCOL_REGS");
+}
+
+/* A NULL handler is poll mode: the groups still accumulate, nothing is
+** called. With no sprites rendered there are none, so the accumulator
+** reads 0 -- and reads 0 again, because the read clears it.
+*/
+static void test_sprcol_poll(void)
+{
+    unsigned char first, second;
+
+    x16_irq_sprcol_install((x16_sprcol_handler)0);
+    first = x16_sprite_collisions();
+    second = x16_sprite_collisions();
+    x16_irq_sprcol_remove();
+    x16_irq_remove();
+
+    t_check(first == 0 && second == 0, "SPRCOL_POLL");
+}
+
+static unsigned char line_fired;
+
+static void counting_line_handler(void)
+{
+    ++line_fired;
+}
+
+/* Does a raster interrupt actually reach the handler? Needs video, so it
+** uses the same three-way jiffy oracle as VSYNC_COUNTER: frames stuck +
+** jiffy stuck means the harness has no interrupts at all (skip); frames
+** stuck + jiffy moving means the IRQ ran and our handler did not (fail).
+**
+** This is the test that catches a shim clobbering the handler address:
+** the vector is only dereferenced when the interrupt fires, so no
+** register check could ever see it.
+*/
+static void test_irq_line_fires(void)
+{
+    clock_t jiffy0;
+    unsigned int spin;
+
+    line_fired = 0;
+    jiffy0 = clock();
+    x16_irq_line_install(240, counting_line_handler);
+
+    for (spin = 0; spin < 30000 && !line_fired; ++spin) {
+        /* bounded: a broken handler must fail, not hang the harness */
+    }
+
+    x16_irq_line_remove();
+    x16_irq_remove();
+
+    if (line_fired) {
+        t_check(1, "IRQ_LINE_FIRES");
+    } else if (clock() == jiffy0) {
+        t_skip("IRQ_LINE_FIRES");       /* headless: no interrupts at all */
+    } else {
+        t_check(0, "IRQ_LINE_FIRES");
+    }
+}
+
+static unsigned int line_scan;
+
+/* Read the 9-bit scanline: low byte from $9F28, bit 8 from IEN bit 6. */
+static void scanline_probe_handler(void)
+{
+    line_scan = VERA_SCANLINE_L;
+    if (VERA_IEN_REG & VERA_IEN_SCAN8) {
+        line_scan |= 0x100;
+    }
+    ++line_fired;
+}
+
+/* Did the interrupt fire WHERE it was asked to?
+**
+** IRQ_LINE is write-only, so the only way to know the line number landed
+** -- low byte and bit 8 both -- is to ask the beam once the handler runs.
+** Line 300 has bit 8 set; line 100 does not. Drop bit 8 and 300 becomes
+** 44, drop the low byte and 300 becomes 256: either way, far outside the
+** window.
+**
+** VERA renders a line ahead of scanout, and the KERNAL's IRQ stub runs
+** before our handler, so allow some slack.
+*/
+static void check_line_at(unsigned int want, const char *name)
+{
+    clock_t jiffy0 = clock();
+    unsigned int spin;
+    int delta;
+
+    line_fired = 0;
+    line_scan = 0xFFFF;
+    x16_irq_line_install(want, scanline_probe_handler);
+
+    for (spin = 0; spin < 30000 && !line_fired; ++spin) {
+    }
+
+    x16_irq_line_remove();
+    x16_irq_remove();
+
+    if (!line_fired) {
+        if (clock() == jiffy0) {
+            t_skip(name);               /* headless: no video, no raster IRQ */
+        } else {
+            t_check(0, name);
+        }
+        return;
+    }
+    delta = (int)line_scan - (int)want;
+    t_check(delta >= -4 && delta <= 12, name);
+}
+
+static void test_irq_line_at_scanline(void)
+{
+    check_line_at(100, "IRQ_LINE_AT_100");     /* bit 8 clear */
+    check_line_at(300, "IRQ_LINE_AT_300");     /* bit 8 set */
+}
+
+static unsigned char zp_fired;
+
+/* Runs inside the interrupt and deliberately uses the library's scratch
+** block: x16_bank_peek() writes X16_P0/P1 and X16_T0/T1.
+*/
+static void zp_clobbering_handler(void)
+{
+    (void)x16_bank_peek(2, 0x0102);
+    ++zp_fired;
+}
+
+/* Does the handler wrapper really preserve the zero page?
+**
+** Park a sentinel in X16_P0 -- found through x16_zp_base(), so nothing is
+** hardcoded -- then spin until a raster interrupt has run a handler that
+** overwrites that very byte. If save_zp/restore_zp work, the sentinel is
+** still there. If they do not, X16_P0 holds 0x02, the low byte of the
+** offset the handler passed to x16_bank_peek().
+**
+** Deterministic: the interrupt is guaranteed to land inside the spin.
+** The same wrapper saves cc65's own runtime zero page by the same means,
+** which is what lets a handler be written in C at all.
+*/
+static void test_irq_zp_preserved(void)
+{
+    volatile unsigned char *p0 = (volatile unsigned char *)(unsigned int)x16_zp_base();
+    clock_t jiffy0;
+    unsigned int spin;
+    unsigned char survived;
+
+    zp_fired = 0;
+    jiffy0 = clock();
+
+    /* Install FIRST: the installer itself passes the scanline through
+    ** X16_P0/P1, so a sentinel written before it would not survive.
+    */
+    x16_irq_line_install(240, zp_clobbering_handler);
+    *p0 = 0x5A;
+
+    for (spin = 0; spin < 30000 && !zp_fired; ++spin) {
+    }
+    survived = (*p0 == 0x5A);
+
+    x16_irq_line_remove();
+    x16_irq_remove();
+
+    if (zp_fired) {
+        t_check(survived, "IRQ_ZP_PRESERVED");
+    } else if (clock() == jiffy0) {
+        t_skip("IRQ_ZP_PRESERVED");
+    } else {
+        t_check(0, "IRQ_ZP_PRESERVED");
+    }
 }
 
 /* The VSYNC hook must actually tick -- where VSYNC exists at all.
@@ -949,6 +1332,109 @@ static void test_pcm_rate_clamp(void)
             "PCM_RATE_CLAMP");
 }
 
+/* AFLOW streaming, primed at rate 0 so nothing actually plays -- which is
+** what makes this runnable headless.
+**
+** Two shapes matter. A buffer bigger than the 4 KB FIFO must leave the
+** stream active with the refill interrupt armed. One that fits outright
+** must leave it inactive with AFLOW disabled: enabling AFLOW with no data
+** behind it would storm, because nothing acknowledges AFLOW except
+** refilling the FIFO.
+*/
+static void test_pcm_stream(void)
+{
+    unsigned char big_full, big_active, big_ien;
+    unsigned char sml_active, sml_ien, sml_queued;
+    unsigned char stopped_ien, stopped_active;
+
+    x16_pcm_rate(0);
+    x16_pcm_ctrl(X16_PCM_VOLUME(15));   /* 8-bit mono, full volume */
+    x16_pcm_reset();
+
+    /* Any readable RAM does as sample data. */
+    x16_pcm_stream_start((const void *)0x2000, 5120, 0);   /* > 4 KB FIFO */
+    big_full = x16_pcm_full();
+    big_active = x16_pcm_stream_active();
+    big_ien = VERA_IEN_REG & 0x08;      /* AFLOW enable */
+
+    x16_pcm_stream_stop();
+    stopped_ien = VERA_IEN_REG & 0x08;
+    stopped_active = x16_pcm_stream_active();
+
+    x16_pcm_reset();
+    x16_pcm_stream_start((const void *)0x2000, 64, 0);      /* fits outright */
+    sml_active = x16_pcm_stream_active();
+    sml_ien = VERA_IEN_REG & 0x08;
+    sml_queued = !x16_pcm_empty();
+
+    x16_pcm_reset();
+    x16_irq_remove();
+
+    t_check(big_full == 1 && big_active == 1 && big_ien != 0 &&
+            stopped_ien == 0 && stopped_active == 0 &&
+            sml_active == 0 && sml_ien == 0 && sml_queued,
+            "PCM_STREAM");
+}
+
+/* Play a real stream to the end, and check the refill interrupt turned
+** itself off.
+**
+** This is the only test that reaches the ISR's exhaustion path: with the
+** small buffer above, the data runs out while priming, before AFLOW was
+** ever enabled. Here the buffer outlives the FIFO, so AFLOW is armed, the
+** interrupt refills, and eventually the last byte goes in.
+**
+** AFLOW cannot be acknowledged -- it clears only by refilling the FIFO --
+** so a refiller that finishes without disabling it in IEN storms forever
+** and the machine livelocks. Remove the `trb VERA_IEN` from psf_exhausted
+** and this run hangs rather than fails.
+**
+** Needs interrupts, so headless it skips, exactly like the raster tests.
+*/
+static void test_pcm_stream_exhaust(void)
+{
+    clock_t jiffy0 = clock();
+    unsigned long spin;
+
+    x16_pcm_rate(0);
+    x16_pcm_ctrl(X16_PCM_VOLUME(1));    /* quiet: this really does play */
+    x16_pcm_reset();
+
+    x16_pcm_stream_start((const void *)0x2000, 5120, 128);
+
+    for (spin = 0; spin < 200000UL && x16_pcm_stream_active(); ++spin) {
+    }
+
+    if (x16_pcm_stream_active()) {
+        x16_pcm_stream_stop();
+        if (clock() == jiffy0) {
+            t_skip("PCM_STREAM_EXHAUST");       /* no interrupts here at all */
+        } else {
+            t_check(0, "PCM_STREAM_EXHAUST");   /* the IRQ ran; refill did not */
+        }
+    } else {
+        t_check((VERA_IEN_REG & 0x08) == 0, "PCM_STREAM_EXHAUST");
+    }
+
+    x16_pcm_rate(0);
+    x16_pcm_reset();
+    x16_irq_remove();
+}
+
+/* A zero-length buffer must start nothing at all. */
+static void test_pcm_stream_empty(void)
+{
+    x16_pcm_rate(0);
+    x16_pcm_reset();
+    x16_pcm_stream_start((const void *)0x2000, 0, 0);
+
+    t_check(x16_pcm_stream_active() == 0 && (VERA_IEN_REG & 0x08) == 0,
+            "PCM_STREAM_EMPTY");
+
+    x16_pcm_reset();
+    x16_irq_remove();
+}
+
 /* ym_write must complete rather than time out on the busy flag. */
 static void test_ym_write(void)
 {
@@ -1036,6 +1522,115 @@ static void test_bank_to_mem(void)
     t_check(dst[0] == 0xDE && dst[1] == 0xAD &&
             dst[2] == 0xBE && dst[3] == 0xEF,
             "BANK_TO_MEM");
+}
+
+/* Banked -> banked, straddling a bank edge on BOTH sides. Four bytes
+** from (5,8190) land at (8,8190): two in each source bank, two in each
+** destination bank. A copy that forgot to roll either side would put the
+** last two bytes at offset 8192 of the same bank -- which is $C000, RAM
+** that is not even mapped.
+*/
+static void test_bank_copy_far(void)
+{
+    unsigned char before;
+
+    x16_bank_set(11);
+    before = x16_bank_get();
+
+    x16_bank_poke(5, 8190, 0x11);
+    x16_bank_poke(5, 8191, 0x22);
+    x16_bank_poke(6, 0, 0x33);
+    x16_bank_poke(6, 1, 0x44);
+
+    x16_bank_poke(8, 8190, 0x00);
+    x16_bank_poke(8, 8191, 0x00);
+    x16_bank_poke(9, 0, 0x00);
+    x16_bank_poke(9, 1, 0x00);
+
+    x16_bank_copy_far(5, 8190, 8, 8190, 4);
+
+    t_check(x16_bank_peek(8, 8190) == 0x11 &&
+            x16_bank_peek(8, 8191) == 0x22 &&
+            x16_bank_peek(9, 0) == 0x33 &&
+            x16_bank_peek(9, 1) == 0x44 &&
+            x16_bank_get() == before,           /* caller's bank restored */
+            "BANK_COPY_FAR");
+
+    x16_bank_set(1);
+}
+
+/* More than the 128-byte bounce buffer, so the loop runs several chunks. */
+static void test_bank_copy_far_long(void)
+{
+    unsigned int i;
+    unsigned char ok = 1;
+
+    for (i = 0; i < 200; ++i) {
+        x16_bank_poke(5, 100 + i, (unsigned char)(i ^ 0x5A));
+        x16_bank_poke(8, 300 + i, 0x00);
+    }
+    x16_bank_poke(8, 500, 0x00);        /* the one-past-the-end guard */
+
+    x16_bank_copy_far(5, 100, 8, 300, 200);
+
+    for (i = 0; i < 200; ++i) {
+        if (x16_bank_peek(8, 300 + i) != (unsigned char)(i ^ 0x5A)) ok = 0;
+    }
+    t_check(ok && x16_bank_peek(8, 500) == 0x00, "BANK_COPY_FAR_LONG");
+}
+
+/* ------------------------------------------------------------------ */
+/* bank allocator                                                      */
+/* ------------------------------------------------------------------ */
+
+static void test_bank_alloc(void)
+{
+    unsigned char a, b, c, d;
+
+    x16_bank_alloc_init(1, 3);
+    a = x16_bank_alloc();               /* lowest first */
+    b = x16_bank_alloc();
+    c = x16_bank_alloc();
+    d = x16_bank_alloc();               /* exhausted */
+
+    t_check(a == 1 && b == 2 && c == 3 && d == 0, "BANK_ALLOC");
+}
+
+static void test_bank_free(void)
+{
+    x16_bank_alloc_init(1, 3);
+    x16_bank_alloc();                   /* 1 */
+    x16_bank_alloc();                   /* 2 */
+    x16_bank_alloc();                   /* 3 */
+    x16_bank_free(2);
+
+    t_check(x16_bank_alloc() == 2 && x16_bank_alloc() == 0, "BANK_FREE");
+}
+
+static void test_bank_reserve(void)
+{
+    unsigned char first, again, after_free, outside;
+
+    x16_bank_alloc_init(4, 6);
+    first = x16_bank_reserve(5);        /* free -> claimed */
+    again = x16_bank_reserve(5);        /* already taken */
+    x16_bank_free(5);
+    after_free = x16_bank_reserve(5);
+    outside = x16_bank_reserve(9);      /* never in the pool */
+
+    t_check(first == 1 && again == 0 && after_free == 1 && outside == 0,
+            "BANK_RESERVE");
+}
+
+/* Before init, nothing is allocatable: a forgotten init must fail
+** cleanly rather than hand out bank 0, which is the KERNAL's.
+*/
+static void test_bank_alloc_uninit(void)
+{
+    x16_bank_alloc_init(1, 1);
+    x16_bank_alloc();                   /* drain it */
+
+    t_check(x16_bank_alloc() == 0, "BANK_ALLOC_UNINIT");
 }
 
 /* ------------------------------------------------------------------ */
@@ -1276,6 +1871,149 @@ static void test_f_cmp(void)
     }
     x16_f_from_s16(4);
     t_check(x16_f_cmp(fb) == 1, "F_CMP");
+}
+
+/* ------------------------------------------------------------------ */
+/* KERNAL block memory operations                                      */
+/* ------------------------------------------------------------------ */
+
+/* "X16LIB-DECOMPRESS-TEST!!" four times over, as a raw LZSA2 block --
+** the output of `lzsa -r -f2`. Written as hex, not a string literal,
+** so the ASCII charmap cannot touch it.
+*/
+static const unsigned char lzsa_packed[] = {
+    0x3f, 0xf4, 0x06, 0x58, 0x31, 0x36, 0x4c, 0x49, 0x42, 0x2d, 0x44, 0x45,
+    0x43, 0x4f, 0x4d, 0x50, 0x52, 0x45, 0x53, 0x53, 0x2d, 0x54, 0x45, 0x53,
+    0x54, 0x21, 0x21, 0xff, 0x30, 0xe7, 0xe8
+};
+static const unsigned char lzsa_phrase[24] = {
+    'X','1','6','L','I','B','-','D','E','C','O','M','P','R','E','S','S',
+    '-','T','E','S','T','!','!'
+};
+static unsigned char unpacked[97];
+
+static void test_mem_fill(void)
+{
+    static unsigned char buf[8];
+    unsigned char i, ok = 1;
+
+    for (i = 0; i < 8; ++i) {
+        buf[i] = 0x11;
+    }
+    x16_mem_fill(buf, 5, 0xC3);
+    x16_mem_fill(buf + 6, 0, 0x99);     /* a zero count fills nothing */
+
+    for (i = 0; i < 5; ++i) {
+        if (buf[i] != 0xC3) ok = 0;
+    }
+    t_check(ok && buf[5] == 0x11 && buf[6] == 0x11, "MEM_FILL");
+}
+
+/* The target does not increment when it is in $9F00-$9FFF, so a fill
+** through VERA_DATA0 paints VRAM at the data port's own increment.
+*/
+static void test_mem_fill_vram(void)
+{
+    vram_poison(TESTVRAM, 6, 0x00);
+
+    x16_vera_addr0(X16_INC_1, TESTVRAM);
+    x16_mem_fill(X16_VERA_DATA0, 4, 0x7E);
+
+    t_check(vram_all(TESTVRAM, 4, 0x7E) && vpeek(TESTVRAM + 4) == 0x00,
+            "MEM_FILL_VRAM");
+}
+
+static void test_mem_copy(void)
+{
+    static const unsigned char src[6] = { 1, 2, 3, 4, 5, 6 };
+    static unsigned char dst[8];
+    unsigned char i, ok = 1;
+
+    for (i = 0; i < 8; ++i) {
+        dst[i] = 0xEE;
+    }
+    x16_mem_copy(src, dst, 6);
+    x16_mem_copy(src, dst + 7, 0);      /* a zero count copies nothing */
+
+    for (i = 0; i < 6; ++i) {
+        if (dst[i] != i + 1) ok = 0;
+    }
+    t_check(ok && dst[6] == 0xEE && dst[7] == 0xEE, "MEM_COPY");
+}
+
+/* Upload to VRAM and download back, both through the non-incrementing
+** data-port address.
+*/
+static void test_mem_copy_vram(void)
+{
+    static const unsigned char src[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+    static unsigned char back[4];
+
+    vram_poison(TESTVRAM, 4, 0x00);
+    back[0] = back[1] = back[2] = back[3] = 0;
+
+    x16_vera_addr0(X16_INC_1, TESTVRAM);
+    x16_mem_copy(src, X16_VERA_DATA0, 4);       /* upload */
+
+    x16_vera_addr0(X16_INC_1, TESTVRAM);
+    x16_mem_copy(X16_VERA_DATA0, back, 4);      /* download */
+
+    t_check(vpeek(TESTVRAM) == 0xDE && vpeek(TESTVRAM + 3) == 0xEF &&
+            back[0] == 0xDE && back[3] == 0xEF,
+            "MEM_COPY_VRAM");
+}
+
+/* 0x29B1 over "123456789" is the published check value for
+** CRC-16/IBM-3740, so this pins the algorithm, not just our plumbing.
+*/
+static void test_mem_crc(void)
+{
+    static const unsigned char check[9] = { '1','2','3','4','5','6','7','8','9' };
+
+    t_check(x16_mem_crc(check, 9) == 0x29B1 &&
+            x16_mem_crc(check, 0) == 0xFFFF,    /* empty: the init value */
+            "MEM_CRC");
+}
+
+static void test_mem_decompress(void)
+{
+    unsigned char *end;
+    unsigned char i, r, ok = 1;
+
+    unpacked[96] = 0x77;                /* guard, one past the output */
+    end = x16_mem_decompress(lzsa_packed, unpacked);
+
+    if (end != unpacked + 96 || unpacked[96] != 0x77) {
+        t_check(0, "MEM_DECOMPRESS");
+        return;
+    }
+    for (r = 0; r < 4; ++r) {
+        for (i = 0; i < 24; ++i) {
+            if (unpacked[r * 24 + i] != lzsa_phrase[i]) ok = 0;
+        }
+    }
+    t_check(ok, "MEM_DECOMPRESS");
+}
+
+/* The flagship trick: unpack an asset straight into video memory, with
+** no staging buffer. VERA_DATA0 does not increment, so the data port's
+** own increment walks the output.
+*/
+static void test_mem_decompress_vram(void)
+{
+    unsigned char i, r, ok = 1;
+
+    vram_poison(TESTVRAM, 4, 0x00);
+
+    x16_vera_addr0(X16_INC_1, TESTVRAM);
+    x16_mem_decompress(lzsa_packed, X16_VERA_DATA0);
+
+    for (r = 0; r < 4 && ok; ++r) {
+        for (i = 0; i < 24; ++i) {
+            if (vpeek(TESTVRAM + r * 24 + i) != lzsa_phrase[i]) ok = 0;
+        }
+    }
+    t_check(ok, "MEM_DECOMPRESS_VRAM");
 }
 
 /* ------------------------------------------------------------------ */
@@ -1641,6 +2379,11 @@ int main(void)
         test_fx_accum_dirty();
         test_fx_fill();
         test_fx_clear();
+        test_fx_line();
+        test_fx_line_carry();
+        test_fx_line_axis();
+        test_fx_triangle();
+        test_fx_triangle_unsorted();
         test_fx_leaves_clean();
     } else {
         t_skip("FX_MULT");
@@ -1648,12 +2391,23 @@ int main(void)
         t_skip("FX_ACCUM_DIRTY");
         t_skip("FX_FILL");
         t_skip("FX_CLEAR");
+        t_skip("FX_LINE");
+        t_skip("FX_LINE_CARRY");
+        t_skip("FX_LINE_AXIS");
+        t_skip("FX_TRIANGLE");
+        t_skip("FX_TRIANGLE_UNSORTED");
         t_skip("FX_LEAVES_CLEAN");
     }
 
     test_irq_hook();
     test_irq_preserves_iflag();
+    test_irq_line_regs();
+    test_sprcol_regs();
+    test_sprcol_poll();
     test_vsync_counter();
+    test_irq_line_fires();
+    test_irq_line_at_scanline();
+    test_irq_zp_preserved();
 
     test_joy_get();
     test_joy_absent();
@@ -1664,6 +2418,9 @@ int main(void)
     test_psg_hz();
     test_psg_note_off();
     test_pcm_rate_clamp();
+    test_pcm_stream();
+    test_pcm_stream_empty();
+    test_pcm_stream_exhaust();
     test_ym_write();
 
     /* x16_ym_init() reports whether this machine has a YM2151 at all.
@@ -1678,6 +2435,13 @@ int main(void)
     test_bank_roundtrip();
     test_bank_boundary();
     test_bank_to_mem();
+    test_bank_copy_far();
+    test_bank_copy_far_long();
+
+    test_bank_alloc();
+    test_bank_free();
+    test_bank_reserve();
+    test_bank_alloc_uninit();
 
     test_fs_roundtrip();
     test_fs_load_null_end();
@@ -1693,6 +2457,14 @@ int main(void)
     test_f_str();
     test_f_from_str();
     test_f_cmp();
+
+    test_mem_fill();
+    test_mem_fill_vram();
+    test_mem_copy();
+    test_mem_copy_vram();
+    test_mem_crc();
+    test_mem_decompress();
+    test_mem_decompress_vram();
 
     test_abi_fill_argorder();
     test_abi_addr_bank();

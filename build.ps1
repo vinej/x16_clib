@@ -8,11 +8,14 @@
     .\build.ps1 -Run                              # ...and run it windowed
     .\build.ps1 -Source examples\bounce.c -Run
     .\build.ps1 -Test                             # headless regression suite
+    .\build.ps1 -Test -Windowed                   # ...with video, so VSYNC and
+                                                  # raster interrupts really fire
 #>
 param(
     [string]$Source = "examples\hello.c",
     [switch]$Run,
     [switch]$Test,
+    [switch]$Windowed,
     [int]$Scale = 2
 )
 
@@ -122,7 +125,14 @@ Write-Host "      $size bytes"
 
 # --- test ------------------------------------------------------------
 if ($Test) {
-    Write-Host "x16emu (headless testbench)"
+    # Headless -testbench runs no video, so VERA raises neither VSYNC nor a
+    # raster interrupt: the tests that need one skip themselves and say so.
+    # -Windowed opens a real display, at real speed, and those tests run.
+    if ($Windowed) {
+        Write-Host "x16emu (windowed: video, VSYNC and raster interrupts live)"
+    } else {
+        Write-Host "x16emu (headless testbench)"
+    }
 
     # x16emu -testbench only exits at stdin EOF, and it only reads stdin
     # once it has printed its own "RDY" prompt -- which it never does if
@@ -141,12 +151,20 @@ if ($Test) {
     if (-not (Test-Path $fsroot)) { New-Item -ItemType Directory -Path $fsroot | Out-Null }
     Get-ChildItem $fsroot -File | Remove-Item -Force
 
-    $emuArgs = @('-rom', $rom, '-fsroot', $fsroot, '-prg', $out,
-                 '-run', '-warp', '-echo', '-testbench')
+    # -echo works either way; it is what puts CHROUT on stdout. Windowed
+    # drops -testbench (which forces headless) and -warp (real 60 Hz, so
+    # a raster interrupt lands where the scanline counter says it should).
+    if ($Windowed) {
+        $emuArgs = @('-rom', $rom, '-fsroot', $fsroot, '-prg', $out,
+                     '-run', '-echo', '-scale', $Scale)
+    } else {
+        $emuArgs = @('-rom', $rom, '-fsroot', $fsroot, '-prg', $out,
+                     '-run', '-warp', '-echo', '-testbench')
+    }
     $proc = Start-Process -FilePath $emu -ArgumentList $emuArgs -NoNewWindow -PassThru `
                           -RedirectStandardInput $stdin -RedirectStandardOutput $stdout
 
-    $deadline = (Get-Date).AddSeconds(60)
+    $deadline = (Get-Date).AddSeconds(120)
     $text = ""
     while ($true) {
         Start-Sleep -Milliseconds 200
@@ -157,7 +175,7 @@ if ($Test) {
         if ($proc.HasExited) { break }
         if ((Get-Date) -gt $deadline) {
             if (-not $proc.HasExited) { $proc.Kill() }
-            Fail "emulator timed out after 60s -- no DONE line; the test program never finished"
+            Fail "emulator timed out after 120s -- no DONE line; the test program never finished"
         }
     }
     if (-not $proc.HasExited) { $proc.Kill() }

@@ -45,4 +45,37 @@ void __fastcall__ x16_fx_fill (unsigned char value, unsigned int count,
 
 void __fastcall__ x16_fx_clear (unsigned int count, unsigned long addr);
 
+/* ---------------------------------------------------------------------
+ * Hardware line and polygon drawing.
+ *
+ * VERA carries the Bresenham error itself: the CPU's whole job becomes
+ * one store per pixel. Both routines assume the 320x240x256 framebuffer
+ * that x16_gfx_init() selects, and NEITHER CLIPS -- keep every coordinate
+ * on screen.
+ * ------------------------------------------------------------------ */
+
+/* The same arguments and the same endpoints as x16_gfx_line(), drawn by
+** the hardware helper instead of a software Bresenham.
+*/
+void __fastcall__ x16_fx_line (unsigned int x0, unsigned char y0,
+                               unsigned int x1, unsigned char y1,
+                               unsigned char color);
+
+/* A vertex. The three bytes are copied straight onto the assembly's
+** operand block, so the field order is load-bearing. Do not reorder.
+*/
+typedef struct {
+    unsigned int  x;            /* 0-319 */
+    unsigned char y;            /* 0-239 */
+} x16_point;
+
+/* Filled triangle. The vertices may come in any order.
+**
+** The rasterisation is HALF-OPEN: the bottom row, at the largest y, is
+** not drawn. Two triangles sharing an edge therefore paint it once
+** between them, rather than twice.
+*/
+void __fastcall__ x16_fx_triangle (const x16_point *a, const x16_point *b,
+                                   const x16_point *c, unsigned char color);
+
 #endif /* X16_VERAFX_H */

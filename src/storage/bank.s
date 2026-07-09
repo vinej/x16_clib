@@ -11,9 +11,15 @@
 ; All routines here save and restore RAM_BANK, so they are safe to call
 ; without disturbing whatever bank the caller had mapped in.
 ;
-; cc65's BANK_RAM[] array in <cx16.h> gives raw access to the window at
-; $A000 once you have set RAM_BANK yourself. These add the bank save and
-; restore, the offset arithmetic, and the boundary-crossing copies.
+; The heavy lifting is the KERNAL's MEMORY_COPY ($FEE7), one bank-segment
+; per call, rather than a hand-rolled byte loop.
+;
+; cc65's BANK_RAM[] in <cx16.h> gives raw access to the window once you
+; have set RAM_BANK yourself. These add the save/restore, the offset
+; arithmetic, and the boundary crossing.
+;
+; The ACME original named its shared helpers `.segment` and `.advance`.
+; `.segment` is a ca65 directive, so the first is `seg_span` here.
 ; =====================================================================
 
         .include        "macros.inc"
@@ -27,9 +33,13 @@
         .export         _x16_bank_poke
         .export         _x16_mem_to_bank
         .export         _x16_bank_to_mem
+        .export         _x16_bank_copy_far
 
 BANK_WINDOW     = $A000
 BANK_WINDOW_END = $C000
+BANK_SIZE       = BANK_WINDOW_END - BANK_WINDOW    ; 8192
+
+BANK_BOUNCE_SIZE = 128
 
         .segment        "CODE"
 
@@ -111,6 +121,28 @@ _x16_bank_to_mem:
         sta     X16_P0                  ; bank
         jmp     bank_to_mem
 
+; ---------------------------------------------------------------------
+; void __fastcall__ x16_bank_copy_far(unsigned char src_bank,
+;                                     unsigned int src_offset,
+;                                     unsigned char dst_bank,
+;                                     unsigned int dst_offset,
+;                                     unsigned int count)
+; ---------------------------------------------------------------------
+_x16_bank_copy_far:
+        sta     X16_P6                  ; count lo (rightmost arg: A/X)
+        stx     X16_P7                  ; count hi
+        jsr     popax
+        sta     X16_P4                  ; dst offset
+        stx     X16_P5
+        jsr     popa
+        sta     X16_P3                  ; dst bank
+        jsr     popax
+        sta     X16_P1                  ; src offset
+        stx     X16_P2
+        jsr     popa
+        sta     X16_P0                  ; src bank
+        jmp     bank_copy_far
+
 ; =====================================================================
 ; Internal routines
 ; =====================================================================
@@ -175,8 +207,8 @@ window_ptr:
 ;        X16_P3/P4 = destination address
 ;        X16_P5/P6 = byte count
 ;
-; Both auto-advance: when the window pointer reaches $C000 it snaps back
-; to $A000 and RAM_BANK increments.
+; Both auto-advance: a run that hits the end of a bank continues at
+; offset 0 of the next.
 ; ---------------------------------------------------------------------
 mem_to_bank:
         lda     RAM_BANK
@@ -184,30 +216,39 @@ mem_to_bank:
         lda     X16_P2
         sta     RAM_BANK
 
-        lda     X16_P0                  ; T2/T3 = source
-        sta     X16_T2
-        lda     X16_P1
-        sta     X16_T3
-        lda     X16_P3                  ; T0/T1 = window pointer
-        clc
-        adc     #<BANK_WINDOW
+        lda     X16_P0                  ; T0/T1 = low-RAM side
         sta     X16_T0
-        lda     X16_P4
-        adc     #>BANK_WINDOW
+        lda     X16_P1
         sta     X16_T1
-        jsr     load_count
+        lda     X16_P3                  ; T2/T3 = offset within the window
+        sta     X16_T2
+        lda     X16_P4
+        sta     X16_T3
+        lda     X16_P5                  ; T4/T5 = remaining
+        sta     X16_T4
+        lda     X16_P6
+        sta     X16_T5
 
-@copy_out:
-        lda     X16_T4
-        ora     X16_T5
+@seg_out:
+        jsr     seg_span                ; T6/T7 = bytes until the bank edge
         beq     @out_done
-        ldy     #0
-        lda     (X16_T2),y
-        sta     (X16_T0),y
-        jsr     advance_src
-        jsr     advance_window
-        jsr     dec_count
-        bra     @copy_out
+        lda     X16_T0                  ; source: low RAM
+        sta     r0L
+        lda     X16_T1
+        sta     r0H
+        lda     X16_T2                  ; target: window + offset
+        sta     r1L
+        lda     X16_T3
+        clc
+        adc     #>BANK_WINDOW
+        sta     r1H
+        lda     X16_T6
+        sta     r2L
+        lda     X16_T7
+        sta     r2H
+        jsr     MEMORY_COPY
+        jsr     advance
+        bra     @seg_out
 @out_done:
         pla
         sta     RAM_BANK
@@ -219,69 +260,245 @@ bank_to_mem:
         lda     X16_P0
         sta     RAM_BANK
 
-        lda     X16_P3                  ; T2/T3 = destination
-        sta     X16_T2
-        lda     X16_P4
-        sta     X16_T3
-        lda     X16_P1                  ; T0/T1 = window pointer
-        clc
-        adc     #<BANK_WINDOW
+        lda     X16_P3                  ; T0/T1 = low-RAM side
         sta     X16_T0
-        lda     X16_P2
-        adc     #>BANK_WINDOW
+        lda     X16_P4
         sta     X16_T1
-        jsr     load_count
+        lda     X16_P1                  ; T2/T3 = offset within the window
+        sta     X16_T2
+        lda     X16_P2
+        sta     X16_T3
+        lda     X16_P5
+        sta     X16_T4
+        lda     X16_P6
+        sta     X16_T5
 
-@copy_in:
-        lda     X16_T4
-        ora     X16_T5
+@seg_in:
+        jsr     seg_span
         beq     @in_done
-        ldy     #0
-        lda     (X16_T0),y
-        sta     (X16_T2),y
-        jsr     advance_src
-        jsr     advance_window
-        jsr     dec_count
-        bra     @copy_in
+        lda     X16_T2                  ; source: window + offset
+        sta     r0L
+        lda     X16_T3
+        clc
+        adc     #>BANK_WINDOW
+        sta     r0H
+        lda     X16_T0                  ; target: low RAM
+        sta     r1L
+        lda     X16_T1
+        sta     r1H
+        lda     X16_T6
+        sta     r2L
+        lda     X16_T7
+        sta     r2H
+        jsr     MEMORY_COPY
+        jsr     advance
+        bra     @seg_in
 @in_done:
         pla
         sta     RAM_BANK
         rts
 
 ; --- shared helpers --------------------------------------------------
-load_count:
-        lda     X16_P5
+
+; T6/T7 = min(remaining, space left in this bank). Z set when nothing
+; remains.
+seg_span:
+        lda     X16_T4
+        ora     X16_T5
+        beq     seg_done                ; remaining == 0 (Z set for the caller)
+
+        sec                             ; space = $2000 - offset
+        lda     #<BANK_SIZE
+        sbc     X16_T2
+        sta     X16_T6
+        lda     #>BANK_SIZE
+        sbc     X16_T3
+        sta     X16_T7
+
+        lda     X16_T5                  ; remaining < space? then take remaining
+        cmp     X16_T7
+        bcc     seg_take_rem
+        bne     seg_have
+        lda     X16_T4
+        cmp     X16_T6
+        bcs     seg_have
+seg_take_rem:
+        lda     X16_T4
+        sta     X16_T6
+        lda     X16_T5
+        sta     X16_T7
+seg_have:
+        lda     #1                      ; Z clear: there is work to do
+seg_done:
+        rts
+
+; consume T6/T7 bytes: advance the low-RAM pointer and the window offset
+; (rolling into the next bank), shrink the remaining count.
+advance:
+        clc
+        lda     X16_T0
+        adc     X16_T6
+        sta     X16_T0
+        lda     X16_T1
+        adc     X16_T7
+        sta     X16_T1
+
+        clc
+        lda     X16_T2
+        adc     X16_T6
+        sta     X16_T2
+        lda     X16_T3
+        adc     X16_T7
+        sta     X16_T3
+        cmp     #>BANK_SIZE             ; offset reached $2000: next bank
+        bne     @count
+        stz     X16_T2
+        stz     X16_T3
+        inc     RAM_BANK
+@count:
+        sec
+        lda     X16_T4
+        sbc     X16_T6
         sta     X16_T4
-        lda     X16_P6
+        lda     X16_T5
+        sbc     X16_T7
         sta     X16_T5
         rts
 
-; T2/T3 is whichever side lives in low RAM.
-advance_src:
-        inc     X16_T2
-        bne     @done
-        inc     X16_T3
-@done:
+; ---------------------------------------------------------------------
+; bank_copy_far -- copy banked RAM to banked RAM
+;   in:  X16_P0    = source bank,      X16_P1/P2 = source offset
+;        X16_P3    = destination bank, X16_P4/P5 = destination offset
+;        X16_P6/P7 = byte count
+;
+; Only one bank fits in the $A000 window at a time, so this bounces
+; through a small low-RAM buffer, MEMORY_COPY on both legs. Both sides
+; auto-advance across bank boundaries. The parameter block is consumed.
+; ---------------------------------------------------------------------
+bank_copy_far:
+        lda     RAM_BANK
+        pha
+
+@far_loop:
+        lda     X16_P6
+        ora     X16_P7
+        bne     @far_more
+        jmp     @far_done               ; out of branch range from here
+@far_more:
+
+        ; chunk = min(count, bounce size, source bank space, dest space)
+        ldx     #BANK_BOUNCE_SIZE
+        lda     X16_P7
+        bne     @far_src_cap            ; count >= 256: the buffer is the cap
+        lda     X16_P6
+        cmp     #BANK_BOUNCE_SIZE
+        bcs     @far_src_cap
+        tax                             ; count < buffer: count is the cap
+@far_src_cap:
+        ; Space to the end of a bank only matters when the offset is in the
+        ; window's last page: below that, more than a full chunk remains.
+        sec
+        lda     #<BANK_SIZE
+        sbc     X16_P1
+        sta     X16_T0
+        lda     #>BANK_SIZE
+        sbc     X16_P2
+        bne     @far_dst_cap            ; >= 256 bytes left in the source bank
+        txa
+        cmp     X16_T0
+        bcc     @far_dst_cap
+        ldx     X16_T0
+@far_dst_cap:
+        sec
+        lda     #<BANK_SIZE
+        sbc     X16_P4
+        sta     X16_T0
+        lda     #>BANK_SIZE
+        sbc     X16_P5
+        bne     @far_go
+        txa
+        cmp     X16_T0
+        bcc     @far_go
+        ldx     X16_T0
+@far_go:
+        stx     X16_T7                  ; T7 = chunk (1..BANK_BOUNCE_SIZE)
+
+        lda     X16_P0                  ; leg 1: source bank -> bounce buffer
+        sta     RAM_BANK
+        lda     X16_P1
+        sta     r0L
+        lda     X16_P2
+        clc
+        adc     #>BANK_WINDOW
+        sta     r0H
+        lda     #<bounce
+        sta     r1L
+        lda     #>bounce
+        sta     r1H
+        stx     r2L
+        stz     r2H
+        jsr     MEMORY_COPY
+
+        lda     X16_P3                  ; leg 2: bounce buffer -> destination
+        sta     RAM_BANK
+        lda     #<bounce
+        sta     r0L
+        lda     #>bounce
+        sta     r0H
+        lda     X16_P4
+        sta     r1L
+        lda     X16_P5
+        clc
+        adc     #>BANK_WINDOW
+        sta     r1H
+        lda     X16_T7
+        sta     r2L
+        stz     r2H
+        jsr     MEMORY_COPY
+
+        clc                             ; advance the source (rolls at $2000)
+        lda     X16_P1
+        adc     X16_T7
+        sta     X16_P1
+        lda     X16_P2
+        adc     #0
+        sta     X16_P2
+        cmp     #>BANK_SIZE
+        bne     @far_adv_dst
+        stz     X16_P1
+        stz     X16_P2
+        inc     X16_P0
+@far_adv_dst:
+        clc
+        lda     X16_P4
+        adc     X16_T7
+        sta     X16_P4
+        lda     X16_P5
+        adc     #0
+        sta     X16_P5
+        cmp     #>BANK_SIZE
+        bne     @far_count
+        stz     X16_P4
+        stz     X16_P5
+        inc     X16_P3
+@far_count:
+        sec
+        lda     X16_P6
+        sbc     X16_T7
+        sta     X16_P6
+        lda     X16_P7
+        sbc     #0
+        sta     X16_P7
+        jmp     @far_loop
+
+@far_done:
+        pla
+        sta     RAM_BANK
         rts
 
-; T0/T1 walks the $A000 window and rolls into the next bank at $C000.
-advance_window:
-        inc     X16_T0
-        bne     @done
-        inc     X16_T1
-        lda     X16_T1
-        cmp     #>BANK_WINDOW_END
-        bne     @done
-        lda     #>BANK_WINDOW
-        sta     X16_T1
-        inc     RAM_BANK
-@done:
-        rts
+; The bounce buffer must live in low RAM, never in the banked window.
+; cc65's cx16.cfg puts BSS between the program and the C stack, so it
+; always does.
+        .segment        "BSS"
 
-dec_count:
-        lda     X16_T4
-        bne     @low
-        dec     X16_T5
-@low:
-        dec     X16_T4
-        rts
+bounce: .res    BANK_BOUNCE_SIZE

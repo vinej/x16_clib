@@ -48,13 +48,14 @@
 #include <x16/tile.h>           /* tilemap cells, layer config, scroll */
 #include <x16/sprite.h>         /* 128 hardware sprites */
 #include <x16/bitmap.h>         /* 320x240x256 drawing */
-#include <x16/verafx.h>         /* hardware multiply, fast fills */
+#include <x16/verafx.h>         /* hardware multiply, fills, lines, triangles */
 #include <x16/psg.h>            /* 16-voice PSG */
 #include <x16/ym.h>             /* YM2151 FM */
-#include <x16/pcm.h>            /* PCM FIFO */
+#include <x16/pcm.h>            /* PCM FIFO, and AFLOW streaming */
 #include <x16/input.h>          /* joystick, mouse, keyboard */
-#include <x16/irq.h>            /* VSYNC frame counter */
-#include <x16/bank.h>           /* banked RAM */
+#include <x16/irq.h>            /* VSYNC, raster and collision interrupts */
+#include <x16/bank.h>           /* banked RAM, and a whole-bank allocator */
+#include <x16/mem.h>            /* KERNAL block ops, incl. LZSA2 depacking */
 #include <x16/load.h>           /* load and save, including into VRAM */
 #include <x16/fixed.h>          /* 8.8 fixed point, 16x16 multiply */
 #include <x16/collide.h>        /* bounding-box overlap */
