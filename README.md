@@ -187,6 +187,10 @@ suites assert against r49 behaviour.
 Swap `build_ca65.ps1` for `build_llvm.ps1` to do the same with llvm-mos;
 the examples build unchanged under both.
 
+For a function-by-function guide to the whole API -- every routine, its
+parameters, and a small example of each -- see
+[tutorial/userguide.md](tutorial/userguide.md).
+
 `-Run` runs the emulator **windowed**. `-Test` is headless and raises no
 VSYNC interrupt, so anything calling `x16_vsync_wait()` would hang there.
 
