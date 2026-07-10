@@ -44,6 +44,9 @@
         .export         _x16_fx_clear
         .export         _x16_fx_line
         .export         _x16_fx_triangle
+        .export         _x16_fx_copy
+        .export         _x16_fx_transp_on
+        .export         _x16_fx_transp_off
 
         .segment        "CODE"
 
@@ -104,6 +107,51 @@ _x16_fx_clear:
         jsr     fill_marshal
         lda     #0
         jmp     fx_fill
+
+; ---------------------------------------------------------------------
+; void __fastcall__ x16_fx_copy(unsigned long src, unsigned long dst,
+;                               unsigned int count)
+;
+; cc65 has no 32-bit stack pop, so each `unsigned long` argument comes
+; off as two popax calls: low word, then high word. Arguments were pushed
+; left to right, so `dst` -- the last one on the stack -- is popped first.
+; ---------------------------------------------------------------------
+_x16_fx_copy:
+        sta     X16_P6                  ; count lo (rightmost arg: A/X)
+        stx     X16_P7                  ; count hi
+
+        jsr     popax                   ; dst bits 0-15
+        sta     X16_P3
+        stx     X16_P4
+        jsr     popax                   ; dst bits 16-31; only bit 16 exists
+        sta     X16_P5
+
+        jsr     popax                   ; src bits 0-15
+        sta     X16_P0
+        stx     X16_P1
+        jsr     popax                   ; src bits 16-31
+        sta     X16_P2
+
+        jmp     fx_copy
+
+; ---------------------------------------------------------------------
+; void x16_fx_transp_on(void) / void x16_fx_transp_off(void)
+; ---------------------------------------------------------------------
+_x16_fx_transp_on:
+        vera_dcsel 2
+        lda     VERA_FX_CTRL
+        ora     #VERA_FX_TRANSPARENT
+        sta     VERA_FX_CTRL
+        vera_dcsel 0
+        rts
+
+_x16_fx_transp_off:
+        vera_dcsel 2
+        lda     VERA_FX_CTRL
+        and     #($FF - VERA_FX_TRANSPARENT)
+        sta     VERA_FX_CTRL
+        vera_dcsel 0
+        rts
 
 ; ---------------------------------------------------------------------
 ; void __fastcall__ x16_fx_line(unsigned int x0, unsigned char y0,
@@ -330,6 +378,100 @@ fx_fill:
         dex
         bne     @rest
 @done:
+        rts
+
+; ---------------------------------------------------------------------
+; fx_copy -- VRAM to VRAM through the 32-bit cache (~4x a byte loop)
+;   in:  X16_P0/P1/P2 = source address (17-bit)
+;        X16_P3/P4/P5 = destination address, 4-BYTE ALIGNED
+;        X16_P6/P7    = byte count
+;
+; With Cache Fill enabled, each DATA1 read latches a byte into the cache;
+; after four, one DATA0 write (mask 0) flushes all four to the aligned
+; destination. The 0-3 leftover bytes are copied singly with FX off. The
+; source needs no alignment.
+; ---------------------------------------------------------------------
+fx_copy:
+        vera_dcsel 2
+        stz     VERA_FX_CTRL            ; mode 0 while the ports are aimed
+        stz     VERA_FX_MULT            ; multiplier off, cache index to 0
+
+        vera_addrsel 1                  ; port 1 reads the source
+        lda     X16_P0
+        sta     VERA_ADDR_L
+        lda     X16_P1
+        sta     VERA_ADDR_M
+        lda     X16_P2
+        and     #VERA_ADDR_H_BANK
+        ora     #(VERA_INC_1 << 4)
+        sta     VERA_ADDR_H
+        vera_addrsel 0                  ; port 0 writes quads
+        lda     X16_P3
+        sta     VERA_ADDR_L
+        lda     X16_P4
+        sta     VERA_ADDR_M
+        lda     X16_P5
+        and     #VERA_ADDR_H_BANK
+        ora     #(VERA_INC_4 << 4)
+        sta     VERA_ADDR_H
+
+        vera_dcsel 2
+        lda     #(VERA_FX_CACHE_FILL | VERA_FX_CACHE_WRITE)
+        sta     VERA_FX_CTRL
+
+        ; quads = count >> 2, remainder = count & 3
+        lda     X16_P6
+        and     #$03
+        sta     X16_T3
+        lda     X16_P7
+        sta     X16_T2
+        lda     X16_P6
+        sta     X16_T1
+        lsr     X16_T2
+        ror     X16_T1
+        lsr     X16_T2
+        ror     X16_T1
+
+        lda     X16_T1
+        ora     X16_T2
+        beq     @tail
+
+        ldx     X16_T1
+        ldy     X16_T2
+        txa
+        beq     @full
+        iny
+@full:
+@quad:
+        lda     VERA_DATA1              ; four reads fill the cache...
+        lda     VERA_DATA1
+        lda     VERA_DATA1
+        lda     VERA_DATA1
+        stz     VERA_DATA0              ; ...one write flushes it (mask 0)
+        dex
+        bne     @quad
+        dey
+        bne     @quad
+
+@tail:
+        vera_dcsel 2
+        stz     VERA_FX_CTRL            ; leftovers are plain byte copies
+        vera_dcsel 0
+
+        lda     X16_T3
+        beq     @cdone
+        lda     VERA_ADDR_H             ; port 0 sits just past the quads:
+        and     #$0F                    ; step it by 1 for the tail
+        ora     #(VERA_INC_1 << 4)
+        sta     VERA_ADDR_H
+        ldx     X16_T3
+@crest:
+        lda     VERA_DATA1
+        sta     VERA_DATA0
+        dex
+        bne     @crest
+@cdone:
+        vera_addrsel 0
         rts
 
 ; =====================================================================

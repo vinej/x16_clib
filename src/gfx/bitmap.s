@@ -32,6 +32,11 @@
         .export         _x16_gfx_rect
         .export         _x16_gfx_frame
         .export         _x16_gfx_line
+        .export         _x16_gfx_circle
+        .export         _x16_gfx_disc
+        .export         _x16_gfx_char
+        .export         _x16_gfx_text
+        .export         _x16_gfx_flood
 
 GFX_WIDTH  = 320
 GFX_HEIGHT = 240
@@ -170,6 +175,89 @@ _x16_gfx_line:
         sta     X16_P0                  ; x0
         stx     X16_P1
         jmp     gfx_line
+
+; ---------------------------------------------------------------------
+; void __fastcall__ x16_gfx_circle(unsigned int cx, unsigned char cy,
+;                                  unsigned char r, unsigned char color)
+; void __fastcall__ x16_gfx_disc(...same...)
+;
+; Both plot through gfx_pset / gfx_hline, so unlike the line and rect
+; primitives they clip at every screen edge for free.
+; ---------------------------------------------------------------------
+_x16_gfx_circle:
+        jsr     circle_marshal
+        jmp     gfx_circle
+
+_x16_gfx_disc:
+        jsr     circle_marshal
+        jmp     gfx_disc
+
+circle_marshal:
+        sta     X16_P3                  ; color (rightmost arg, in A)
+        jsr     popa
+        sta     X16_P4                  ; radius
+        jsr     popa
+        sta     X16_P2                  ; cy
+        jsr     popax
+        sta     X16_P0                  ; cx
+        stx     X16_P1
+        rts
+
+; ---------------------------------------------------------------------
+; void __fastcall__ x16_gfx_char(unsigned int x, unsigned char y,
+;                                unsigned char color, unsigned char code)
+;   `code` is a SCREEN code, not PETSCII.
+; ---------------------------------------------------------------------
+_x16_gfx_char:
+        pha                             ; screen code (rightmost arg, in A)
+        jsr     popa
+        sta     X16_P3                  ; color
+        jsr     popa
+        sta     X16_P2                  ; y
+        jsr     popax
+        sta     X16_P0                  ; x
+        stx     X16_P1
+        pla
+        jmp     gfx_char
+
+; ---------------------------------------------------------------------
+; void __fastcall__ x16_gfx_text(unsigned int x, unsigned char y,
+;                                unsigned char color, const char *s)
+;   The pointer already arrives as A = low, X = high.
+; ---------------------------------------------------------------------
+_x16_gfx_text:
+        pha                             ; string lo
+        phx                             ; string hi
+        jsr     popa
+        sta     X16_P3                  ; color
+        jsr     popa
+        sta     X16_P2                  ; y
+        jsr     popax
+        sta     X16_P0                  ; x
+        stx     X16_P1
+        plx
+        pla
+        jmp     gfx_text
+
+; ---------------------------------------------------------------------
+; unsigned char __fastcall__ x16_gfx_flood(unsigned int x, unsigned char y,
+;                                          unsigned char color)
+;   1 if the region was filled completely; 0 if the span stack overflowed
+;   and the fill is incomplete.
+; ---------------------------------------------------------------------
+_x16_gfx_flood:
+        sta     X16_P3                  ; color
+        jsr     popa
+        sta     X16_P2                  ; y
+        jsr     popax
+        sta     X16_P0                  ; x
+        stx     X16_P1
+        jsr     gfx_flood               ; carry set = incomplete
+        lda     #0
+        ldx     #0
+        rol     a
+        eor     #1                      ; report success, not overflow
+        rts
 
 ; =====================================================================
 ; Internal routines
@@ -562,10 +650,866 @@ plot:
         jmp     gfx_pset
 
 ; ---------------------------------------------------------------------
+; gfx_circle -- midpoint circle outline
+;   in:  X16_P0/P1 = centre x, X16_P2 = centre y, X16_P3 = colour,
+;        X16_P4 = radius (0-120)
+;
+; Plots through gfx_pset, so the circle clips at every screen edge for
+; free. Preserves X16_P0..P4.
+; ---------------------------------------------------------------------
+gfx_circle:
+        jsr     c_setup
+        lda     gc_r
+        bne     @go
+        lda     gc_cx                   ; radius 0: a single point
+        sta     X16_P0
+        lda     gc_cx+1
+        sta     X16_P1
+        lda     gc_cy
+        sta     X16_P2
+        jsr     gfx_pset
+        jmp     c_restore
+@go:
+        ; x = r, y = 0, err = 1 - r
+        lda     gc_r
+        sta     gc_x
+        stz     gc_y
+        sec
+        lda     #1
+        sbc     gc_r
+        sta     gc_err
+        lda     #0
+        sbc     #0
+        sta     gc_err+1
+
+@loop:
+        lda     gc_x                    ; the 8 octant points
+        ldy     gc_y
+        jsr     c_plot4
+        lda     gc_y
+        ldy     gc_x
+        jsr     c_plot4
+
+        inc     gc_y
+        lda     gc_err+1                ; err < 0 ?
+        bmi     @err_neg
+        dec     gc_x                    ; no: also step x inward,
+        sec                             ; err += 2*(y - x) + 1
+        lda     gc_y
+        sbc     gc_x
+        sta     X16_T0
+        lda     #0
+        sbc     #0
+        sta     X16_T1
+        asl     X16_T0
+        rol     X16_T1
+        inc     X16_T0
+        bne     @add_err
+        inc     X16_T1
+@add_err:
+        clc
+        lda     gc_err
+        adc     X16_T0
+        sta     gc_err
+        lda     gc_err+1
+        adc     X16_T1
+        sta     gc_err+1
+        bra     @cont
+@err_neg:
+        lda     gc_y                    ; err += 2*y + 1
+        stz     X16_T1
+        asl     a
+        rol     X16_T1
+        inc     a
+        bne     @add2
+        inc     X16_T1
+@add2:
+        clc
+        adc     gc_err
+        sta     gc_err
+        lda     gc_err+1
+        adc     X16_T1
+        sta     gc_err+1
+@cont:
+        lda     gc_y
+        cmp     gc_x
+        bcc     @loop
+        beq     @loop_last
+        jmp     c_restore
+@loop_last:
+        lda     gc_x                    ; the final x == y diagonal points
+        ldy     gc_y
+        jsr     c_plot4
+        jmp     c_restore
+
+; ---------------------------------------------------------------------
+; gfx_disc -- filled circle, same arguments as gfx_circle.
+; Draws horizontal spans clamped to the screen, so it clips too.
+; ---------------------------------------------------------------------
+gfx_disc:
+        jsr     c_setup
+        lda     gc_r
+        sta     gc_x
+        stz     gc_y
+        sec
+        lda     #1
+        sbc     gc_r
+        sta     gc_err
+        lda     #0
+        sbc     #0
+        sta     gc_err+1
+
+@dloop:
+        lda     gc_x                    ; spans at cy+/-y, half-width x
+        ldy     gc_y
+        jsr     c_span2
+        lda     gc_y                    ; spans at cy+/-x, half-width y
+        ldy     gc_x
+        jsr     c_span2
+
+        inc     gc_y
+        lda     gc_err+1
+        bmi     @derr_neg
+        dec     gc_x
+        sec
+        lda     gc_y
+        sbc     gc_x
+        sta     X16_T0
+        lda     #0
+        sbc     #0
+        sta     X16_T1
+        asl     X16_T0
+        rol     X16_T1
+        inc     X16_T0
+        bne     @dadd
+        inc     X16_T1
+@dadd:
+        clc
+        lda     gc_err
+        adc     X16_T0
+        sta     gc_err
+        lda     gc_err+1
+        adc     X16_T1
+        sta     gc_err+1
+        bra     @dcont
+@derr_neg:
+        lda     gc_y
+        stz     X16_T1
+        asl     a
+        rol     X16_T1
+        inc     a
+        bne     @dadd2
+        inc     X16_T1
+@dadd2:
+        clc
+        adc     gc_err
+        sta     gc_err
+        lda     gc_err+1
+        adc     X16_T1
+        sta     gc_err+1
+@dcont:
+        lda     gc_y
+        cmp     gc_x
+        bcc     @dloop
+        beq     @dloop_last
+        jmp     c_restore
+@dloop_last:
+        lda     gc_x
+        ldy     gc_y
+        jsr     c_span2
+        jmp     c_restore
+
+; --- circle plumbing --------------------------------------------------
+
+c_setup:                                ; park the caller's block
+        lda     X16_P0
+        sta     gc_cx
+        sta     gc_sav
+        lda     X16_P1
+        sta     gc_cx+1
+        sta     gc_sav+1
+        lda     X16_P2
+        sta     gc_cy
+        sta     gc_sav+2
+        lda     X16_P4
+        sta     gc_r
+        sta     gc_sav+3
+        rts
+
+c_restore:                              ; put the caller's block back
+        lda     gc_sav
+        sta     X16_P0
+        lda     gc_sav+1
+        sta     X16_P1
+        lda     gc_sav+2
+        sta     X16_P2
+        lda     gc_sav+3
+        sta     X16_P4
+        rts
+
+; plot (cx +/- A, cy +/- Y): the four reflections of one octant point
+c_plot4:
+        sta     gc_ox
+        sty     gc_oy
+        jsr     c_ypl
+        bcs     @p4_low
+        jsr     c_xpl
+        jsr     gfx_pset
+        jsr     c_xmi
+        jsr     gfx_pset
+@p4_low:
+        jsr     c_ymi
+        bcs     @p4_done
+        jsr     c_xpl
+        jsr     gfx_pset
+        jsr     c_xmi
+        jsr     gfx_pset
+@p4_done:
+        rts
+
+; two clamped horizontal spans: rows cy +/- Y, half-width A
+c_span2:
+        sta     gc_ox
+        sty     gc_oy
+        jsr     c_ypl
+        bcs     @s2_lower
+        jsr     c_hspan
+@s2_lower:
+        lda     gc_oy
+        beq     @s2_done                ; same row twice: skip the mirror
+        jsr     c_ymi
+        bcs     @s2_done
+        jsr     c_hspan
+@s2_done:
+        rts
+
+; X16_P2 already holds the row: draw cx-gc_ox .. cx+gc_ox clamped
+c_hspan:
+        sec                             ; left = cx - ox, clamped to 0
+        lda     gc_cx
+        sbc     gc_ox
+        sta     X16_T0
+        lda     gc_cx+1
+        sbc     #0
+        sta     X16_T1
+        bpl     @left_ok
+        stz     X16_T0
+        stz     X16_T1
+@left_ok:
+        clc                             ; right = cx + ox, clamped to 319
+        lda     gc_cx
+        adc     gc_ox
+        sta     X16_T2
+        lda     gc_cx+1
+        adc     #0
+        sta     X16_T3
+        lda     X16_T3                  ; right >= 320 ?
+        cmp     #>320
+        bcc     @right_ok
+        bne     @clamp_r
+        lda     X16_T2
+        cmp     #<320
+        bcc     @right_ok
+@clamp_r:
+        lda     #<319
+        sta     X16_T2
+        lda     #>319
+        sta     X16_T3
+@right_ok:
+        sec                             ; entirely off screen?
+        lda     X16_T2
+        sbc     X16_T0
+        sta     X16_T4
+        lda     X16_T3
+        sbc     X16_T1
+        sta     X16_T5
+        bmi     @off
+        inc     X16_T4                  ; length = right - left + 1
+        bne     @len_ok
+        inc     X16_T5
+@len_ok:
+        lda     X16_T0
+        sta     X16_P0
+        lda     X16_T1
+        sta     X16_P1
+        lda     X16_T4
+        sta     X16_P4
+        lda     X16_T5
+        sta     X16_P5
+        jmp     gfx_hline
+@off:
+        rts
+
+; X16_P2 = cy + gc_oy; carry set if the row is off screen.
+c_ypl:
+        clc
+        lda     gc_cy
+        adc     gc_oy
+        bcs     @ypl_bad                ; past 255
+        cmp     #GFX_HEIGHT
+        bcs     @ypl_bad                ; 240..255
+        sta     X16_P2
+        clc
+        rts
+@ypl_bad:
+        sec
+        rts
+
+; X16_P2 = cy - gc_oy; carry set if above the screen.
+c_ymi:
+        sec
+        lda     gc_cy
+        sbc     gc_oy
+        bcc     @ymi_bad
+        sta     X16_P2
+        clc
+        rts
+@ymi_bad:
+        sec
+        rts
+
+c_xpl:                                  ; X16_P0/P1 = cx + gc_ox
+        clc
+        lda     gc_cx
+        adc     gc_ox
+        sta     X16_P0
+        lda     gc_cx+1
+        adc     #0
+        sta     X16_P1
+        rts
+
+c_xmi:                                  ; X16_P0/P1 = cx - gc_ox
+        sec
+        lda     gc_cx
+        sbc     gc_ox
+        sta     X16_P0
+        lda     gc_cx+1
+        sbc     #0
+        sta     X16_P1
+        rts
+
+; ---------------------------------------------------------------------
+; gfx_char -- draw one glyph from the VRAM charset into the bitmap
+;   in:  A = screen code (0-255)
+;        X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour
+;
+; Reads the 8-byte 1bpp glyph from the charset the KERNAL keeps at VRAM
+; $1F000; set bits become colour pixels through gfx_pset (so text clips),
+; clear bits stay transparent. Preserves X16_P0..P3.
+; ---------------------------------------------------------------------
+gfx_char:
+        ; glyph address = VRAM_CHARSET + code * 8  (17-bit)
+        sta     gt_code
+        stz     gt_hi
+        asl     a
+        rol     gt_hi
+        asl     a
+        rol     gt_hi
+        asl     a
+        rol     gt_hi                   ; gt_hi:A = code * 8
+        pha
+        vera_addrsel 1
+        pla
+        sta     VERA_ADDR_L
+        lda     gt_hi
+        clc
+        adc     #<(VRAM_CHARSET >> 8)
+        sta     VERA_ADDR_M
+        lda     #(VERA_ADDR_H_BANK | (VERA_INC_1 << 4))  ; $1F000 is in bank 1
+        sta     VERA_ADDR_H
+        ldx     #0
+@fetch:
+        lda     VERA_DATA1
+        sta     gt_glyph,x
+        inx
+        cpx     #8
+        bne     @fetch
+        vera_addrsel 0
+
+        lda     X16_P0                  ; park the caller's position
+        sta     gt_bx
+        lda     X16_P1
+        sta     gt_bx+1
+        lda     X16_P2
+        sta     gt_by
+
+        stz     gt_row
+@rows:
+        ldx     gt_row
+        lda     gt_glyph,x
+        sta     gt_bits
+        beq     @next_row               ; a blank row: nothing to plot
+        stz     gt_col
+@cols:
+        asl     gt_bits                 ; leftmost pixel first
+        bcc     @next_col
+        clc
+        lda     gt_bx
+        adc     gt_col
+        sta     X16_P0
+        lda     gt_bx+1
+        adc     #0
+        sta     X16_P1
+        clc
+        lda     gt_by
+        adc     gt_row
+        bcs     @next_col               ; wrapped past 255: off screen
+        sta     X16_P2
+        jsr     gfx_pset
+@next_col:
+        inc     gt_col
+        lda     gt_col
+        cmp     #8
+        bne     @cols
+@next_row:
+        inc     gt_row
+        lda     gt_row
+        cmp     #8
+        bne     @rows
+
+        lda     gt_bx                   ; restore the caller's block
+        sta     X16_P0
+        lda     gt_bx+1
+        sta     X16_P1
+        lda     gt_by
+        sta     X16_P2
+        rts
+
+; ---------------------------------------------------------------------
+; gfx_text -- a NUL-terminated string, 8 pixels per character
+;   in:  A = string low, X = string high; X16_P0..P3 as gfx_char.
+;   ASCII letters are converted to screen codes ('A'-'Z' work as
+;   expected); X16_P0/P1 are left one past the final character.
+;
+; gt_lda must be a plain label so the pointer can live in its own operand
+; -- and in ca65 a plain label ends the enclosing cheap-local scope, so
+; this loop's labels are plain too. ACME's zone-local `.gt_lda` did not.
+; ---------------------------------------------------------------------
+gfx_text:
+        sta     gt_lda+1                ; the string pointer lives in the lda's
+        stx     gt_lda+2                ; own operand (no zero page needed)
+gt_loop:
+gt_lda:
+        lda     $FFFF                   ; operand patched above and stepped below
+        beq     gt_done
+        ; ASCII -> screen code: bit 6 set means the letters/at-sign block
+        bit     #%01000000
+        beq     gt_code_ok
+        and     #$1F
+gt_code_ok:
+        jsr     gfx_char
+        clc                             ; advance the pen 8 pixels
+        lda     X16_P0
+        adc     #8
+        sta     X16_P0
+        lda     X16_P1
+        adc     #0
+        sta     X16_P1
+        inc     gt_lda+1
+        bne     gt_loop
+        inc     gt_lda+2
+        bra     gt_loop
+gt_done:
+        rts
+
+; ---------------------------------------------------------------------
+; gfx_flood -- scanline flood fill
+;   in:  X16_P0/P1 = seed x, X16_P2 = seed y, X16_P3 = fill colour
+;   out: carry clear = filled completely; carry set = the span stack
+;        overflowed and the fill is INCOMPLETE (pathological shapes: the
+;        stack holds FF_DEPTH pending spans)
+;
+; Fills the 4-connected region of the seed's colour. Filling with the
+; colour already under the seed is a no-op. Spans are painted with
+; gfx_hline; both VERA ports get repointed freely.
+; ---------------------------------------------------------------------
+FF_DEPTH = 170
+
+gfx_flood:
+        lda     X16_P2                  ; a seed off screen fills nothing
+        cmp     #GFX_HEIGHT
+        bcs     @bail
+        lda     X16_P1
+        beq     @seed_ok
+        cmp     #1
+        bne     @bail
+        lda     X16_P0
+        cmp     #<GFX_WIDTH
+        bcc     @seed_ok
+@bail:
+        clc
+        rts
+@seed_ok:
+        lda     X16_P3
+        sta     ff_col
+        lda     X16_P0
+        sta     ff_x
+        lda     X16_P1
+        sta     ff_x+1
+        lda     X16_P2
+        sta     ff_y
+
+        jsr     f_rd                    ; the colour being replaced
+        sta     ff_tgt
+        cmp     ff_col
+        beq     @bail                   ; already the fill colour: no-op
+
+        stz     ff_sp
+        stz     ff_ovf
+        lda     ff_x
+        sta     ff_px
+        lda     ff_x+1
+        sta     ff_px+1
+        lda     ff_y
+        sta     ff_ny
+        jsr     f_push
+
+@main:
+        lda     ff_sp
+        bne     @have_work
+        jmp     @finish
+@have_work:
+        jsr     f_pop                   ; -> ff_x / ff_y
+        jsr     f_rd
+        cmp     ff_tgt
+        bne     @main                   ; painted over since it was queued
+
+        ; grow the span left: xl = leftmost target pixel
+        lda     ff_x
+        sta     ff_xl
+        lda     ff_x+1
+        sta     ff_xl+1
+        lda     ff_xl
+        ora     ff_xl+1
+        beq     @left_done
+        sec                             ; walk from xl-1 downwards
+        lda     ff_xl
+        sbc     #1
+        sta     ff_ax
+        lda     ff_xl+1
+        sbc     #0
+        sta     ff_ax+1
+        lda     ff_y
+        sta     ff_ay
+        lda     #VERA_ADDR_H_DECR
+        jsr     f_addr1
+@left_scan:
+        lda     VERA_DATA1
+        cmp     ff_tgt
+        bne     @left_done
+        lda     ff_xl
+        bne     @left_dec
+        dec     ff_xl+1
+@left_dec:
+        dec     ff_xl
+        lda     ff_xl
+        ora     ff_xl+1
+        bne     @left_scan
+@left_done:
+
+        ; grow the span right: xr = rightmost target pixel
+        lda     ff_x
+        sta     ff_xr
+        lda     ff_x+1
+        sta     ff_xr+1
+        jsr     f_at_right
+        bcs     @right_done
+        clc                             ; walk from xr+1 upwards
+        lda     ff_xr
+        adc     #1
+        sta     ff_ax
+        lda     ff_xr+1
+        adc     #0
+        sta     ff_ax+1
+        lda     ff_y
+        sta     ff_ay
+        lda     #0
+        jsr     f_addr1
+@right_scan:
+        lda     VERA_DATA1
+        cmp     ff_tgt
+        bne     @right_done
+        inc     ff_xr
+        bne     @right_chk
+        inc     ff_xr+1
+@right_chk:
+        jsr     f_at_right
+        bcc     @right_scan
+@right_done:
+
+        ; paint it
+        lda     ff_xl
+        sta     X16_P0
+        lda     ff_xl+1
+        sta     X16_P1
+        lda     ff_y
+        sta     X16_P2
+        lda     ff_col
+        sta     X16_P3
+        sec                             ; length = xr - xl + 1
+        lda     ff_xr
+        sbc     ff_xl
+        sta     X16_P4
+        lda     ff_xr+1
+        sbc     ff_xl+1
+        sta     X16_P5
+        inc     X16_P4
+        bne     @len_ok
+        inc     X16_P5
+@len_ok:
+        jsr     gfx_hline
+
+        ; queue fresh spans in the rows above and below
+        lda     ff_y
+        beq     @no_up
+        dec     a
+        sta     ff_ny
+        jsr     f_scanrow
+@no_up:
+        lda     ff_y
+        cmp     #(GFX_HEIGHT - 1)
+        bcs     @no_down
+        inc     a
+        sta     ff_ny
+        jsr     f_scanrow
+@no_down:
+        jmp     @main
+
+@finish:
+        vera_addrsel 0
+        lda     ff_ovf                  ; carry = "the fill may be incomplete"
+        lsr     a
+        rts
+
+; carry set when ff_xr is the last column (319)
+f_at_right:
+        lda     ff_xr+1
+        cmp     #>(GFX_WIDTH - 1)
+        bne     @below
+        lda     ff_xr
+        cmp     #<(GFX_WIDTH - 1)
+        bcs     @at
+@below:
+        clc
+        rts
+@at:
+        sec
+        rts
+
+; scan row ff_ny across columns ff_xl..ff_xr, pushing the start of every
+; run of target-coloured pixels
+f_scanrow:
+        lda     ff_xl
+        sta     ff_ax
+        sta     ff_px
+        lda     ff_xl+1
+        sta     ff_ax+1
+        sta     ff_px+1
+        lda     ff_ny
+        sta     ff_ay
+        lda     #0
+        jsr     f_addr1
+        sec                             ; count = xr - xl + 1
+        lda     ff_xr
+        sbc     ff_xl
+        sta     ff_cnt
+        lda     ff_xr+1
+        sbc     ff_xl+1
+        sta     ff_cnt+1
+        inc     ff_cnt
+        bne     @counted
+        inc     ff_cnt+1
+@counted:
+        stz     ff_seg
+@cell:
+        lda     VERA_DATA1
+        cmp     ff_tgt
+        bne     @break
+        lda     ff_seg
+        bne     @step                   ; already inside a run
+        jsr     f_push                  ; a run begins here: remember its start
+        lda     #1
+        sta     ff_seg
+        bra     @step
+@break:
+        stz     ff_seg
+@step:
+        inc     ff_px
+        bne     @count
+        inc     ff_px+1
+@count:
+        lda     ff_cnt
+        bne     @declo
+        dec     ff_cnt+1
+@declo:
+        dec     ff_cnt
+        lda     ff_cnt
+        ora     ff_cnt+1
+        bne     @cell
+        rts
+
+; push (ff_px, ff_ny); a full stack sets ff_ovf instead
+f_push:
+        lda     ff_sp
+        cmp     #FF_DEPTH
+        bcc     @room
+        lda     #1
+        sta     ff_ovf
+        rts
+@room:
+        jsr     f_slot
+        ldy     #0
+        lda     ff_px
+        sta     (X16_T6),y
+        iny
+        lda     ff_px+1
+        sta     (X16_T6),y
+        iny
+        lda     ff_ny
+        sta     (X16_T6),y
+        inc     ff_sp
+        rts
+
+; pop -> ff_x, ff_y
+f_pop:
+        dec     ff_sp
+        jsr     f_slot
+        ldy     #0
+        lda     (X16_T6),y
+        sta     ff_x
+        iny
+        lda     (X16_T6),y
+        sta     ff_x+1
+        iny
+        lda     (X16_T6),y
+        sta     ff_y
+        rts
+
+; X16_T6/T7 = &ff_stk[ff_sp * 3]
+f_slot:
+        lda     ff_sp
+        sta     X16_T6
+        stz     X16_T7
+        asl     X16_T6
+        rol     X16_T7
+        clc
+        lda     X16_T6
+        adc     ff_sp
+        sta     X16_T6
+        lda     X16_T7
+        adc     #0
+        sta     X16_T7
+        clc
+        lda     X16_T6
+        adc     #<ff_stk
+        sta     X16_T6
+        lda     X16_T7
+        adc     #>ff_stk
+        sta     X16_T7
+        rts
+
+; A = the pixel at (ff_x, ff_y)
+f_rd:
+        lda     ff_x
+        sta     ff_ax
+        lda     ff_x+1
+        sta     ff_ax+1
+        lda     ff_y
+        sta     ff_ay
+        lda     #0
+        jsr     f_addr1
+        lda     VERA_DATA1
+        rts
+
+; point port 1 at (ff_ax, ff_ay), INC_1, with A's DECR flag
+f_addr1:
+        ora     #(VERA_INC_1 << 4)
+        sta     ff_h
+        lda     ff_ay                   ; ay*320 = ay*64 + ay*256
+        stz     X16_T1
+        asl     a
+        rol     X16_T1
+        asl     a
+        rol     X16_T1
+        asl     a
+        rol     X16_T1
+        asl     a
+        rol     X16_T1
+        asl     a
+        rol     X16_T1
+        asl     a
+        rol     X16_T1
+        sta     X16_T0
+        clc
+        lda     ff_ay
+        adc     X16_T1
+        sta     X16_T1
+        lda     #0
+        adc     #0
+        sta     X16_T2
+        clc                             ; + ax
+        lda     X16_T0
+        adc     ff_ax
+        sta     X16_T0
+        lda     X16_T1
+        adc     ff_ax+1
+        sta     X16_T1
+        lda     X16_T2
+        adc     #0
+        sta     X16_T2
+        lda     #VERA_CTRL_ADDRSEL
+        tsb     VERA_CTRL
+        lda     X16_T0
+        sta     VERA_ADDR_L
+        lda     X16_T1
+        sta     VERA_ADDR_M
+        lda     X16_T2
+        and     #VERA_ADDR_H_BANK
+        ora     ff_h
+        sta     VERA_ADDR_H
+        rts
+
+; ---------------------------------------------------------------------
 ; Module variables. Kept out of zero page: these are only touched by the
 ; routine that owns them, never across a call boundary.
 ; ---------------------------------------------------------------------
         .segment        "BSS"
+
+gc_cx:     .res 2
+gc_cy:     .res 1
+gc_r:      .res 1
+gc_x:      .res 1
+gc_y:      .res 1
+gc_ox:     .res 1
+gc_oy:     .res 1
+gc_err:    .res 2
+gc_sav:    .res 4
+
+gt_code:   .res 1
+gt_hi:     .res 1
+gt_glyph:  .res 8
+gt_bx:     .res 2
+gt_by:     .res 1
+gt_row:    .res 1
+gt_col:    .res 1
+gt_bits:   .res 1
+
+ff_x:      .res 2
+ff_y:      .res 1
+ff_xl:     .res 2
+ff_xr:     .res 2
+ff_px:     .res 2
+ff_ny:     .res 1
+ff_ax:     .res 2
+ff_ay:     .res 1
+ff_h:      .res 1
+ff_tgt:    .res 1
+ff_col:    .res 1
+ff_seg:    .res 1
+ff_cnt:    .res 2
+ff_sp:     .res 1
+ff_ovf:    .res 1
+ff_stk:    .res FF_DEPTH * 3
 
 gb_x:      .res 2
 gb_y:      .res 1

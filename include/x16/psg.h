@@ -71,4 +71,41 @@ void __fastcall__ x16_psg_note_off (unsigned char voice);
 void __fastcall__ x16_psg_voice_ptr (unsigned char voice,
                                      unsigned char offset);
 
+/* ---------------------------------------------------------------------
+ * ASR envelopes -- the decay everybody hand-rolls in the frame loop.
+ *
+ * Attack ramps the volume up to `peak`, sustain holds it, release ramps
+ * it back to silence. Set the voice's frequency, wave and pan first; the
+ * envelope drives only the volume bits and leaves the panning alone.
+ *
+ *      x16_psg_set_freq(0, X16_PSG_HZ(880));
+ *      x16_psg_set_wave(0, X16_PSG_WAVE_PULSE, 32);
+ *      x16_psg_set_vol(0, 0, X16_PSG_PAN_BOTH);        // pan only
+ *      x16_psg_env_start(0, 60, 8, 20, 4);
+ *      ...
+ *      for (;;) { x16_vsync_wait(); x16_psg_env_tick(); }
+ *
+ * x16_psg_env_tick() must be called once per frame. From a VSYNC
+ * callback is fine -- the IRQ wrapper saves the zero page for you.
+ * ------------------------------------------------------------------ */
+
+/* attack = 0 jumps straight to the peak (audible immediately).
+** sustain = 0 releases at once; 255 holds until x16_psg_env_release().
+** release = 0 holds at the peak until x16_psg_env_stop().
+*/
+void __fastcall__ x16_psg_env_start (unsigned char voice,
+                                     unsigned char peak,
+                                     unsigned char attack,
+                                     unsigned char sustain,
+                                     unsigned char release);
+
+/* Enter the release phase now. */
+void __fastcall__ x16_psg_env_release (unsigned char voice);
+
+/* Silence and disarm immediately. */
+void __fastcall__ x16_psg_env_stop (unsigned char voice);
+
+/* Advance every armed envelope one step. Once per frame. */
+void x16_psg_env_tick (void);
+
 #endif /* X16_PSG_H */

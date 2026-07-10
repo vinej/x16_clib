@@ -22,22 +22,29 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/palette.h` | 256 entries of 12-bit colour, single and bulk |
 | `x16/tile.h` | tilemap cells, layer config, 12-bit hardware scroll |
 | `x16/sprite.h` | all 128 hardware sprites |
-| `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham |
-| `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines and filled triangles** |
-| `x16/psg.h` | the 16-voice PSG |
+| `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham, **circles, discs, text, flood fill** |
+| `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines, filled triangles, blits, transparency** |
+| `x16/psg.h` | the 16-voice PSG, and **ASR envelopes** |
 | `x16/ym.h` | the YM2151 FM chip |
 | `x16/pcm.h` | the PCM FIFO, and **AFLOW-driven streaming** |
+| `x16/adpcm.h` | **IMA ADPCM: 4:1 compressed audio** |
 | `x16/input.h` | joystick, mouse, keyboard |
 | `x16/irq.h` | VSYNC frame counter, **raster interrupts, hardware sprite collision** |
 | `x16/bank.h` | banked RAM, boundary-crossing copies, **a whole-bank allocator** |
 | `x16/mem.h` | **KERNAL block ops: fill, copy, CRC-16, and LZSA2 depacking** |
 | `x16/load.h` | load and save, including straight into VRAM |
+| `x16/dos.h` | **the DOS command channel: status, delete, rename, mkdir, chdir** |
+| `x16/bmx.h` | **BMX, the X16's native bitmap file format** |
+| `x16/zx0.h` | **ZX0 depacking, tighter than LZSA2** |
 | `x16/fixed.h` | 8.8 fixed point, 16x16 multiply |
+| `x16/math.h` | **PRNG, sine/cosine tables, atan2, lerp** |
 | `x16/collide.h` | 8- and 16-bit bounding-box overlap |
+| `x16/clip.h` | **Cohen-Sutherland line clipping** |
+| `x16/buffers.h` | **a ring buffer and a stack** |
 | `x16/float.h` | a binding to the ROM's floating point library |
 
-Four of those are things the machine can do that nothing else exposes to
-C. `x16_mem_decompress()` is an **LZSA2 depacker sitting in ROM**, and
+Several of those are things the machine can do that nothing else exposes
+to C. `x16_mem_decompress()` is an **LZSA2 depacker sitting in ROM**, and
 because KERNAL block operations do not increment an address in
 `$9F00-$9FFF`, it unpacks a compressed asset **straight into video
 memory**:
@@ -50,9 +57,12 @@ x16_mem_decompress(tiles_lzsa, X16_VERA_DATA0);   /* no staging buffer */
 `x16_irq_line_install()` gives raster splits, and `x16_sprite_collisions()`
 reads VERA's own collision hardware instead of comparing rectangles in
 software. `x16_fx_line()` and `x16_fx_triangle()` hand the Bresenham error
-to VERA, leaving the CPU one store per pixel. `x16_pcm_stream_start()`
-plays a buffer longer than the 4 KB FIFO, refilled from the AFLOW
-interrupt.
+to VERA, leaving the CPU one store per pixel; `x16_fx_copy()` moves VRAM
+to VRAM 32 bits at a time. `x16_pcm_stream_start()` plays a buffer longer
+than the 4 KB FIFO, refilled from the AFLOW interrupt. `x16_bmx_load()`
+reads the image format the community's tools and Prog8 write, which no C
+library could read before. And `x16_dos_status()` is the difference
+between "the save failed" and "the save failed because the disk is full".
 
 What it deliberately does **not** port: the assembly library's `int16`,
 `int32`, `number` and `bits` modules. C already has `int`, `long`,
@@ -208,13 +218,31 @@ a refiller that runs out of data must disable AFLOW in `IEN` or the
 interrupt storms forever. This is also why `x16_irq_remove()` stops a
 stream: with the handler unhooked, nothing would ever clear it.
 
-**A C interrupt callback would corrupt the zero page**, because cc65's
-compiled code uses `sp`, `sreg`, `ptr1-4`, `tmp1-4` and `regbank`, and the
-code it interrupted owns all of them mid-expression. cc65's own
-interruptor mechanism does not save them. So this library does: 42 bytes,
-about 950 cycles, and only when a callback is installed. That is what lets
-a raster handler be written in C, and call any `x16_*` routine, rather
-than being usually-correct.
+**A C interrupt callback would corrupt the zero page** three times over.
+cc65's compiled code uses `sp`, `sreg`, `ptr1-4`, `tmp1-4` and `regbank`
+(26 bytes), and the code it interrupted owns all of them mid-expression.
+This library's own `X16_P`/`X16_T` scratch adds 16. And the KERNAL's
+virtual registers `r0`-`r15` at `$02-$21` are another 32, clobbered by any
+KERNAL call the handler makes. cc65's interruptor mechanism saves none of
+the three. So this library saves all 74 bytes, only when a callback is
+installed. That is what lets a raster handler be written in C, and call
+any `x16_*` routine, rather than being usually-correct.
+
+**`OPEN` succeeds for a file that does not exist.** CBM DOS reports
+`62,FILE NOT FOUND` on the command channel, and the KERNAL only surfaces
+it in `READST` once a read has been attempted -- so `OPEN` and `CHKIN`
+both return carry clear, and the first `CHRIN` hands back junk. Any reader
+that trusts carry alone will misdiagnose a missing file as a corrupt one.
+`x16_bmx_load()` checks `READST` after the header and answers
+`X16_BMX_ERR_IO`. Use `x16_dos_status()` for the reason.
+
+**`x16_psg_set_freq()` leaves VERA's DECR bit set on port 0.** It writes
+the frequency high byte first, walking the address backwards, so that the
+pitch never passes through a garbage intermediate value that clicks. It
+does not clear the decrement flag afterwards. Nothing in this library
+cares -- every routine that uses port 0 sets `ADDR_H` whole -- and neither
+does cc65's `vpoke()`. But hand-written `VERA_DATA0` writes after a
+`set_freq` will walk the wrong way.
 
 **`x16_f_to_str()` copies.** The ROM writes its answer into `$0100`, the
 bottom of the stack page. The raw ROM call's buffer would not survive the
@@ -223,9 +251,18 @@ next deep call; the wrapper copies it into yours before returning.
 ## Tests
 
 ```powershell
-.\build.ps1 -Test              # headless: 112 tests in a few seconds
-.\build.ps1 -Test -Windowed    # with video: 118, nothing skipped but one
+.\build.ps1 -Test              # headless: 158 tests in a few seconds
+.\build.ps1 -Test -Windowed    # with video: 165, nothing skipped but one
 ```
+
+**The suite is two programs.** All 28 library modules plus 160-odd test
+functions no longer fit in the X16's 38.6 KB of program RAM — the code
+alone reaches 33 KB, leaving nothing for BSS. So `test/runner.c` compiles
+twice: `test/runner2.c` is three lines that set `SUITE` to 2 and
+`#include` it, and the groups behind `#if SUITE == 2` move to the second
+PRG, which then links only the modules its half reaches. `build.ps1` runs
+both and sums the results. Each half is self-contained, so
+`-Source test\runner2.c` runs it alone.
 
 Every test drives the library one way and verifies through an
 **independent path** -- write through a library call on port 0, read back
@@ -234,7 +271,7 @@ behind itself. Any `FAIL`, a pass count that disagrees with the total, a
 missing `DONE` line, or a timeout fails the build with a real exit code.
 
 **Run it both ways.** Headless `-testbench` has no video, so VERA raises
-neither VSYNC nor a raster interrupt and the CPU takes no IRQ at all. Six
+neither VSYNC nor a raster interrupt and the CPU takes no IRQ at all. Eight
 tests therefore skip -- and say so rather than passing quietly. Each uses
 the KERNAL's jiffy clock as an independent oracle, to tell "no interrupts
 here at all" (skip) apart from "the interrupt ran and our handler did not"
@@ -259,7 +296,17 @@ the only sequence that leaves the FX accumulator's carry set;
 it is, since IRQ_LINE cannot be read back; `IRQ_ZP_PRESERVED` parks a
 sentinel in the scratch block and lets an interrupt handler overwrite it;
 `PCM_STREAM_EXHAUST` plays a real buffer to its end and checks the refill
-interrupt disarmed itself.
+interrupt disarmed itself; `BMX_MISSING` asks for a file that is not
+there, because `OPEN` succeeds anyway and the naive reader calls it a
+format error.
+
+**A test that cannot fail is not a test.** Two of these were written
+weakly and only found out under mutation. `DOS_DELETE_MISSING` asserted
+merely "some error", which a mistranslated command channel satisfies with
+`30,SYNTAX ERROR`; it now asserts `62`. And `PSG_ENV_RELEASE` ramped 40
+down by steps of 10, landing on zero exactly and never reaching the
+underflow clamp it existed to check; the step is now 12, and the test also
+checks the pan bits, which an unclamped volume overwrites.
 
 ### The ABI tests
 
@@ -289,7 +336,7 @@ include/x16/     the C API, one header per module
 src/core/        constants, macros, the zero-page block
 src/*/           one .s per module -> one .o -> one member of x16c.lib
 examples/        hello.c, bounce.c, numbers.c
-test/            runner.c, testlib.h, fsroot/
+test/            runner.c, runner2.c, testlib.h, fsroot/
 build/           objects, x16c.lib, PRGs        (gitignored)
 ```
 
@@ -323,3 +370,26 @@ three-byte instruction against an address the linker resolves below
 `$0100`. And the assembly library's hardcoded `$22` zero-page block is
 gone: cc65's `cx16.cfg` maps its `ZEROPAGE` segment onto exactly that
 window, so `src/core/x16zp.s` declares the block and the linker places it.
+
+Four more differences bit during the port and are not visible in the table.
+
+**`ca65 -t cx16` translates character literals to PETSCII.** ACME did not.
+`lda #'S'` assembles to `$D3`, not `$53` — so the DOS command channel,
+fed a scratch command it cannot parse, answers `30,SYNTAX ERROR` and the
+delete silently does nothing. Every byte in `src/storage/dos.s` and
+`src/storage/bmx.s` that goes to a drive or into a file magic is therefore
+written as an explicit constant (`CH_S = $53`) rather than a literal.
+Nothing warns you: the code assembles, links and runs.
+
+**ca65 has no assembly-time floating point.** ACME's
+`!for i, 0, 255 { !byte int(sin(i * ...) * 127) }` has no translation at
+all, so `src/util/math.s` carries a precomputed 256-byte sine table and a
+33-byte arctangent table as literal data.
+
+**A plain label ends the enclosing cheap-local (`@`) scope**, where ACME's
+zone-locals did not. Self-modifying code that needs a named operand — the
+`lda $xxxx` in `pcmstream.s` and `gfx_text` — must therefore use plain
+labels throughout that routine, not a mix.
+
+**`.byte -1` is a range error**; write `$FF`. And a nonzero initialiser
+belongs in `.segment "DATA"`, because crt0's `zerobss` wipes `BSS`.

@@ -45,6 +45,25 @@ void __fastcall__ x16_fx_fill (unsigned char value, unsigned int count,
 
 void __fastcall__ x16_fx_clear (unsigned int count, unsigned long addr);
 
+/* VRAM to VRAM through the 32-bit cache, about four times a byte loop.
+**
+** `dst` must be 4-BYTE ALIGNED -- the cache flushes four bytes at a
+** time. `src` needs no alignment. A count that is not a multiple of four
+** is finished off one byte at a time with FX switched off.
+*/
+void __fastcall__ x16_fx_copy (unsigned long src, unsigned long dst,
+                               unsigned int count);
+
+/* Transparent VRAM writes. While on, a ZERO byte written to a data port
+** -- or sitting in a flushed cache -- leaves the target byte alone, so
+** colour 0 acts as transparency for blits.
+**
+** Every other x16_fx_* routine resets FX_CTRL on the way out, which turns
+** transparency off again. Enable it, do your writes, disable it.
+*/
+void x16_fx_transp_on (void);
+void x16_fx_transp_off (void);
+
 /* ---------------------------------------------------------------------
  * Hardware line and polygon drawing.
  *

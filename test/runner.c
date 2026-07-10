@@ -18,7 +18,24 @@
  * =====================================================================
  */
 
+/* ---------------------------------------------------------------------
+ * THE SUITE IS BUILT TWICE.
+ *
+ * All 28 library modules plus 150-odd test functions no longer fit in the
+ * X16's 38.6 KB of program RAM: the code alone reaches 33 KB, leaving no
+ * room for BSS. So runner.c compiles into two PRGs -- test/runner2.c is
+ * three lines that set SUITE to 2 and include this file -- and build.ps1
+ * runs both, summing the results.
+ *
+ * Helpers below stay outside the guards and compile into both. Only the
+ * test functions and their calls are split.
+ * ------------------------------------------------------------------ */
+#ifndef SUITE
+#define SUITE 1
+#endif
+
 #include "testlib.h"
+#include <cbm.h>
 #include <cx16.h>
 #include <x16/x16.h>
 #include <x16/vera.h>
@@ -39,6 +56,13 @@
 #include <x16/load.h>
 #include <x16/float.h>
 #include <x16/mem.h>
+#include <x16/math.h>
+#include <x16/clip.h>
+#include <x16/buffers.h>
+#include <x16/dos.h>
+#include <x16/adpcm.h>
+#include <x16/zx0.h>
+#include <x16/bmx.h>
 #include <time.h>
 
 /* Scratch VRAM, well clear of the text screen ($1B000), the default
@@ -333,6 +357,257 @@ static void test_umul16(void)
             "UMUL16");
 }
 
+#if SUITE == 2
+
+/* ------------------------------------------------------------------ */
+/* game math                                                           */
+/* ------------------------------------------------------------------ */
+
+/* The tables are precomputed literals, because ca65 has no assembly-time
+** floating point and cannot evaluate ACME's `!for ... sin()`. So pin the
+** values that would move if anyone regenerated them wrong: the four
+** quarter points of the sine, and the ends of the arctangent table.
+*/
+static void test_math_tables(void)
+{
+    t_check(x16_sin8(0) == 0 &&
+            x16_sin8(64) == 127 &&              /* +90 degrees */
+            x16_sin8(128) == 0 &&
+            x16_sin8(192) == -127 &&            /* -90 degrees */
+            x16_cos8(0) == 127 &&               /* cos(a) = sin(a+64) */
+            x16_cos8(64) == 0 &&
+            x16_sin8u(64) == 255 &&             /* biased by 128 */
+            x16_sin8u(192) == 1,
+            "MATH_TABLES");
+}
+
+/* xorshift has period 65535 and one fixed point at zero, which the seed
+** routine must avoid. The same seed must replay the same sequence.
+*/
+static void test_rnd(void)
+{
+    unsigned int a, b, c;
+
+    x16_rnd_seed(0x1234);
+    a = x16_rnd16();
+    b = x16_rnd16();
+
+    x16_rnd_seed(0x1234);
+    c = x16_rnd16();
+
+    t_check(a == c && a != b, "RND_REPEATABLE");
+}
+
+static void test_rnd_zero_seed(void)
+{
+    unsigned int a, b;
+
+    x16_rnd_seed(0);                    /* must be nudged off the fixed point */
+    a = x16_rnd16();
+    b = x16_rnd16();
+
+    t_check(a != 0 && b != 0 && a != b, "RND_ZERO_SEED");
+}
+
+/* Angle 0 is east (+x); 64 is south (+y), because the screen's y axis
+** points down. A byte angle wraps for free, so 192 is north.
+*/
+static void test_atan2(void)
+{
+    t_check(x16_atan2(100, 0) == 0 &&           /* east */
+            x16_atan2(0, 100) == 64 &&          /* south, down-screen */
+            x16_atan2(-100, 0) == 128 &&        /* west */
+            x16_atan2(0, -100) == 192 &&        /* north */
+            x16_atan2(50, 50) == 32 &&          /* exactly 45 degrees */
+            x16_atan2(0, 0) == 0,               /* degenerate: call it east */
+            "ATAN2");
+}
+
+/* atan2 must agree with the sine table it shares a convention with:
+** walking one step along the returned heading moves toward the target.
+*/
+static void test_atan2_roundtrip(void)
+{
+    unsigned char a = x16_atan2(-60, 60);       /* south-west: 96 = 135 deg */
+
+    t_check(a == 96 && x16_cos8(a) < 0 && x16_sin8(a) > 0,
+            "ATAN2_ROUNDTRIP");
+}
+
+/* Exact at both ends; the interior is a /256 approximation of /255. */
+static void test_lerp8(void)
+{
+    t_check(x16_lerp8(10, 200, 0) == 10 &&
+            x16_lerp8(10, 200, 255) == 200 &&
+            x16_lerp8(200, 10, 0) == 200 &&     /* descending */
+            x16_lerp8(200, 10, 255) == 10 &&
+            x16_lerp8(0, 100, 128) == 50 &&     /* halfway, within one */
+            x16_lerp8(77, 77, 128) == 77,       /* a == b */
+            "LERP8");
+}
+
+#endif /* SUITE == 2 */
+
+#if SUITE == 2
+
+/* ------------------------------------------------------------------ */
+/* ring buffer and stack                                               */
+/* ------------------------------------------------------------------ */
+
+static void test_ringbuffer(void)
+{
+    x16_rb_init();
+
+    t_check(x16_rb_get() == -1 &&               /* empty reads -1 */
+            x16_rb_count() == 0 &&
+            x16_rb_put(0x11) == 1 &&
+            x16_rb_put(0x22) == 1 &&
+            x16_rb_count() == 2 &&
+            x16_rb_get() == 0x11 &&             /* FIFO order */
+            x16_rb_get() == 0x22 &&
+            x16_rb_get() == -1 &&
+            x16_rb_count() == 0,
+            "RINGBUFFER");
+}
+
+/* Capacity is 255, and the 8-bit head/tail wrap for free -- so pushing
+** and draining twice as many bytes as the buffer holds must still come
+** out in order.
+*/
+static void test_ringbuffer_wrap(void)
+{
+    unsigned int i;
+    unsigned char ok = 1;
+
+    x16_rb_init();
+    for (i = 0; i < 255; ++i) {
+        if (!x16_rb_put((unsigned char)i)) ok = 0;
+    }
+    if (x16_rb_put(0xFF) != 0) ok = 0;          /* the 256th is refused */
+    if (x16_rb_count() != 255) ok = 0;
+
+    for (i = 0; i < 200; ++i) {                 /* drain most of it... */
+        if (x16_rb_get() != (int)(unsigned char)i) ok = 0;
+    }
+    for (i = 0; i < 100; ++i) {                 /* ...and refill past the wrap */
+        if (!x16_rb_put((unsigned char)(0xC0 + i))) ok = 0;
+    }
+    for (i = 200; i < 255; ++i) {
+        if (x16_rb_get() != (int)(unsigned char)i) ok = 0;
+    }
+    for (i = 0; i < 100; ++i) {
+        if (x16_rb_get() != (int)(unsigned char)(0xC0 + i)) ok = 0;
+    }
+    t_check(ok && x16_rb_get() == -1, "RINGBUFFER_WRAP");
+}
+
+static void test_stack(void)
+{
+    x16_stk_init();
+
+    t_check(x16_stk_pop() == -1 &&
+            x16_stk_depth() == 0 &&
+            x16_stk_push(0xAA) == 1 &&
+            x16_stk_push(0xBB) == 1 &&
+            x16_stk_depth() == 2 &&
+            x16_stk_pop() == 0xBB &&            /* LIFO order */
+            x16_stk_pop() == 0xAA &&
+            x16_stk_pop() == -1,
+            "STACK");
+}
+
+/* A byte of 0xFF must not be mistaken for the -1 that means "empty". */
+static void test_buffers_ff_is_not_empty(void)
+{
+    x16_rb_init();
+    x16_stk_init();
+    x16_rb_put(0xFF);
+    x16_stk_push(0xFF);
+
+    t_check(x16_rb_get() == 0x00FF && x16_stk_pop() == 0x00FF,
+            "BUFFERS_FF_NOT_EMPTY");
+}
+
+#endif /* SUITE == 2 */
+
+#if SUITE == 2
+
+/* ------------------------------------------------------------------ */
+/* line clipping                                                       */
+/* ------------------------------------------------------------------ */
+
+/* Wholly inside: unchanged, and accepted. */
+static void test_clip_inside(void)
+{
+    x16_line s = { 10, 20, 300, 200 };
+
+    t_check(x16_clip_line(&s) == 1 &&
+            s.x0 == 10 && s.y0 == 20 && s.x1 == 300 && s.y1 == 200,
+            "CLIP_INSIDE");
+}
+
+/* Both endpoints share an outside half-plane: rejected without work. */
+static void test_clip_reject(void)
+{
+    x16_line above = { -50, -10, 400, -5 };
+    x16_line right = { 400, 10, 500, 200 };
+
+    t_check(x16_clip_line(&above) == 0 && x16_clip_line(&right) == 0,
+            "CLIP_REJECT");
+}
+
+/* A horizontal line crossing both vertical edges: y is unchanged, and
+** the ends land exactly on xmin and xmax (inclusive: 0 and 319).
+*/
+static void test_clip_horizontal(void)
+{
+    x16_line s = { -100, 120, 500, 120 };
+
+    t_check(x16_clip_line(&s) == 1 &&
+            s.x0 == 0 && s.x1 == 319 && s.y0 == 120 && s.y1 == 120,
+            "CLIP_HORIZONTAL");
+}
+
+/* A 45-degree diagonal from (-40,-40): it must enter the rectangle
+** exactly at the origin, because x and y cross zero together.
+*/
+static void test_clip_diagonal(void)
+{
+    x16_line s = { -40, -40, 100, 100 };
+
+    t_check(x16_clip_line(&s) == 1 &&
+            s.x0 == 0 && s.y0 == 0 && s.x1 == 100 && s.y1 == 100,
+            "CLIP_DIAGONAL");
+}
+
+/* A user rectangle, and a segment clipped to it on all four sides. */
+static void test_clip_set(void)
+{
+    x16_line s = { 0, 50, 319, 50 };
+    unsigned char ok;
+
+    x16_clip_set(100, 40, 200, 60);
+    ok = x16_clip_line(&s) == 1 && s.x0 == 100 && s.x1 == 200;
+
+    x16_clip_set(0, 0, 319, 239);       /* back to the full bitmap */
+    t_check(ok, "CLIP_SET");
+}
+
+/* Reversing the endpoints must clip to the same segment, reversed --
+** the algorithm moves whichever end is outside, and both can be.
+*/
+static void test_clip_symmetry(void)
+{
+    x16_line a = { -100, 120, 500, 120 };
+    x16_line b = { 500, 120, -100, 120 };
+
+    t_check(x16_clip_line(&a) == 1 && x16_clip_line(&b) == 1 &&
+            a.x0 == b.x1 && a.x1 == b.x0,
+            "CLIP_SYMMETRY");
+}
+
+#endif /* SUITE == 2 */
+
 /* ------------------------------------------------------------------ */
 /* collision                                                           */
 /* ------------------------------------------------------------------ */
@@ -555,6 +830,155 @@ static void test_gfx_frame(void)
             vpeek(PIXEL(41, 31)) == 0x00,       /* hollow */
             "GFX_FRAME");
 }
+
+#if SUITE == 2
+
+/* A midpoint circle: the four cardinal points are exact, the centre is
+** hollow, and nothing lands one pixel outside the radius.
+*/
+static void test_gfx_circle(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);         /* rows 0..39 */
+
+    x16_gfx_circle(50, 20, 10, 0x91);
+
+    t_check(vpeek(PIXEL(60, 20)) == 0x91 &&     /* east */
+            vpeek(PIXEL(40, 20)) == 0x91 &&     /* west */
+            vpeek(PIXEL(50, 10)) == 0x91 &&     /* north */
+            vpeek(PIXEL(50, 30)) == 0x91 &&     /* south */
+            vpeek(PIXEL(50, 20)) == 0x00 &&     /* hollow */
+            vpeek(PIXEL(61, 20)) == 0x00,       /* nothing outside */
+            "GFX_CIRCLE");
+}
+
+/* Radius 0 is a single point, not nothing. */
+static void test_gfx_circle_r0(void)
+{
+    vpoke(0x00, PIXEL(100, 20));
+    vpoke(0x00, PIXEL(101, 20));
+
+    x16_gfx_circle(100, 20, 0, 0x92);
+
+    t_check(vpeek(PIXEL(100, 20)) == 0x92 && vpeek(PIXEL(101, 20)) == 0x00,
+            "GFX_CIRCLE_R0");
+}
+
+/* A disc is solid to the rim and empty past it. */
+static void test_gfx_disc(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+
+    x16_gfx_disc(50, 20, 10, 0x93);
+
+    t_check(vpeek(PIXEL(50, 20)) == 0x93 &&     /* centre filled */
+            vpeek(PIXEL(55, 20)) == 0x93 &&
+            vpeek(PIXEL(60, 20)) == 0x93 &&     /* rim */
+            vpeek(PIXEL(61, 20)) == 0x00 &&     /* one past */
+            vpeek(PIXEL(50, 31)) == 0x00,
+            "GFX_DISC");
+}
+
+/* Circles clip: a disc centred off the left edge paints only the part on
+** screen, and never wraps to the right-hand side of the row above.
+*/
+static void test_gfx_circle_clips(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+
+    x16_gfx_disc(2, 20, 10, 0x94);
+
+    t_check(vpeek(PIXEL(0, 20)) == 0x94 &&      /* the visible sliver */
+            vpeek(PIXEL(319, 19)) == 0x00 &&    /* did not wrap */
+            vpeek(PIXEL(12, 20)) == 0x94 &&
+            vpeek(PIXEL(13, 20)) == 0x00,
+            "GFX_CIRCLE_CLIPS");
+}
+
+/* A glyph from the KERNAL's charset. Screen code 1 is 'A'; its top row
+** is blank and it has set pixels in the middle rows. Clear bits stay
+** transparent, so the background shows through.
+*/
+static void test_gfx_char(void)
+{
+    unsigned char i, set = 0;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+
+    x16_gfx_char(40, 8, 0x95, 1);       /* screen code 1 = 'A' */
+
+    for (i = 0; i < 8; ++i) {
+        unsigned char j;
+        for (j = 0; j < 8; ++j) {
+            if (vpeek(PIXEL(40 + j, 8 + i)) == 0x95) ++set;
+        }
+    }
+    /* Some pixels lit, but not the whole 8x8 cell: it is a glyph, and
+    ** the clear bits were left transparent.
+    */
+    t_check(set > 4 && set < 64 && vpeek(PIXEL(48, 8)) == 0x00,
+            "GFX_CHAR");
+}
+
+/* x16_gfx_text advances the pen 8 pixels per character, so the second
+** glyph of "AB" starts 8 to the right of the first, and the two differ.
+*/
+static void test_gfx_text(void)
+{
+    unsigned char i, a = 0, b = 0;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+
+    x16_gfx_text(100, 8, 0x96, "AB");
+
+    for (i = 0; i < 8; ++i) {
+        unsigned char j;
+        for (j = 0; j < 8; ++j) {
+            if (vpeek(PIXEL(100 + j, 8 + i)) == 0x96) ++a;
+            if (vpeek(PIXEL(108 + j, 8 + i)) == 0x96) ++b;
+        }
+    }
+    t_check(a > 4 && b > 4 && a != b, "GFX_TEXT");
+}
+
+/* Flood a rectangle bounded by a frame: the interior fills, the frame
+** survives, and the pixel just outside is untouched.
+*/
+static void test_gfx_flood(void)
+{
+    unsigned char ok;
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+
+    x16_gfx_frame(200, 4, 20, 20, 0x97);        /* a hollow box */
+    ok = x16_gfx_flood(205, 10, 0x98);          /* seed inside it */
+
+    t_check(ok == 1 &&
+            vpeek(PIXEL(205, 10)) == 0x98 &&    /* the seed */
+            vpeek(PIXEL(218, 22)) == 0x98 &&    /* the far interior corner */
+            vpeek(PIXEL(200, 4)) == 0x97 &&     /* the frame survived */
+            vpeek(PIXEL(199, 10)) == 0x00,      /* did not leak out */
+            "GFX_FLOOD");
+}
+
+/* Filling with the colour already under the seed is a no-op, not an
+** infinite loop.
+*/
+static void test_gfx_flood_noop(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x33, 640);           /* rows 0..1 */
+
+    t_check(x16_gfx_flood(10, 1, 0x33) == 1 && vpeek(PIXEL(10, 1)) == 0x33,
+            "GFX_FLOOD_NOOP");
+}
+
+#endif /* SUITE == 2 */
 
 /* ------------------------------------------------------------------ */
 /* tiles and layers                                                    */
@@ -829,6 +1253,88 @@ static void test_fx_triangle_unsorted(void)
 
     t_check(ok, "FX_TRIANGLE_UNSORTED");
 }
+
+#if SUITE == 2
+
+/* Cached VRAM-to-VRAM. The destination must be 4-byte aligned; a count
+** that is not a multiple of four exercises the single-byte tail.
+**
+** Both long arguments come off the C stack as two popax pairs each, so a
+** wrong pop order would corrupt an address rather than a value: hence
+** distinct bytes and a guard one past the end.
+*/
+static void test_fx_copy(void)
+{
+    unsigned char i, ok = 1;
+
+    for (i = 0; i < 10; ++i) {
+        vpoke(0xA0 + i, TESTVRAM + i);          /* source: a ramp */
+    }
+    vram_poison(TESTVRAM + 0x100, 12, 0x00);    /* aligned destination */
+
+    x16_fx_copy(TESTVRAM, TESTVRAM + 0x100, 10);
+
+    for (i = 0; i < 10; ++i) {
+        if (vpeek(TESTVRAM + 0x100 + i) != 0xA0 + i) ok = 0;
+    }
+    t_check(ok && vpeek(TESTVRAM + 0x100 + 10) == 0x00, "FX_COPY");
+}
+
+/* Bit 16 of each address must survive: copy across the VRAM bank
+** boundary, from bank 0 to bank 1.
+*/
+static void test_fx_copy_bank(void)
+{
+    unsigned char i, ok = 1;
+
+    for (i = 0; i < 8; ++i) {
+        vpoke(0x50 + i, TESTVRAM + i);
+    }
+    vram_poison(TESTVRAM_HI, 8, 0x00);
+
+    x16_fx_copy(TESTVRAM, TESTVRAM_HI, 8);
+
+    for (i = 0; i < 8; ++i) {
+        if (vpeek(TESTVRAM_HI + i) != 0x50 + i) ok = 0;
+    }
+    t_check(ok, "FX_COPY_BANK");
+}
+
+/* With transparency on, a zero byte written to a data port leaves the
+** target alone. Enable, write, disable -- and check the enable actually
+** reached FX_CTRL rather than being reset by the previous fx_* call.
+*/
+static void test_fx_transparency(void)
+{
+    vram_poison(TESTVRAM, 4, 0x77);
+
+    x16_fx_transp_on();
+    x16_vera_addr0(X16_INC_1, TESTVRAM);
+    x16_vera_fill(0x00, 2);             /* zeros: must be dropped */
+    x16_vera_addr0(X16_INC_1, TESTVRAM + 2);
+    x16_vera_fill(0x5B, 2);             /* nonzero: must land */
+    x16_fx_transp_off();
+
+    t_check(vpeek(TESTVRAM + 0) == 0x77 &&      /* transparent */
+            vpeek(TESTVRAM + 1) == 0x77 &&
+            vpeek(TESTVRAM + 2) == 0x5B &&      /* opaque */
+            vpeek(TESTVRAM + 3) == 0x5B,
+            "FX_TRANSPARENCY");
+}
+
+/* ...and once off, a zero write is opaque again. */
+static void test_fx_transparency_off(void)
+{
+    vram_poison(TESTVRAM, 2, 0x77);
+
+    x16_vera_addr0(X16_INC_1, TESTVRAM);
+    x16_vera_fill(0x00, 2);
+
+    t_check(vpeek(TESTVRAM) == 0x00 && vpeek(TESTVRAM + 1) == 0x00,
+            "FX_TRANSPARENCY_OFF");
+}
+
+#endif /* SUITE == 2 */
 
 /* Every FX routine must leave FX_CTRL and DCSEL at 0. Leaving Addr1 Mode
 ** set silently changes VRAM addressing for everyone downstream, so this
@@ -1131,6 +1637,56 @@ static void test_irq_zp_preserved(void)
     }
 }
 
+static unsigned char vreg_fired;
+
+/* Runs inside the interrupt and clobbers the KERNAL's virtual registers:
+** x16_mem_copy() loads r0, r1 and r2 before calling MEMORY_COPY.
+*/
+static void vreg_clobbering_handler(void)
+{
+    static unsigned char a[2], b[2];
+
+    x16_mem_copy(a, b, 2);
+    ++vreg_fired;
+}
+
+/* r0-r15 at $02-$21 are ordinary zero page, and the KERNAL does not
+** preserve them across an interrupt. The foreground's x16_mem_copy()
+** sets r0/r1/r2 and then runs MEMORY_COPY *with interrupts enabled*, so
+** a callback that touches them corrupts the interrupted copy on resume.
+**
+** Park a sentinel in r0 and let a handler run x16_mem_copy(). Without
+** the vreg half of save_zp/restore_zp, r0 comes back as a pointer.
+*/
+static void test_irq_vregs_preserved(void)
+{
+    volatile unsigned char *r0 = (volatile unsigned char *)0x02;
+    clock_t jiffy0;
+    unsigned int spin;
+    unsigned char survived;
+
+    vreg_fired = 0;
+    jiffy0 = clock();
+
+    x16_irq_line_install(240, vreg_clobbering_handler);
+    *r0 = 0xA7;
+
+    for (spin = 0; spin < 30000 && !vreg_fired; ++spin) {
+    }
+    survived = (*r0 == 0xA7);
+
+    x16_irq_line_remove();
+    x16_irq_remove();
+
+    if (vreg_fired) {
+        t_check(survived, "IRQ_VREGS_PRESERVED");
+    } else if (clock() == jiffy0) {
+        t_skip("IRQ_VREGS_PRESERVED");
+    } else {
+        t_check(0, "IRQ_VREGS_PRESERVED");
+    }
+}
+
 /* The VSYNC hook must actually tick -- where VSYNC exists at all.
 **
 ** x16emu's -testbench mode is headless: it runs no video, so VERA never
@@ -1331,6 +1887,118 @@ static void test_pcm_rate_clamp(void)
     t_check(over == 128 && under == 64 && x16_pcm_empty() == 1,
             "PCM_RATE_CLAMP");
 }
+
+#if SUITE == 2
+
+/* The volume byte of a voice: pan bits in 7:6, volume in 5:0. */
+#define PSG_VOL_OF(v)   (vpeek(X16_VRAM_PSG + (v) * 4 + 2) & 0x3F)
+#define PSG_PAN_OF(v)   (vpeek(X16_VRAM_PSG + (v) * 4 + 2) & 0xC0)
+
+/* Attack ramps up by `attack` per tick, stops at the peak, and the pan
+** bits survive: the envelope drives only the volume.
+*/
+static void test_psg_env_attack(void)
+{
+    unsigned char v0, v1, v2, peak;
+
+    x16_psg_init();
+    x16_psg_set_vol(1, 0, X16_PSG_PAN_RIGHT);   /* establish the panning */
+    x16_psg_env_start(1, 30, 10, 255, 5);       /* peak 30, +10/tick */
+
+    v0 = PSG_VOL_OF(1);                         /* not written yet */
+    x16_psg_env_tick(); v1 = PSG_VOL_OF(1);     /* 10 */
+    x16_psg_env_tick(); v2 = PSG_VOL_OF(1);     /* 20 */
+    x16_psg_env_tick();                         /* 30: clamps at the peak */
+    x16_psg_env_tick();
+    peak = PSG_VOL_OF(1);
+
+    t_check(v0 == 0 && v1 == 10 && v2 == 20 && peak == 30 &&
+            PSG_PAN_OF(1) == X16_PSG_PAN_RIGHT,
+            "PSG_ENV_ATTACK");
+}
+
+/* attack = 0 jumps to the peak and writes it immediately, without
+** waiting for a tick.
+*/
+static void test_psg_env_instant(void)
+{
+    x16_psg_init();
+    x16_psg_set_vol(2, 0, X16_PSG_PAN_BOTH);
+    x16_psg_env_start(2, 45, 0, 255, 5);
+
+    t_check(PSG_VOL_OF(2) == 45, "PSG_ENV_INSTANT");
+}
+
+/* A sustain count of 255 holds until release is asked for; then the
+** volume ramps down and the voice disarms at zero.
+**
+** The release step deliberately does NOT divide the peak: 40 steps down
+** by 12 to 28, 16, 4, and the next step would go below zero. A step that
+** divided evenly (10 into 40) would land on zero exactly and never
+** exercise the underflow clamp -- and an unclamped volume does not merely
+** read back wrong, it wraps to 248 and its high bits overwrite the pan
+** field, because env_write ORs the volume in unmasked.
+*/
+static void test_psg_env_release(void)
+{
+    unsigned char held, r1, i;
+
+    x16_psg_init();
+    x16_psg_set_vol(3, 0, X16_PSG_PAN_BOTH);
+    x16_psg_env_start(3, 40, 0, 255, 12);       /* instant peak, hold */
+
+    x16_psg_env_tick();
+    x16_psg_env_tick();
+    held = PSG_VOL_OF(3);                       /* still 40 */
+
+    x16_psg_env_release(3);
+    x16_psg_env_tick();
+    r1 = PSG_VOL_OF(3);                         /* 28 */
+
+    for (i = 0; i < 8; ++i) {
+        x16_psg_env_tick();                     /* ...down to silence */
+    }
+    t_check(held == 40 && r1 == 28 &&
+            PSG_VOL_OF(3) == 0 &&
+            PSG_PAN_OF(3) == X16_PSG_PAN_BOTH,  /* the clamp kept pan intact */
+            "PSG_ENV_RELEASE");
+}
+
+/* A finite sustain counts down and then releases on its own. Again the
+** step (6) does not divide the peak (20): 14, 8, 2, then underflow.
+*/
+static void test_psg_env_sustain(void)
+{
+    unsigned char after2, i;
+
+    x16_psg_init();
+    x16_psg_set_vol(4, 0, X16_PSG_PAN_BOTH);
+    x16_psg_env_start(4, 20, 0, 2, 6);          /* hold 2 ticks, then fade */
+
+    x16_psg_env_tick();
+    x16_psg_env_tick();
+    after2 = PSG_VOL_OF(4);                     /* still at the peak */
+
+    for (i = 0; i < 5; ++i) {
+        x16_psg_env_tick();
+    }
+    t_check(after2 == 20 && PSG_VOL_OF(4) == 0, "PSG_ENV_SUSTAIN");
+}
+
+static void test_psg_env_stop(void)
+{
+    x16_psg_init();
+    x16_psg_set_vol(5, 0, X16_PSG_PAN_LEFT);
+    x16_psg_env_start(5, 50, 0, 255, 0);
+
+    x16_psg_env_stop(5);
+    x16_psg_env_tick();                         /* disarmed: stays silent */
+
+    t_check(PSG_VOL_OF(5) == 0 && PSG_PAN_OF(5) == X16_PSG_PAN_LEFT,
+            "PSG_ENV_STOP");
+}
+
+#endif /* SUITE == 2 */
 
 /* AFLOW streaming, primed at rate 0 so nothing actually plays -- which is
 ** what makes this runnable headless.
@@ -1713,6 +2381,273 @@ static void test_fs_vload(void)
             "FS_VLOAD");
 }
 
+#if SUITE == 2
+
+/* ------------------------------------------------------------------ */
+/* the DOS command channel                                             */
+/* ------------------------------------------------------------------ */
+
+/* A status read always answers with a parsable line: two digits, a
+** comma, then text. The code is those digits.
+*/
+static void test_dos_status(void)
+{
+    unsigned char code = x16_dos_status();
+    const char *msg = x16_dos_msg();
+
+    t_check(code != X16_DOS_NO_CHANNEL &&
+            code <= 99 &&
+            msg[0] >= '0' && msg[0] <= '9' &&
+            msg[1] >= '0' && msg[1] <= '9' &&
+            msg[2] == ',',
+            "DOS_STATUS");
+}
+
+/* Deleting a file that is not there is an ERROR, not a silent success --
+** which is the whole reason this module exists. CBM DOS answers 62,
+** FILE NOT FOUND.
+**
+** Assert that exact code, not merely "some error": a command channel that
+** is being fed mistranslated bytes answers 30, SYNTAX ERROR, which is
+** also an error and would slip past a looser check.
+*/
+static void test_dos_delete_missing(void)
+{
+    static const char name[] = "NOSUCH.BIN";
+    unsigned char code = x16_dos_delete(name, sizeof name - 1);
+
+    t_check(code == 62, "DOS_DELETE_MISSING");
+}
+
+/* Save a file, delete it, and prove it is gone: the load that worked
+** before now fails.
+*/
+static void test_dos_delete(void)
+{
+    static const char name[] = "DOSTEST.BIN";
+    static unsigned char buf[4] = { 1, 2, 3, 4 };
+    unsigned char saved, deleted, loaded;
+
+    saved = x16_fs_save(name, sizeof name - 1, X16_DEVICE_SD,
+                        buf, buf + sizeof buf);
+    deleted = x16_dos_delete(name, sizeof name - 1);
+    loaded = x16_fs_load(name, sizeof name - 1, X16_DEVICE_SD,
+                         X16_SA_ADDR, buf, (unsigned int *)0);
+
+    t_check(saved == 0 &&
+            deleted < X16_DOS_OK_BELOW &&       /* the drive said yes */
+            loaded != 0,                        /* ...and it really is gone */
+            "DOS_DELETE");
+}
+
+/* Rename builds "R:new=old" on the command channel. Prove it by loading
+** the file back under its new name.
+*/
+static void test_dos_rename(void)
+{
+    static const char oldname[] = "DOSOLD.BIN";
+    static const char newname[] = "DOSNEW.BIN";
+    static unsigned char out[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+    static unsigned char in[4];
+    unsigned char code, loaded;
+
+    x16_fs_save(oldname, sizeof oldname - 1, X16_DEVICE_SD,
+                out, out + sizeof out);
+
+    code = x16_dos_rename(oldname, sizeof oldname - 1,
+                          newname, sizeof newname - 1);
+
+    in[0] = 0;
+    loaded = x16_fs_load(newname, sizeof newname - 1, X16_DEVICE_SD,
+                         X16_SA_ADDR, in, (unsigned int *)0);
+
+    x16_dos_delete(newname, sizeof newname - 1);
+
+    t_check(code < X16_DOS_OK_BELOW && loaded == 0 && in[0] == 0xDE,
+            "DOS_RENAME");
+}
+
+#endif /* SUITE == 2 */
+
+#if SUITE == 2
+
+/* ------------------------------------------------------------------ */
+/* BMX, the X16's native bitmap format                                 */
+/* ------------------------------------------------------------------ */
+
+/* Save a small image out of VRAM and load it back somewhere else. The
+** palette goes with it, and the header round-trips.
+**
+** stride is set to the image width so the pixels are contiguous; the
+** default 320 would stamp each row a full screen-line apart.
+*/
+static void test_bmx_roundtrip(void)
+{
+    static const char name[] = "PIC.BMX";
+    x16_bmx_info info, back;
+    unsigned char i, ok;
+
+    /* An 8x4 image of a colour ramp at TESTVRAM. */
+    for (i = 0; i < 32; ++i) {
+        vpoke(0x40 + i, TESTVRAM + i);
+    }
+    x16_pal_set(200, 0x0F0F);           /* two palette entries to carry */
+    x16_pal_set(201, 0x00F0);
+
+    info.width = 8;
+    info.height = 4;
+    info.bpp = 8;
+    info.palstart = 200;
+    info.palcount = 2;
+    info.border = 5;
+    info.stride = 8;                    /* contiguous, not a screen row */
+    x16_bmx_set_info(&info);
+
+    if (x16_bmx_save(name, sizeof name - 1, X16_DEVICE_SD, TESTVRAM) != 0) {
+        t_check(0, "BMX_ROUNDTRIP");
+        return;
+    }
+
+    vram_poison(TESTVRAM_HI, 32, 0x00);
+    x16_pal_set(200, 0x0000);           /* wipe the palette we saved */
+    x16_pal_set(201, 0x0000);
+
+    if (x16_bmx_load(name, sizeof name - 1, X16_DEVICE_SD, TESTVRAM_HI) != 0) {
+        t_check(0, "BMX_ROUNDTRIP");
+        return;
+    }
+
+    x16_bmx_get_info(&back);
+    ok = back.width == 8 && back.height == 4 && back.bpp == 8 &&
+         back.palstart == 200 && back.palcount == 2 && back.border == 5;
+
+    for (i = 0; i < 32; ++i) {          /* pixels, across the VRAM bank */
+        if (vpeek(TESTVRAM_HI + i) != 0x40 + i) ok = 0;
+    }
+    /* ...and the palette came back: entry 200 = 0x0F0F, 201 = 0x00F0 */
+    ok = ok && vpeek(X16_VRAM_PALETTE + 400) == 0x0F &&
+               vpeek(X16_VRAM_PALETTE + 401) == 0x0F &&
+               vpeek(X16_VRAM_PALETTE + 402) == 0xF0 &&
+               vpeek(X16_VRAM_PALETTE + 403) == 0x00;
+
+    x16_dos_delete(name, sizeof name - 1);
+    t_check(ok, "BMX_ROUNDTRIP");
+}
+
+/* A file that is not a BMX must be rejected on its magic, not loaded as
+** garbage. Write one here rather than borrowing a file some other test
+** happens to leave behind: a PRG starts with a load address, not "BMX".
+*/
+static void test_bmx_bad_format(void)
+{
+    static const char name[] = "NOTABMX.BIN";
+    static unsigned char junk[20];
+    unsigned char i, code;
+
+    for (i = 0; i < sizeof junk; ++i) {
+        junk[i] = i;
+    }
+    x16_fs_save(name, sizeof name - 1, X16_DEVICE_SD, junk, junk + sizeof junk);
+
+    code = x16_bmx_load(name, sizeof name - 1, X16_DEVICE_SD, TESTVRAM);
+    x16_dos_delete(name, sizeof name - 1);
+
+    t_check(code == X16_BMX_ERR_FORMAT, "BMX_BAD_FORMAT");
+}
+
+static void test_bmx_missing(void)
+{
+    static const char name[] = "NOSUCH.BMX";
+
+    t_check(x16_bmx_load(name, sizeof name - 1, X16_DEVICE_SD, TESTVRAM) ==
+            X16_BMX_ERR_IO,
+            "BMX_MISSING");
+}
+
+/* Write exactly these bytes and nothing else. x16_fs_save() cannot build
+** a fixture that begins with a magic number, because the KERNAL's SAVE
+** prepends a two-byte load address.
+*/
+static unsigned char write_raw (const char *name, const unsigned char *data,
+                                unsigned char len)
+{
+    if (cbm_open(2, X16_DEVICE_SD, 1, name) != 0) {
+        return 1;
+    }
+    cbm_write(2, data, len);
+    cbm_close(2);
+    return 0;
+}
+
+/* A file that stops in the middle of the image is an I/O error, not a
+** success. The header is entirely valid and promises four rows of four
+** pixels; the file carries two. Without a status check the remaining
+** CHRINs return junk, the load reports success, and half the image is
+** whatever VRAM held before -- a silent wrong answer.
+*/
+static void test_bmx_truncated(void)
+{
+    static const char name[] = "TRUNC.BMX";
+    static const unsigned char file[] = {
+        'B', 'M', 'X', 1,       /* magic, version                       */
+        8, 3,                   /* bits per pixel, VERA depth code      */
+        4, 0,                   /* width                                */
+        4, 0,                   /* height                               */
+        1, 0,                   /* one palette entry, from index 0      */
+        18, 0,                  /* pixel data offset: 16 + 1*2, no gap  */
+        0, 0,                   /* not compressed, border 0             */
+        0x0F, 0x00,             /* the palette entry                    */
+        1, 2, 3, 4,             /* row 0                                */
+        5, 6, 7, 8              /* row 1 -- and here the file stops     */
+    };
+    unsigned char code;
+
+    if (write_raw(name, file, sizeof file)) {
+        t_check(0, "BMX_TRUNCATED");
+        return;
+    }
+    code = x16_bmx_load(name, sizeof name - 1, X16_DEVICE_SD, TESTVRAM);
+    x16_dos_delete(name, sizeof name - 1);
+
+    t_check(code == X16_BMX_ERR_IO, "BMX_TRUNCATED");
+}
+
+/* ...and a file that stops inside the PALETTE, before a single pixel.
+**
+** This one exists because the per-row check cannot see it. The image is
+** one row tall, so that check never runs: it deliberately tolerates EOF
+** after the last row, and here the last row is the first. Only the status
+** test between the palette and the pixels catches this, which is why that
+** test is not redundant. The header asks for four palette entries --
+** eight bytes -- and the file supplies two.
+*/
+static void test_bmx_short_pal(void)
+{
+    static const char name[] = "SHORTPAL.BMX";
+    static const unsigned char file[] = {
+        'B', 'M', 'X', 1,
+        8, 3,
+        4, 0,                   /* width                                */
+        1, 0,                   /* height: ONE row, so no per-row check */
+        4, 0,                   /* four palette entries = eight bytes...*/
+        24, 0,                  /* pixel data offset: 16 + 4*2          */
+        0, 0,
+        0x0F, 0x00              /* ...of which the file holds two       */
+    };
+    unsigned char code;
+
+    if (write_raw(name, file, sizeof file)) {
+        t_check(0, "BMX_SHORT_PAL");
+        return;
+    }
+    code = x16_bmx_load(name, sizeof name - 1, X16_DEVICE_SD, TESTVRAM);
+    x16_dos_delete(name, sizeof name - 1);
+
+    t_check(code == X16_BMX_ERR_IO, "BMX_SHORT_PAL");
+}
+
+#endif /* SUITE == 2 */
+
 /* ------------------------------------------------------------------ */
 /* floating point                                                      */
 /* ------------------------------------------------------------------ */
@@ -2015,6 +2950,108 @@ static void test_mem_decompress_vram(void)
     }
     t_check(ok, "MEM_DECOMPRESS_VRAM");
 }
+
+#if SUITE == 2
+
+/* ------------------------------------------------------------------ */
+/* ZX0 and IMA ADPCM                                                   */
+/* ------------------------------------------------------------------ */
+
+/* The same phrase as the LZSA2 test, four times over, packed by
+** `salvador`. ZX0 v2, not -classic.
+*/
+static const unsigned char zx0_packed[] = {
+    0x15, 0xb8, 0x58, 0x31, 0x36, 0x4c, 0x49, 0x42, 0x2d, 0x44, 0x45, 0x43,
+    0x4f, 0x4d, 0x50, 0x52, 0x45, 0x53, 0x53, 0x2d, 0x54, 0x45, 0x53, 0x54,
+    0x21, 0xd0, 0x15, 0xd5, 0x55, 0x60
+};
+
+static void test_zx0(void)
+{
+    unsigned char *end;
+    unsigned char i, r, ok = 1;
+
+    unpacked[96] = 0x77;                /* guard, one past the output */
+    end = x16_zx0_decompress(zx0_packed, unpacked);
+
+    if (end != unpacked + 96 || unpacked[96] != 0x77) {
+        t_check(0, "ZX0");
+        return;
+    }
+    for (r = 0; r < 4; ++r) {
+        for (i = 0; i < 24; ++i) {
+            if (unpacked[r * 24 + i] != lzsa_phrase[i]) ok = 0;
+        }
+    }
+    /* Aside: 30 bytes here against LZSA2's 31 for the same payload --
+    ** ZX0 packs tighter, which is the reason to carry this code at all.
+    */
+    t_check(ok, "ZX0");
+}
+
+/* Eight ADPCM bytes decode to sixteen signed 16-bit samples. The
+** expected values came from Python's audioop, so this pins the algorithm
+** -- the saturation, the index clamp, the low-nibble-first order -- not
+** just our plumbing.
+*/
+static void test_adpcm(void)
+{
+    static const unsigned char packed[8] = {
+        0x17, 0x28, 0x93, 0x4C, 0xE5, 0x0A, 0x71, 0xBF
+    };
+    static const int expect[16] = {
+        0x000b, 0x0011, 0x0010, 0x0017, 0x0021, 0x001e, 0x0013, 0x0020,
+        0x0032, 0x0011, -5,     -1,     0x0009, 0x003d, -51,    -164
+    };
+    static int out[16];
+    unsigned char i, ok = 1;
+
+    x16_adpcm_init();
+    x16_adpcm_block(packed, out, sizeof packed);
+
+    for (i = 0; i < 16; ++i) {
+        if (out[i] != expect[i]) ok = 0;
+    }
+    /* The decoder state must end where the reference says it does. */
+    ok = ok && x16_adpcm_predictor() == -164 && x16_adpcm_index() == 29;
+
+    t_check(ok, "ADPCM");
+}
+
+/* State carries across calls, so decoding a block in slices gives the
+** same answer as decoding it in one go. That is what makes it stream.
+*/
+static void test_adpcm_sliced(void)
+{
+    static const unsigned char packed[8] = {
+        0x17, 0x28, 0x93, 0x4C, 0xE5, 0x0A, 0x71, 0xBF
+    };
+    static int whole[16], sliced[16];
+    unsigned char i, ok = 1;
+
+    x16_adpcm_init();
+    x16_adpcm_block(packed, whole, 8);
+
+    x16_adpcm_init();
+    x16_adpcm_block(packed, sliced, 3);
+    x16_adpcm_block(packed + 3, sliced + 6, 5);
+
+    for (i = 0; i < 16; ++i) {
+        if (whole[i] != sliced[i]) ok = 0;
+    }
+    t_check(ok, "ADPCM_SLICED");
+}
+
+/* An IMA WAV block header carries the initial predictor and step index. */
+static void test_adpcm_state(void)
+{
+    x16_adpcm_set_state(-1000, 42);
+
+    t_check(x16_adpcm_predictor() == -1000 && x16_adpcm_index() == 42,
+            "ADPCM_STATE");
+}
+
+#endif /* SUITE == 2 */
 
 /* ------------------------------------------------------------------ */
 /* ABI shim tests                                                      */
@@ -2321,6 +3358,8 @@ int main(void)
 {
     t_init();
 
+#if SUITE == 1
+
     test_zp_in_window();
 
     test_fill();
@@ -2408,6 +3447,7 @@ int main(void)
     test_irq_line_fires();
     test_irq_line_at_scanline();
     test_irq_zp_preserved();
+    test_irq_vregs_preserved();
 
     test_joy_get();
     test_joy_absent();
@@ -2488,6 +3528,72 @@ int main(void)
         t_skip("ABI_FX_FILL_ARGORDER");
     }
     test_abi_stack_balance();
+
+#else   /* SUITE == 2: the Prog8-inspired batch */
+
+    test_math_tables();
+    test_rnd();
+    test_rnd_zero_seed();
+    test_atan2();
+    test_atan2_roundtrip();
+    test_lerp8();
+
+    test_ringbuffer();
+    test_ringbuffer_wrap();
+    test_stack();
+    test_buffers_ff_is_not_empty();
+
+    test_clip_inside();
+    test_clip_reject();
+    test_clip_horizontal();
+    test_clip_diagonal();
+    test_clip_set();
+    test_clip_symmetry();
+
+    test_gfx_circle();
+    test_gfx_circle_r0();
+    test_gfx_disc();
+    test_gfx_circle_clips();
+    test_gfx_char();
+    test_gfx_text();
+    test_gfx_flood();
+    test_gfx_flood_noop();
+
+    if (x16_vera_has_fx()) {
+        test_fx_copy();
+        test_fx_copy_bank();
+        test_fx_transparency();
+        test_fx_transparency_off();
+    } else {
+        t_skip("FX_COPY");
+        t_skip("FX_COPY_BANK");
+        t_skip("FX_TRANSPARENCY");
+        t_skip("FX_TRANSPARENCY_OFF");
+    }
+
+    test_psg_env_attack();
+    test_psg_env_instant();
+    test_psg_env_release();
+    test_psg_env_sustain();
+    test_psg_env_stop();
+
+    test_dos_status();
+    test_dos_delete_missing();
+    test_dos_delete();
+    test_dos_rename();
+
+    test_bmx_roundtrip();
+    test_bmx_bad_format();
+    test_bmx_missing();
+    test_bmx_truncated();
+    test_bmx_short_pal();
+
+    test_zx0();
+    test_adpcm();
+    test_adpcm_sliced();
+    test_adpcm_state();
+
+#endif
 
     t_done();
     return 0;

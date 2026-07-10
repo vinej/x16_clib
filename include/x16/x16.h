@@ -57,8 +57,15 @@
 #include <x16/bank.h>           /* banked RAM, and a whole-bank allocator */
 #include <x16/mem.h>            /* KERNAL block ops, incl. LZSA2 depacking */
 #include <x16/load.h>           /* load and save, including into VRAM */
+#include <x16/dos.h>            /* the DOS command channel: status, delete */
+#include <x16/bmx.h>            /* the X16's native bitmap file format */
+#include <x16/zx0.h>            /* ZX0 depacking, tighter than LZSA2 */
+#include <x16/adpcm.h>          /* IMA ADPCM: 4:1 compressed audio */
 #include <x16/fixed.h>          /* 8.8 fixed point, 16x16 multiply */
+#include <x16/math.h>           /* PRNG, sine tables, atan2, lerp */
 #include <x16/collide.h>        /* bounding-box overlap */
+#include <x16/clip.h>           /* Cohen-Sutherland line clipping */
+#include <x16/buffers.h>        /* a ring buffer and a stack */
 #include <x16/float.h>          /* the ROM's floating point library */
 
 /* Diagnostic: the address the linker gave the scratch block. Nothing

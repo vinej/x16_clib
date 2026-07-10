@@ -21,15 +21,21 @@
 ;
 ; 1. Zero page. A user callback runs inside the interrupt, and in C it is
 ;    compiled code that uses cc65's zero-page runtime (sp, sreg, ptr1-4,
-;    tmp1-4, regbank) and may call library routines that use X16_P0..T7.
-;    The interrupted code owns all of those, mid-expression. So the two
-;    blocks are saved before a callback and restored after -- 42 bytes,
-;    about 950 cycles, and only when a callback is actually installed.
-;    That is 0.7% of a frame, and it is what makes a raster handler
-;    written in C correct rather than usually-correct.
+;    tmp1-4, regbank) and may call library routines that use X16_P0..T7
+;    or the KERNAL's virtual registers r0-r15. The interrupted code owns
+;    all three blocks, mid-expression. mem_copy in particular loads r0-r2
+;    and then runs MEMORY_COPY with interrupts enabled: a callback that
+;    calls another mem_* or mouse_get would corrupt the interrupted
+;    copy's pointers on resume.
+;
+;    So all three are saved before a callback and restored after -- 74
+;    bytes, about 1,600 cycles, and only when a callback is actually
+;    installed. That is roughly 1.2% of a frame, and it is what makes a
+;    raster handler written in C correct rather than usually-correct: it
+;    may call anything.
 ;
 ;    The AFLOW handler is exempt: it is this library's own assembly and
-;    touches neither block.
+;    touches none of them.
 ;
 ; 2. Module coupling. The ACME original called pcm_stream_isr behind an
 ;    !ifdef, which cannot survive separate compilation -- irq.o would
@@ -67,6 +73,7 @@
         .destructor     irq_remove, 10
 
 X16_ZP_SAVE_SIZE = 16                   ; X16_P0..X16_T7
+VREG_SAVE_SIZE   = 32                   ; the KERNAL's r0-r15
 
         .segment        "CODE"
 
@@ -131,11 +138,14 @@ call_aflow:
         jmp     (irq_aflow_vec)
 
 ; ---------------------------------------------------------------------
-; Park both zero-page blocks a callback might touch, and put them back.
+; Park every zero-page block a callback might touch, and put them back.
 ;
-; cc65's runtime block is zpspace (26) bytes starting at `sp`; the
-; library's is the 16 bytes from X16_P0. Neither loop can be interrupted:
-; the KERNAL's stub reaches CINV with the I flag already set.
+;   cc65's runtime      zpspace (26) bytes from `sp`
+;   the library's       16 bytes from X16_P0
+;   the KERNAL's        32 bytes of r0-r15, at $02-$21
+;
+; Neither loop can be interrupted: the KERNAL's stub reaches CINV with
+; the I flag already set.
 ; ---------------------------------------------------------------------
 save_zp:
         ldx     #zpspace - 1
@@ -150,6 +160,12 @@ save_zp:
         sta     zp_save + zpspace,x
         dex
         bpl     @lib
+        ldx     #VREG_SAVE_SIZE - 1
+@vreg:
+        lda     r0L,x                   ; r0-r15 live at $02-$21
+        sta     zp_save + zpspace + X16_ZP_SAVE_SIZE,x
+        dex
+        bpl     @vreg
         rts
 
 restore_zp:
@@ -165,6 +181,12 @@ restore_zp:
         sta     X16_P0,x
         dex
         bpl     @lib
+        ldx     #VREG_SAVE_SIZE - 1
+@vreg:
+        lda     zp_save + zpspace + X16_ZP_SAVE_SIZE,x
+        sta     r0L,x
+        dex
+        bpl     @vreg
         rts
 
 ; ---------------------------------------------------------------------
@@ -391,4 +413,4 @@ irq_sprcol_mask:  .res 1                ; groups seen since the last read
 
 irq_aflow_vec:    .res 2                ; audio/pcm.s claims this, or nobody
 
-zp_save:          .res zpspace + X16_ZP_SAVE_SIZE
+zp_save:          .res zpspace + X16_ZP_SAVE_SIZE + VREG_SAVE_SIZE
