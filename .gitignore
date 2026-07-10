@@ -13,5 +13,6 @@ test_llvm/fsroot/*
 # Third-party, not ours to redistribute. See README.md for where to get them.
 emulator/
 llvm-mos/
+ca65/
 doc/*.pdf
 doc/*.md

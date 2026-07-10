@@ -43,9 +43,11 @@ $obj   = Join-Path $build "obj"
 $lib   = Join-Path $build "x16c.lib"
 
 # --- locate cc65 -----------------------------------------------------
-# CC65_HOME wins; then the usual install spots; then whatever is on PATH.
+# The repo-local .\ca65 copy wins, so a checkout that carries its own
+# toolchain always builds with it; then CC65_HOME, the usual install
+# spots, and finally whatever is on PATH.
 $cc65bin = $null
-$candidates = @()
+$candidates = @(Join-Path $root "ca65\bin")
 if ($env:CC65_HOME) { $candidates += (Join-Path $env:CC65_HOME "bin") }
 $candidates += "C:\Emulator\cc65\bin", "C:\cc65\bin"
 foreach ($c in $candidates) {

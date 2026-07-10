@@ -117,16 +117,45 @@ Two third-party things are expected but **not** committed:
 
 | Path | What | Where from |
 |---|---|---|
-| cc65 | one compiler | <https://cc65.github.io/> |
-| llvm-mos | the other | <https://github.com/llvm-mos/llvm-mos-sdk/releases> (the combined `llvm-mos-windows.7z`, not the compiler-only build) |
+| `ca65\` | cc65, the one compiler | <https://cc65.github.io/> (a Windows snapshot zip) |
+| `llvm-mos\` | the other | <https://github.com/llvm-mos/llvm-mos-sdk/releases> (the combined `llvm-mos-windows.7z`, not the compiler-only build) |
 | `emulator\x16emu.exe` + `rom.bin` | X16 emulator r49 | <https://github.com/X16Community/x16-emulator>, ROM from <https://github.com/X16Community/x16-rom> |
 
 You need only the toolchain you intend to use.
 
-`build_ca65.ps1` finds cc65 through `%CC65_HOME%\bin`, then
-`C:\Emulator\cc65\bin`, then `C:\cc65\bin`, then `PATH`.
-`build_llvm.ps1` finds llvm-mos through `%LLVM_MOS_HOME%\bin`, then
-`.\llvm-mos\bin`, then `C:\llvm-mos\bin`.
+`build_ca65.ps1` finds cc65 through `.\ca65\bin` first, then
+`%CC65_HOME%\bin`, then `C:\Emulator\cc65\bin`, then `C:\cc65\bin`, then
+`PATH`. `build_llvm.ps1` finds llvm-mos through `%LLVM_MOS_HOME%\bin`,
+then `.\llvm-mos\bin`, then `C:\llvm-mos\bin`.
+
+### Recompiling with the repo-local `ca65\`
+
+Unpack a cc65 distribution so the repo root looks like this -- `bin`
+alone is not enough, because `cl65` locates the runtime pieces relative
+to its own exe:
+
+```
+ca65\bin\        ca65.exe, cc65.exe, cl65.exe, ld65.exe, ar65.exe
+ca65\asminc\     assembler includes
+ca65\cfg\        linker configs (cx16.cfg)
+ca65\include\    the C standard headers
+ca65\lib\        cx16.lib and the other target runtimes
+ca65\target\     per-target data files
+```
+
+(`html\` and `samples\` from the distribution can be left out.) The
+folder is gitignored -- cc65 is third-party and not committed -- so
+every fresh clone needs this step once. After that, a full recompile is
+just:
+
+```powershell
+.\build_ca65.ps1                 # rebuild x16c.lib + examples\hello.c
+.\build_ca65.ps1 -Test           # rebuild and run the regression suite
+```
+
+The script rebuilds only what changed (it compares timestamps against
+the objects in `build_ca65\obj`); delete the `build_ca65` folder to
+force everything from scratch.
 
 Use the **r49** emulator and ROM: the constants in `src_ca65/core/` and
 `src_llvm/core/` are transcribed from the r49 ROM sources, and both test
