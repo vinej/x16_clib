@@ -40,7 +40,10 @@ $core  = Join-Path $src  "core"
 $inc   = Join-Path $root "include_llvm"
 $build = Join-Path $root "build_llvm"
 $obj   = Join-Path $build "obj"
-$lib   = Join-Path $build "libx16c.a"
+# The finished archive is a deliverable, not an intermediate: it goes to
+# dist_llvm, which is committed, while build_llvm stays gitignored.
+$dist  = Join-Path $root "dist_llvm"
+$lib   = Join-Path $dist "libx16c.a"
 
 # --- locate llvm-mos -------------------------------------------------
 # LLVM_MOS_HOME wins; then the copy inside the repo; then the usual spots.
@@ -62,7 +65,7 @@ $ar    = Join-Path $mosbin "llvm-ar.exe"
 foreach ($tool in @($clang, $ar, $emu, $rom)) {
     if (-not (Test-Path $tool)) { Fail "missing: $tool" }
 }
-foreach ($dir in @($build, $obj)) {
+foreach ($dir in @($build, $obj, $dist)) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
 }
 

@@ -113,40 +113,50 @@ demos.
 
 ## Prerequisites
 
-Two third-party things are expected but **not** committed:
+**To just use the library, nothing needs rebuilding.** The finished
+archives are committed, one per toolchain -- `dist_ca65\x16c.lib` and
+`dist_llvm\libx16c.a` -- along with the headers in `include_ca65\` and
+`include_llvm\`. A compiler for *your* program is all you need:
+
+```
+cl65 -t cx16 -O -I include_ca65 -o PROG.PRG prog.c dist_ca65\x16c.lib
+```
+
+To rebuild the library itself, or run its test suite, read on.
+
+Three third-party things are expected but **not** committed:
 
 | Path | What | Where from |
 |---|---|---|
-| `ca65\` | cc65, the one compiler | <https://cc65.github.io/> (a Windows snapshot zip) |
+| `ca65\` (or any cc65 install) | one compiler | <https://cc65.github.io/> (a Windows snapshot zip) |
 | `llvm-mos\` | the other | <https://github.com/llvm-mos/llvm-mos-sdk/releases> (the combined `llvm-mos-windows.7z`, not the compiler-only build) |
 | `emulator\x16emu.exe` + `rom.bin` | X16 emulator r49 | <https://github.com/X16Community/x16-emulator>, ROM from <https://github.com/X16Community/x16-rom> |
 
 You need only the toolchain you intend to use.
 
-`build_ca65.ps1` finds cc65 through `.\ca65\bin` first, then
-`%CC65_HOME%\bin`, then `C:\Emulator\cc65\bin`, then `C:\cc65\bin`, then
-`PATH`. `build_llvm.ps1` finds llvm-mos through `%LLVM_MOS_HOME%\bin`,
+`build_ca65.ps1` finds cc65 through the repo-local `.\ca65\bin` first,
+then `%CC65_HOME%\bin`, then `C:\Emulator\cc65\bin`, then `C:\cc65\bin`,
+then `PATH`. `build_llvm.ps1` finds llvm-mos through `%LLVM_MOS_HOME%\bin`,
 then `.\llvm-mos\bin`, then `C:\llvm-mos\bin`.
 
-### Recompiling with the repo-local `ca65\`
+### Recompiling the library
 
-Unpack a cc65 distribution so the repo root looks like this -- `bin`
-alone is not enough, because `cl65` locates the runtime pieces relative
-to its own exe:
+Point the script at a cc65 install using any of the paths above. The
+repo-local option is a `ca65\` folder (gitignored) shaped like this --
+`bin` alone is not enough, because `cl65` locates the runtime pieces
+relative to its own exe:
 
 ```
 ca65\bin\        ca65.exe, cc65.exe, cl65.exe, ld65.exe, ar65.exe
 ca65\asminc\     assembler includes
 ca65\cfg\        linker configs (cx16.cfg)
 ca65\include\    the C standard headers
-ca65\lib\        cx16.lib and the other target runtimes
-ca65\target\     per-target data files
+ca65\lib\        cx16.lib
+ca65\target\     cx16 data files (conio drivers)
 ```
 
-(`html\` and `samples\` from the distribution can be left out.) The
-folder is gitignored -- cc65 is third-party and not committed -- so
-every fresh clone needs this step once. After that, a full recompile is
-just:
+(`html\`, `samples\`, and the other targets' files under `lib\` and
+`target\` can be left out.) Then a full recompile is just:
 
 ```powershell
 .\build_ca65.ps1                 # rebuild x16c.lib + examples\hello.c
@@ -155,7 +165,11 @@ just:
 
 The script rebuilds only what changed (it compares timestamps against
 the objects in `build_ca65\obj`); delete the `build_ca65` folder to
-force everything from scratch.
+force everything from scratch. Intermediates stay in the gitignored
+`build_ca65\`; the finished archive lands in the committed
+`dist_ca65\`, so expect git to see `dist_ca65\x16c.lib` as modified
+after a rebuild. `build_llvm.ps1` does the same with `build_llvm\` and
+`dist_llvm\libx16c.a`.
 
 Use the **r49** emulator and ROM: the constants in `src_ca65/core/` and
 `src_llvm/core/` are transcribed from the r49 ROM sources, and both test
@@ -200,14 +214,14 @@ int main(void)
 Build it:
 
 ```
-cl65 -t cx16 -O -I include_ca65 -o PROG.PRG prog.c build_ca65\x16c.lib
+cl65 -t cx16 -O -I include_ca65 -o PROG.PRG prog.c dist_ca65\x16c.lib
 ```
 
 ...or, with llvm-mos:
 
 ```
 mos-cx16-clang -Os -mreserve-zp=16 -I include_llvm \
-    -o PROG.PRG prog.c build_llvm\libx16c.a
+    -o PROG.PRG prog.c dist_llvm\libx16c.a
 ```
 
 `<x16/x16.h>` pulls in everything, and costs nothing at run time: ld65
@@ -418,8 +432,9 @@ src_ca65/core/   constants, macros, the zero-page block
 src/*/           one .s per module -> one .o -> one member of x16c.lib
 examples/        hello.c, bounce.c, numbers.c
 test_ca65/       runner.c, runner2.c, testlib.h, fsroot/
-build_ca65/      objects, x16c.lib, PRGs        (gitignored)
-src_llvm/ include_llvm/ test_llvm/ build_llvm/  the llvm-mos half
+build_ca65/      objects, PRGs, transcripts             (gitignored)
+dist_ca65/       x16c.lib, the finished archive         (committed)
+src_llvm/ include_llvm/ test_llvm/ build_llvm/ dist_llvm/  the llvm-mos half
 tools/           ca65_to_llvm.py
 ```
 

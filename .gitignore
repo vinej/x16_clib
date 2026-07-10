@@ -1,5 +1,7 @@
-# Build output: objects, the archive, PRGs, test transcripts. One tree per
-# toolchain -- the two share no object code.
+# Build intermediates: objects, PRGs, test transcripts. One tree per
+# toolchain -- the two share no object code. The finished archives land in
+# dist_ca65/ and dist_llvm/, which are committed for users who only want
+# to link against the library, not rebuild it.
 build_ca65/
 build_llvm/
 
@@ -10,7 +12,9 @@ test_ca65/fsroot/*
 test_llvm/fsroot/*
 !test_llvm/fsroot/.gitkeep
 
-# Third-party, not ours to redistribute. See README.md for where to get them.
+# Third-party, not committed. See README.md for where to get them.
+# ca65/ is an optional repo-local cc65 install that build_ca65.ps1
+# prefers when present.
 emulator/
 llvm-mos/
 ca65/

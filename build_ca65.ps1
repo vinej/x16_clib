@@ -40,7 +40,10 @@ $core  = Join-Path $src  "core"
 $inc   = Join-Path $root "include_ca65"
 $build = Join-Path $root "build_ca65"
 $obj   = Join-Path $build "obj"
-$lib   = Join-Path $build "x16c.lib"
+# The finished archive is a deliverable, not an intermediate: it goes to
+# dist_ca65, which is committed, while build_ca65 stays gitignored.
+$dist  = Join-Path $root "dist_ca65"
+$lib   = Join-Path $dist "x16c.lib"
 
 # --- locate cc65 -----------------------------------------------------
 # The repo-local .\ca65 copy wins, so a checkout that carries its own
@@ -68,7 +71,7 @@ $cl65 = Join-Path $cc65bin "cl65.exe"
 foreach ($tool in @($ca65, $ar65, $cl65, $emu, $rom)) {
     if (-not (Test-Path $tool)) { Fail "missing: $tool" }
 }
-foreach ($dir in @($build, $obj)) {
+foreach ($dir in @($build, $obj, $dist)) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
 }
 
