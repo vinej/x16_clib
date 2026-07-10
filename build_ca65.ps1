@@ -3,12 +3,16 @@
     Build the x16clib library with cc65, then compile and optionally run
     a C program against it.
 
+    This is the cc65/ca65 half of the library. The llvm-mos half is
+    build_llvm.ps1, over src_llvm/ and include_llvm/. The two toolchains
+    share no object code and no calling convention -- only the API.
+
 .EXAMPLE
-    .\build.ps1                                   # build lib + examples\hello.c
-    .\build.ps1 -Run                              # ...and run it windowed
-    .\build.ps1 -Source examples\bounce.c -Run
-    .\build.ps1 -Test                             # headless regression suite
-    .\build.ps1 -Test -Windowed                   # ...with video, so VSYNC and
+    .\build_ca65.ps1                              # build lib + examples\hello.c
+    .\build_ca65.ps1 -Run                         # ...and run it windowed
+    .\build_ca65.ps1 -Source examples\bounce.c -Run
+    .\build_ca65.ps1 -Test                        # headless regression suite
+    .\build_ca65.ps1 -Test -Windowed              # ...with video, so VSYNC and
                                                   # raster interrupts really fire
 #>
 param(
@@ -31,10 +35,10 @@ function Fail([string]$message) {
 $root  = $PSScriptRoot
 $emu   = Join-Path $root "emulator\x16emu.exe"
 $rom   = Join-Path $root "emulator\rom.bin"
-$src   = Join-Path $root "src"
+$src   = Join-Path $root "src_ca65"
 $core  = Join-Path $src  "core"
-$inc   = Join-Path $root "include"
-$build = Join-Path $root "build"
+$inc   = Join-Path $root "include_ca65"
+$build = Join-Path $root "build_ca65"
 $obj   = Join-Path $build "obj"
 $lib   = Join-Path $build "x16c.lib"
 
@@ -122,7 +126,7 @@ function Build-Prg([string]$srcRel) {
 
     Write-Host "cl65  $srcRel -> $prg"
     $linkArgs = @('-t', 'cx16', '-O', '-I', $inc, '-o', $prg)
-    if ($srcRel -like 'test\*') { $linkArgs += @('-Wl', '-D,__STACKSIZE__=0x0400') }
+    if ($srcRel -like 'test_ca65\*') { $linkArgs += @('-Wl', '-D,__STACKSIZE__=0x0400') }
     $linkArgs += (Join-Path $root $srcRel)
     $linkArgs += $lib
 
@@ -135,7 +139,7 @@ function Build-Prg([string]$srcRel) {
 # -Test with no explicit -Source runs both halves of the suite.
 $suites = @()
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test\runner.c', 'test\runner2.c')
+    $suites = @('test_ca65\runner.c', 'test_ca65\runner2.c')
 } else {
     $suites = @($Source)
 }
@@ -159,7 +163,7 @@ if ($Test) {
     # hermetic and never touch a real SD-card image. Cleared ONCE, before
     # the first suite: a stale file could make a broken save look like a
     # working one, but each suite cleans up after itself.
-    $fsroot = Join-Path $root "test\fsroot"
+    $fsroot = Join-Path $root "test_ca65\fsroot"
     if (-not (Test-Path $fsroot)) { New-Item -ItemType Directory -Path $fsroot | Out-Null }
     Get-ChildItem $fsroot -File | Remove-Item -Force
 

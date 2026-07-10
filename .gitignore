@@ -1,12 +1,17 @@
-# Build output: objects, the archive, PRGs, test transcripts.
-build/
+# Build output: objects, the archive, PRGs, test transcripts. One tree per
+# toolchain -- the two share no object code.
+build_ca65/
+build_llvm/
 
-# The suite's scratch SD card. build.ps1 -Test empties it, and the tests
-# write everything they read.
-test/fsroot/*
-!test/fsroot/.gitkeep
+# Each suite's scratch SD card. The build scripts empty it before a run,
+# and the tests write everything they read.
+test_ca65/fsroot/*
+!test_ca65/fsroot/.gitkeep
+test_llvm/fsroot/*
+!test_llvm/fsroot/.gitkeep
 
 # Third-party, not ours to redistribute. See README.md for where to get them.
 emulator/
+llvm-mos/
 doc/*.pdf
 doc/*.md

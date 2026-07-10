@@ -22,7 +22,6 @@
  */
 
 #include <stdio.h>
-#include <conio.h>
 #include <x16/x16.h>
 
 /* Print an 8.8 fixed-point value as a decimal. The fraction is the low
@@ -55,7 +54,7 @@ int main(void)
     x16_float a, b;
     char buf[X16_FP_STRLEN];
 
-    clrscr();
+    x16_screen_cls();
 
     /* --- what C gives you already --------------------------------- */
     heading("NATIVE C");

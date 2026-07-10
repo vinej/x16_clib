@@ -4,10 +4,46 @@ A C library for the Commander X16. Write games and demos in C without
 re-deriving the machine's hardware surface every time.
 
 This is a routine-by-routine port of [x16lib](../x16_library), an ACME
-assembly library, to a cc65-linkable archive with C headers. The assembly
-is preserved, not rewritten: every hot loop is the same hand-written 6502.
-What is new is a thin `__fastcall__` shim in front of each routine, and a
-set of headers that say what the hardware actually does.
+assembly library, to a linkable archive with C headers. The assembly is
+preserved, not rewritten: every hot loop is the same hand-written 6502.
+What is new is a thin shim in front of each routine, and a set of headers
+that say what the hardware actually does.
+
+## Two toolchains
+
+The same 28 modules and the same API build under **cc65** and under
+**llvm-mos**. Pick either; they share no object code.
+
+```
+include_ca65/  src_ca65/  test_ca65/  build_ca65.ps1     cc65      158 tests
+include_llvm/  src_llvm/  test_llvm/  build_llvm.ps1     llvm-mos   46 tests
+examples/      doc/       emulator/   tools/             shared
+```
+
+```powershell
+.\build_ca65.ps1 -Test                 # cc65:     158/158
+.\build_llvm.ps1 -Test                 # llvm-mos:  46/46
+.\build_llvm.ps1 -Source examples\bounce.c -Run
+```
+
+The two trees hold the *same* assembly for the internal routines --
+`tools/ca65_to_llvm.py` translates the mechanical half -- and completely
+different C entry points, because the calling conventions have nothing in
+common:
+
+|  | cc65 | llvm-mos |
+|---|---|---|
+| arguments | rightmost in `A`/`X`; the rest pushed on a software stack | assigned left to right into `A`, `X`, `__rc2`, `__rc3`, … |
+| pointers | two bytes like anything else | a whole aligned `__rc` **pair** |
+| `char` return | `A`, plus `ldx #0` for int promotion | `A` alone |
+| pointer return | `A`/`X` | **`__rc2`/`__rc3`** |
+| declaration | `__fastcall__` | nothing |
+
+**Under llvm-mos, compile with `-mreserve-zp=16`** (`build_llvm.ps1` does).
+The cx16 target leaves only ninety bytes of zero page, clang's LTO claims
+as many as it likes, and this library reserves sixteen for its argument
+block. Without the flag the link fails outright with `section '.zp.bss'
+will not fit in region 'zp'`. See [include_llvm/x16/x16.h](include_llvm/x16/x16.h).
 
 ## What it gives you that cc65 does not
 
@@ -81,24 +117,32 @@ Two third-party things are expected but **not** committed:
 
 | Path | What | Where from |
 |---|---|---|
-| cc65 | the compiler | <https://cc65.github.io/> |
+| cc65 | one compiler | <https://cc65.github.io/> |
+| llvm-mos | the other | <https://github.com/llvm-mos/llvm-mos-sdk/releases> (the combined `llvm-mos-windows.7z`, not the compiler-only build) |
 | `emulator\x16emu.exe` + `rom.bin` | X16 emulator r49 | <https://github.com/X16Community/x16-emulator>, ROM from <https://github.com/X16Community/x16-rom> |
 
-`build.ps1` finds cc65 through `%CC65_HOME%\bin`, then `C:\Emulator\cc65\bin`,
-then `C:\cc65\bin`, then `PATH`.
+You need only the toolchain you intend to use.
 
-Use the **r49** emulator and ROM: the constants in `src/core/` are
-transcribed from the r49 ROM sources, and the test suite asserts against
-r49 behaviour.
+`build_ca65.ps1` finds cc65 through `%CC65_HOME%\bin`, then
+`C:\Emulator\cc65\bin`, then `C:\cc65\bin`, then `PATH`.
+`build_llvm.ps1` finds llvm-mos through `%LLVM_MOS_HOME%\bin`, then
+`.\llvm-mos\bin`, then `C:\llvm-mos\bin`.
+
+Use the **r49** emulator and ROM: the constants in `src_ca65/core/` and
+`src_llvm/core/` are transcribed from the r49 ROM sources, and both test
+suites assert against r49 behaviour.
 
 ## Quick start
 
 ```powershell
-.\build.ps1                              # build the lib + examples\hello.c
-.\build.ps1 -Run                         # ...and run it windowed
-.\build.ps1 -Source examples\bounce.c -Run
-.\build.ps1 -Test                        # the headless regression suite
+.\build_ca65.ps1                         # build the lib + examples\hello.c
+.\build_ca65.ps1 -Run                    # ...and run it windowed
+.\build_ca65.ps1 -Source examples\bounce.c -Run
+.\build_ca65.ps1 -Test                   # the headless regression suite
 ```
+
+Swap `build_ca65.ps1` for `build_llvm.ps1` to do the same with llvm-mos;
+the examples build unchanged under both.
 
 `-Run` runs the emulator **windowed**. `-Test` is headless and raises no
 VSYNC interrupt, so anything calling `x16_vsync_wait()` would hang there.
@@ -127,7 +171,14 @@ int main(void)
 Build it:
 
 ```
-cl65 -t cx16 -O -I include -o PROG.PRG prog.c build\x16c.lib
+cl65 -t cx16 -O -I include_ca65 -o PROG.PRG prog.c build_ca65\x16c.lib
+```
+
+...or, with llvm-mos:
+
+```
+mos-cx16-clang -Os -mreserve-zp=16 -I include_llvm \
+    -o PROG.PRG prog.c build_llvm\libx16c.a
 ```
 
 `<x16/x16.h>` pulls in everything, and costs nothing at run time: ld65
@@ -251,16 +302,17 @@ next deep call; the wrapper copies it into yours before returning.
 ## Tests
 
 ```powershell
-.\build.ps1 -Test              # headless: 158 tests in a few seconds
-.\build.ps1 -Test -Windowed    # with video: 165, nothing skipped but one
+.\build_ca65.ps1 -Test           # cc65, headless: 158 in a few seconds
+.\build_ca65.ps1 -Test -Windowed # ...with video: 165, one skip
+.\build_llvm.ps1 -Test           # llvm-mos: 46, all ABI-focused
 ```
 
 **The suite is two programs.** All 28 library modules plus 160-odd test
 functions no longer fit in the X16's 38.6 KB of program RAM — the code
-alone reaches 33 KB, leaving nothing for BSS. So `test/runner.c` compiles
-twice: `test/runner2.c` is three lines that set `SUITE` to 2 and
+alone reaches 33 KB, leaving nothing for BSS. So `test_ca65/runner.c`
+compiles twice: `test_ca65/runner2.c` is three lines that set `SUITE` to 2 and
 `#include` it, and the groups behind `#if SUITE == 2` move to the second
-PRG, which then links only the modules its half reaches. `build.ps1` runs
+PRG, which then links only the modules its half reaches. `build_ca65.ps1` runs
 both and sums the results. Each half is self-contained, so
 `-Source test\runner2.c` runs it alone.
 
@@ -333,11 +385,13 @@ notice.
 
 ```
 include/x16/     the C API, one header per module
-src/core/        constants, macros, the zero-page block
+src_ca65/core/   constants, macros, the zero-page block
 src/*/           one .s per module -> one .o -> one member of x16c.lib
 examples/        hello.c, bounce.c, numbers.c
-test/            runner.c, runner2.c, testlib.h, fsroot/
-build/           objects, x16c.lib, PRGs        (gitignored)
+test_ca65/       runner.c, runner2.c, testlib.h, fsroot/
+build_ca65/      objects, x16c.lib, PRGs        (gitignored)
+src_llvm/ include_llvm/ test_llvm/ build_llvm/  the llvm-mos half
+tools/           ca65_to_llvm.py
 ```
 
 Each `.s` holds the ported routine under its original bare label plus an
@@ -369,7 +423,7 @@ plain `.import` and ca65 assumes absolute addressing, emitting a
 three-byte instruction against an address the linker resolves below
 `$0100`. And the assembly library's hardcoded `$22` zero-page block is
 gone: cc65's `cx16.cfg` maps its `ZEROPAGE` segment onto exactly that
-window, so `src/core/x16zp.s` declares the block and the linker places it.
+window, so `src_ca65/core/x16zp.s` declares the block and the linker places it.
 
 Four more differences bit during the port and are not visible in the table.
 
@@ -393,3 +447,65 @@ labels throughout that routine, not a mix.
 
 **`.byte -1` is a range error**; write `$FF`. And a nonzero initialiser
 belongs in `.segment "DATA"`, because crt0's `zerobss` wipes `BSS`.
+
+## Porting notes: ca65 to llvm-mos
+
+`tools/ca65_to_llvm.py` does the mechanical half — `.segment "CODE"` to
+`.section .text,"ax",@progbits`, `.export` to `.globl`, `.import` deleted
+(ELF resolves externs by name), `.res` to `.zero`, `.fatal` to `.error`,
+`^(a)` to `((a) >> 16)`, macro parameters to `\arg`, `_x16_foo` to
+`x16_foo`, and ca65's cheap locals (`@loop`, scoped to the preceding real
+label and reused across routines) to `.L<parent>_<name>`.
+
+It deliberately does **not** translate the C entry points. It leaves
+cc65's `popa`, `popax`, `ptr1` and `sreg` exactly where they are, so any
+shim that has not been rewritten by hand fails at *link* time with an
+undefined symbol, and it prints every such line when it runs. A
+plausible-looking automatic translation of a shim would be silently
+wrong, which is the one failure this project cannot afford.
+
+Four more things that bite:
+
+**Argument position decides everything.** Integers and pointers draw from
+the same `__rc` space, left to right. `x16_mem_fill(dst, count, value)`
+puts the pointer in `__rc2/__rc3` and so pushes `value` out to `__rc4`;
+`x16_gfx_text(x, y, color, s)` fills `__rc2` and `__rc3` with `y` and
+`color` first, so the *string* lands in `__rc4/__rc5`. And
+`x16_fs_load(name, len, device, sa, dest, end)` has `sa` take `__rc4`,
+breaking that pair, so `dest` skips to `__rc6/__rc7` and `end` to
+`__rc8/__rc9`. Do not reason about this — capture the registers.
+
+**A pointer return comes back in `__rc2/__rc3`**, not `A`/`X`. Three
+routines return pointers (`x16_mem_decompress`, `x16_zx0_decompress`,
+`x16_dos_msg`), and a shim that leaves the address in `A`/`X` returns
+whatever `__rc2` happened to hold — usually a plausible address in the
+same page.
+
+**`.byte "AB"` silently assembles to a single `00`** under LLVM, where
+ca65 emits `41 42`. Use `.ascii`. Nothing in this library relied on it,
+but it is the same genus as ca65's PETSCII charmap.
+
+**cc65's `.destructor` becomes `.fini_array`.** `irq.s` needs to unhook
+`CINV` before the program returns to BASIC; llvm-mos has no directive for
+it, so the module puts a `.word irq_remove` in `.fini_array` and the
+runtime's `__do_fini_array` walks it on the way out.
+
+The interrupt zero-page save gets *simpler* on llvm-mos, not harder. cc65
+needed three blocks (its 26-byte runtime, our 16, the KERNAL's 32). Here
+`cx16/lib/imag-regs.ld` aliases `__rc2`–`__rc29` straight onto the
+KERNAL's `r0`–`r15`, so `$02`–`$25` is one contiguous run covering all
+thirty-two imaginary registers and all sixteen KERNAL registers at once:
+36 bytes, plus our 16.
+
+## A bug in llvm-mos-sdk v23.0.1
+
+**The cx16 target's `vpoke()` is broken.** `vpeek(addr)` correctly reads
+the address from `A`, `X` and `__rc2`. `vpoke(data, addr)` reads it from
+`__rc2`, `__rc3` and `__rc4` — never touching `X`, where the compiler puts
+`addr`'s first byte. Every write therefore lands at `addr >> 8`. Verified
+on the machine: `vpoke(0xAB, 0x08000)` stores at `$00080`, and
+`vpoke(0xCD, 0x01234)` at `$00012`.
+
+`test_llvm/testlib.h` defines its own `t_vpoke()` and keeps the SDK's
+`vpeek()` as the independent read-back path. If you use `vpoke()` in your
+own cx16 program under this SDK, it is not doing what you think.

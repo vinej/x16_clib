@@ -20,7 +20,6 @@
  * =====================================================================
  */
 
-#include <conio.h>
 #include <x16/x16.h>
 
 #define SPRITE_VRAM     0x13000UL       /* the KERNAL's sprite image area */
@@ -215,6 +214,17 @@ static void build_sprite_image(void)
 
 /* ------------------------------------------------------------------ */
 
+/* Three decimal digits, always. printf would cost more zero page than
+** this whole program has to spare on llvm-mos.
+*/
+static void put_u8(unsigned char v)
+{
+    x16_screen_chrout('0' + (v / 100));
+    x16_screen_chrout('0' + ((v / 10) % 10));
+    x16_screen_chrout('0' + (v % 10));
+    x16_screen_chrout(' ');
+}
+
 int main(void)
 {
     x16_screen_cls();
@@ -241,11 +251,15 @@ int main(void)
         check_collision();
         update_blip();
 
-        /* Nothing here selects VERA's port 1, so conio's own writes are
-        ** safe. See the ADDRSEL note in <x16/screen.h>.
+        /* x16_screen_locate/puts go through the KERNAL, which needs
+        ** ADDRSEL = 0 -- and they clear it for us. See <x16/screen.h>.
+        ** Formatted by hand rather than with printf: printf wants the
+        ** whole of llvm-mos's ninety-byte zero page, and this program
+        ** already spends sixteen of it on the library's scratch block.
         */
-        gotoxy(0, 0);
-        cprintf("%s  FRAME %3u ", hit ? "HIT" : "---", x16_irq_frames());
+        x16_screen_locate(0, 0);
+        x16_screen_puts(hit ? "HIT  FRAME " : "---  FRAME ");
+        put_u8(x16_irq_frames());
     } while (x16_key_get() == 0);
 
     x16_irq_remove();
