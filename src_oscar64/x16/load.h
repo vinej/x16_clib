@@ -1,0 +1,72 @@
+/* =====================================================================
+ * x16clib :: x16/load.h -- load and save
+ * =====================================================================
+ * Device 8 is the SD card. Filenames are (pointer, length), not
+ * NUL-terminated -- pass strlen(name) or a literal count.
+ *
+ * Two different numbers steer a load, and they are easy to conflate:
+ *
+ *   The SECONDARY ADDRESS says how to treat the file. That is the `sa`
+ *   argument, one of the X16_SA_* constants below.
+ *
+ *   Where in memory the bytes land is a separate matter, and it is the
+ *   reason x16_fs_vload() exists rather than an X16_SA_VRAM constant:
+ *   putting 2 or 3 in the secondary address does NOT reach VRAM, it asks
+ *   for a raw header-included load into system RAM.
+ *
+ * cc65's <cbm.h> has cbm_load() and cbm_save() for the system-RAM cases.
+ * x16_fs_vload() has no cc65 equivalent.
+ * =====================================================================
+ */
+
+/* ---------------------------------------------------------------------
+** Oscar64 build. The API is identical to the cc65 build's; what differs
+** is the delivery. Oscar64 compiles the whole program at once and strips
+** what goes unused, so this port is a SOURCE distribution: headers and
+** implementations sit side by side in src_oscar64/x16/, and the
+** `#pragma compile` at the bottom of this header pulls the matching .c
+** in automatically:
+**
+**     oscar64 -tm=x16 -n -i=src_oscar64 -o=YOURPROG.PRG yourprog.c
+** --------------------------------------------------------------------- */
+
+#ifndef X16_LOAD_H
+#define X16_LOAD_H
+
+#define X16_DEVICE_SD   8
+
+/* Secondary address for x16_fs_load(). */
+#define X16_SA_ADDR     0       /* skip the 2-byte PRG header, load at `dest` */
+#define X16_SA_HEADER   1       /* skip it, load where the header itself says */
+#define X16_SA_RAW      2       /* no header: load the whole file at `dest` */
+
+/* Returns 0 on success, else the KERNAL error code.
+**
+** *end receives the address one past the last byte loaded. Pass NULL if
+** you do not want it.
+*/
+unsigned char x16_fs_load (const char *name, unsigned char len,
+                                        unsigned char device, unsigned char sa,
+                                        void *dest, unsigned int *end);
+
+/* Write [start, end) as a PRG, with the usual 2-byte load-address header.
+** `end` is exclusive. Returns 0 on success, else the KERNAL error code.
+*/
+unsigned char x16_fs_save (const char *name, unsigned char len,
+                                        unsigned char device,
+                                        const void *start, const void *end);
+
+/* Load straight into VRAM. The 2-byte PRG header is skipped and the data
+** lands at `vaddr`. Returns 0 on success, else the KERNAL error code.
+*/
+unsigned char x16_fs_vload (const char *name, unsigned char len,
+                                         unsigned char device,
+                                         unsigned long vaddr);
+
+/* KERNAL SETNAM, for driving OPEN and friends yourself. */
+void x16_fs_setname (const char *name, unsigned char len);
+
+/* pulls the implementation in with this header */
+#pragma compile("load.c")
+
+#endif /* X16_LOAD_H */

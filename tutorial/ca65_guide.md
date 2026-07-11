@@ -2,9 +2,11 @@
 
 This guide covers the **cc65** half of x16clib: what dialect of C the
 compiler actually accepts, what standard library `-t cx16` gives you,
-and the traps a 65C02 target sets for C code. The llvm-mos half is
-covered by [llvm_guide.md](llvm_guide.md); the library API itself by
-[tutorial/userguide.md](tutorial/userguide.md).
+and the traps a 65C02 target sets for C code. The other toolchains are
+covered by [llvm_guide.md](llvm_guide.md),
+[kickc_guide.md](kickc_guide.md) and [oscar64_guide.md](oscar64_guide.md);
+the library API itself by
+[userguide.md](userguide.md).
 
 Everything here was verified against **cc65 V2.19 (Git db178e5)**, the
 snapshot bundled in `ca65\`.
