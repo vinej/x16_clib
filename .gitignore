@@ -4,6 +4,7 @@
 # to link against the library, not rebuild it.
 build_ca65/
 build_llvm/
+build_kickc/
 
 # Each suite's scratch SD card. The build scripts empty it before a run,
 # and the tests write everything they read.
@@ -18,5 +19,7 @@ test_llvm/fsroot/*
 emulator/
 llvm-mos/
 ca65/
+kickc/
+__pycache__/
 doc/*.pdf
 doc/*.md

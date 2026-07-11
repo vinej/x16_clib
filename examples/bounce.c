@@ -55,12 +55,17 @@
 #define FM_CHANNEL      0
 #define FM_PATCH        1               /* a ROM instrument patch */
 
-/* Position in 8.8: the low byte is the fraction, so a pixel is pos >> 8.
-** It needs more than 16 bits because the play area is 640 wide, hence
-** long rather than the int an 8.8 velocity fits in.
+/* Position in 8.8, held as a pixel word plus a fraction byte. The full
+** 8.8 value needs 17 bits (the play area is 640 wide), and a `long`
+** would carry it -- but KickC 0.8.6 has no code fragments for runtime
+** 32-bit shifts, so the fields are kept apart and every operation stays
+** on int-sized types, which all three toolchains compile. The pixel is
+** simply the word; no shift needed at the point of use.
 */
-static long pos_x = 64L << 8;
-static long pos_y = 48L << 8;
+static int pos_x = 64;                  /* pixel part */
+static int pos_y = 48;
+static unsigned char frac_x = 0;        /* fraction part */
+static unsigned char frac_y = 0;
 static int vel_x = X16_FIX(1, 128);     /* 1.5 pixels per frame */
 static int vel_y = X16_FIX(0, 192);     /* 0.75 */
 
@@ -139,20 +144,32 @@ static void update_fm_note(void)
 ** a NEGATIVE coordinate: x16_sprite_pos masks it to 10 bits, so the
 ** sprite flicks across to the far side of the screen before coming back.
 */
-static unsigned char step_axis(long *pos, int *vel, int limit)
+static unsigned char step_axis(int *pos, unsigned char *frac, int *vel,
+                               int limit)
 {
-    long p = *pos + *vel;
+    /* Add the 8.8 velocity: its fraction byte to the fraction (the
+    ** sum's high byte is the carry), its pixel half arithmetic-shifted
+    ** onto the pixel word.
+    */
+    int v = *vel;
+    int p = *pos;
+    unsigned int f = (unsigned int)*frac + (unsigned char)v;
     unsigned char bounced = 0;
 
+    p = p + (v >> 8) + (int)(f >> 8);
+
+    *frac = (unsigned char)f;
     if (p < 0) {
         p = 0;
+        *frac = 0;
         bounced = 1;
-    } else if ((p >> 8) >= limit) {
-        p = (long)(limit - 1) << 8;
+    } else if (p >= limit) {
+        p = limit - 1;
+        *frac = 0;
         bounced = 1;
     }
     if (bounced) {
-        *vel = -*vel;
+        *vel = 0 - v;
     }
     *pos = p;
     return bounced;
@@ -162,8 +179,8 @@ static void move_sprite(void)
 {
     unsigned char bounced;
 
-    bounced = step_axis(&pos_x, &vel_x, PLAY_W - SPRITE_PIXELS);
-    bounced |= step_axis(&pos_y, &vel_y, PLAY_H - SPRITE_PIXELS);
+    bounced = step_axis(&pos_x, &frac_x, &vel_x, PLAY_W - SPRITE_PIXELS);
+    bounced |= step_axis(&pos_y, &frac_y, &vel_y, PLAY_H - SPRITE_PIXELS);
 
     if (bounced) {
         start_blip();
@@ -178,8 +195,8 @@ static void check_collision(void)
     static x16_box16 sprite = { 0, 0, SPRITE_PIXELS, SPRITE_PIXELS };
     static const x16_box16 box = { BOX_X, BOX_Y, BOX_W, BOX_H };
 
-    sprite.x = (unsigned int)(pos_x >> 8);
-    sprite.y = (unsigned int)(pos_y >> 8);
+    sprite.x = (unsigned int)pos_x;
+    sprite.y = (unsigned int)pos_y;
 
     hit = x16_collide16(&sprite, &box);
     update_fm_note();
@@ -215,13 +232,20 @@ static void build_sprite_image(void)
 /* ------------------------------------------------------------------ */
 
 /* Three decimal digits, always. printf would cost more zero page than
-** this whole program has to spare on llvm-mos.
+** this whole program has to spare on llvm-mos. Subtraction rather than
+** division, because KickC has no runtime divide at all -- and for one
+** byte twice a second, repeated subtraction is no slower anyway.
 */
 static void put_u8(unsigned char v)
 {
-    x16_screen_chrout('0' + (v / 100));
-    x16_screen_chrout('0' + ((v / 10) % 10));
-    x16_screen_chrout('0' + (v % 10));
+    unsigned char h = 0;
+    unsigned char t = 0;
+
+    while (v >= 100) { v -= 100; h++; }
+    while (v >= 10)  { v -= 10;  t++; }
+    x16_screen_chrout('0' + h);
+    x16_screen_chrout('0' + t);
+    x16_screen_chrout('0' + v);
     x16_screen_chrout(' ');
 }
 
@@ -246,8 +270,7 @@ int main(void)
         x16_vsync_wait();               /* frame-locked: exactly 60 Hz */
 
         move_sprite();
-        x16_sprite_pos(0, (unsigned int)(pos_x >> 8),
-                          (unsigned int)(pos_y >> 8));
+        x16_sprite_pos(0, (unsigned int)pos_x, (unsigned int)pos_y);
         check_collision();
         update_blip();
 

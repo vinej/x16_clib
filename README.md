@@ -9,35 +9,53 @@ preserved, not rewritten: every hot loop is the same hand-written 6502.
 What is new is a thin shim in front of each routine, and a set of headers
 that say what the hardware actually does.
 
-## Two toolchains
+## Three toolchains
 
-The same 28 modules and the same API build under **cc65** and under
-**llvm-mos**. Pick either; they share no object code.
+The same modules and the same API build under **cc65**, under
+**llvm-mos**, and under **KickC**. Pick any; they share no object code.
 
 ```
-include_ca65/  src_ca65/  test_ca65/  build_ca65.ps1     cc65      158 tests
-include_llvm/  src_llvm/  test_llvm/  build_llvm.ps1     llvm-mos   46 tests
-examples/      doc/       emulator/   tools/             shared
+include_ca65/   src_ca65/   test_ca65/   build_ca65.ps1    cc65      158 tests
+include_llvm/   src_llvm/   test_llvm/   build_llvm.ps1    llvm-mos   46 tests
+include_kickc/  src_kickc/  test_kickc/  build_kickc.ps1   KickC     119 tests
+examples/       doc/        emulator/    tools/            shared
 ```
 
 ```powershell
 .\build_ca65.ps1 -Test                 # cc65:     158/158
 .\build_llvm.ps1 -Test                 # llvm-mos:  46/46
+.\build_kickc.ps1 -Test                # KickC:    119/119
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
-The two trees hold the *same* assembly for the internal routines --
-`tools/ca65_to_llvm.py` translates the mechanical half -- and completely
-different C entry points, because the calling conventions have nothing in
-common:
+The trees hold the *same* assembly for the internal routines --
+`tools/ca65_to_llvm.py` and `tools/ca65_to_kickc.py` translate the
+mechanical half -- and completely different C entry points, because the
+calling conventions have nothing in common:
 
-|  | cc65 | llvm-mos |
-|---|---|---|
-| arguments | rightmost in `A`/`X`; the rest pushed on a software stack | assigned left to right into `A`, `X`, `__rc2`, `__rc3`, … |
-| pointers | two bytes like anything else | a whole aligned `__rc` **pair** |
-| `char` return | `A`, plus `ldx #0` for int promotion | `A` alone |
-| pointer return | `A`/`X` | **`__rc2`/`__rc3`** |
-| declaration | `__fastcall__` | nothing |
+|  | cc65 | llvm-mos | KickC |
+|---|---|---|---|
+| arguments | rightmost in `A`/`X`; the rest pushed on a software stack | assigned left to right into `A`, `X`, `__rc2`, `__rc3`, … | each a named memory cell the inline asm reads directly |
+| pointers | two bytes like anything else | a whole aligned `__rc` **pair** | pinned zero-page slots the library manages itself |
+| `char` return | `A`, plus `ldx #0` for int promotion | `A` alone | `A` alone |
+| pointer return | `A`/`X` | **`__rc2`/`__rc3`** | `A`/`X` |
+| declaration | `__fastcall__` | nothing | nothing |
+
+**KickC is a source distribution.** It has no linker and no archive
+format: it compiles the whole program at once and strips every function
+you do not call, so `src_kickc\` *is* the library --
+
+```
+kickc -p cx16 -a -I include_kickc -L src_kickc yourprog.c
+```
+
+-- and there is no `dist_kickc\` because there is nothing to prebuild.
+Two more KickC-specific notes: `include_kickc/x16/zpsafe.h` (pulled in
+by every header) reserves the KERNAL's zero page, which KickC's own cx16
+target does not, and a program that returns to BASIC must call
+`x16_irq_remove()` itself -- KickC has no exit destructors. The
+`examples
+umbers.c` tour stays cc65/llvm-only (KickC has no stdio).
 
 **Under llvm-mos, compile with `-mreserve-zp=16`** (`build_llvm.ps1` does).
 The cx16 target leaves only ninety bytes of zero page, clang's LTO claims
@@ -129,7 +147,8 @@ Three third-party things are expected but **not** committed:
 | Path | What | Where from |
 |---|---|---|
 | `ca65\` (or any cc65 install) | one compiler | <https://cc65.github.io/> (a Windows snapshot zip) |
-| `llvm-mos\` | the other | <https://github.com/llvm-mos/llvm-mos-sdk/releases> (the combined `llvm-mos-windows.7z`, not the compiler-only build) |
+| `llvm-mos\` | another | <https://github.com/llvm-mos/llvm-mos-sdk/releases> (the combined `llvm-mos-windows.7z`, not the compiler-only build) |
+| `kickc\` | the third (plus a Java 8+ runtime on PATH) | <https://gitlab.com/camelot/kickc/-/releases> (the 0.8.6 binary zip; it bundles its own KickAssembler) |
 | `emulator\x16emu.exe` + `rom.bin` | X16 emulator r49 | <https://github.com/X16Community/x16-emulator>, ROM from <https://github.com/X16Community/x16-rom> |
 
 You need only the toolchain you intend to use.
@@ -137,7 +156,10 @@ You need only the toolchain you intend to use.
 `build_ca65.ps1` finds cc65 through the repo-local `.\ca65\bin` first,
 then `%CC65_HOME%\bin`, then `C:\Emulator\cc65\bin`, then `C:\cc65\bin`,
 then `PATH`. `build_llvm.ps1` finds llvm-mos through `%LLVM_MOS_HOME%\bin`,
-then `.\llvm-mos\bin`, then `C:\llvm-mos\bin`.
+then `.\llvm-mos\bin`, then `C:\llvm-mos\bin`. `build_kickc.ps1` finds
+KickC through the repo-local `.\kickc\`, then `%KICKC_HOME%`, then
+`C:\kickc`; it invokes the jar directly, so only `java` needs to be on
+PATH.
 
 ### Recompiling the library
 
