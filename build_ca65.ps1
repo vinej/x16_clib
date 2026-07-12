@@ -97,7 +97,11 @@ foreach ($s in $sources) {
     }
     if ($stale) {
         Write-Host ("ca65  {0}" -f $s.FullName.Substring($root.Length + 1))
-        & $ca65 --cpu 65C02 -t cx16 -I $core -o $o $s.FullName
+        # -g embeds line info in the objects, so a debugger reading ld65's
+        # --dbgfile output (e.g. VS64 attached to an emulator) can step
+        # into library routines at the assembly-source level. It only
+        # grows the objects/debug file; the linked PRG is unaffected.
+        & $ca65 --cpu 65C02 -g -t cx16 -I $core -o $o $s.FullName
         if ($LASTEXITCODE -ne 0) { Fail "assembly failed: $($s.Name)" }
         $assembled++
     }
