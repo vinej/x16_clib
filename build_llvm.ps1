@@ -91,7 +91,11 @@ foreach ($s in $sources) {
     }
     if ($stale) {
         Write-Host ("mos-as {0}" -f $s.FullName.Substring($root.Length + 1))
-        & $clang -c -I $core -o $o $s.FullName
+        # -g embeds DWARF line info for the .s source, so debuggers that
+        # load the final ELF (e.g. VS64 attached to an emulator) can step
+        # into library routines at the assembly-source level. It only
+        # grows the archive/ELF; the extracted PRG is unaffected.
+        & $clang -c -g -I $core -o $o $s.FullName
         if ($LASTEXITCODE -ne 0) { Fail "assembly failed: $($s.Name)" }
         $assembled++
     }
