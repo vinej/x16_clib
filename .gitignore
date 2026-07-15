@@ -6,6 +6,7 @@ build_ca65/
 build_llvm/
 build_kickc/
 build_oscar64/
+build_vbcc/
 
 # Each suite's scratch SD card. The build scripts empty it before a run,
 # and the tests write everything they read.
@@ -17,6 +18,8 @@ test_kickc/fsroot/*
 !test_kickc/fsroot/.gitkeep
 test_oscar64/fsroot/*
 !test_oscar64/fsroot/.gitkeep
+test_vbcc/fsroot/*
+!test_vbcc/fsroot/.gitkeep
 
 # Third-party, not committed. See README.md for where to get them.
 # ca65/ is an optional repo-local cc65 install that build_ca65.ps1
@@ -26,6 +29,8 @@ llvm-mos/
 ca65/
 kickc/
 oscar64/
+vbcc6502/
 __pycache__/
 doc/*.pdf
 doc/*.md
+

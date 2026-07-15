@@ -10,17 +10,18 @@ preserved, not rewritten: every hot loop is the same hand-written 6502.
 What is new is a thin shim in front of each routine, and a set of headers
 that say what the hardware actually does.
 
-## Four toolchains
+## Five toolchains
 
 The same modules and the same API build under **cc65**, under
-**llvm-mos**, under **KickC** and under **Oscar64**. Pick any; they
-share no object code.
+**llvm-mos**, under **KickC**, under **Oscar64** and under **vbcc**. Pick
+any; they share no object code.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      158 tests
 include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos   46 tests
 include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     119 tests
 src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   119 tests
+include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc       54 tests
 examples/       doc/        emulator/      tools/             shared
 ```
 
@@ -29,22 +30,24 @@ examples/       doc/        emulator/      tools/             shared
 .\build_llvm.ps1 -Test                 # llvm-mos:  46/46
 .\build_kickc.ps1 -Test                # KickC:    119/119
 .\build_oscar64.ps1 -Test              # Oscar64:  119/119
+.\build_vbcc.ps1  -Test -Source test_vbcc\runner.c   # vbcc: 54/54
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
 The trees hold the *same* assembly for the internal routines --
-`tools/ca65_to_llvm.py` and `tools/ca65_to_kickc.py` translate the
-mechanical half from the assembly, and `tools/kickc_to_oscar64.py`
-derives the fourth tree from the third -- and completely different C
-entry points, because the calling conventions have nothing in common:
+`tools/ca65_to_llvm.py`, `tools/ca65_to_kickc.py` and
+`tools/ca65_to_vbcc.py` translate the mechanical half from the assembly,
+and `tools/kickc_to_oscar64.py` derives the fourth tree from the third --
+and completely different C entry points, because the calling conventions
+have nothing in common:
 
-|  | cc65 | llvm-mos | KickC | Oscar64 |
-|---|---|---|---|---|
-| arguments | rightmost in `A`/`X`; the rest pushed on a software stack | assigned left to right into `A`, `X`, `__rc2`, `__rc3`, … | each a named memory cell the inline asm reads directly | each a named zero-page cell the inline asm reads directly |
-| pointers | two bytes like anything else | a whole aligned `__rc` **pair** | pinned zero-page slots the library manages itself | zero-page parameters, indirected as `(name),y` |
-| `char` return | `A`, plus `ldx #0` for int promotion | `A` alone | `A` alone | the `accu` zero-page slot |
-| pointer return | `A`/`X` | **`__rc2`/`__rc3`** | `A`/`X` | `accu`/`accu+1` |
-| declaration | `__fastcall__` | nothing | nothing | nothing |
+|  | cc65 | llvm-mos | KickC | Oscar64 | vbcc |
+|---|---|---|---|---|---|
+| arguments | rightmost in `A`/`X`; the rest pushed on a software stack | assigned left to right into `A`, `X`, `__rc2`, `__rc3`, … | each a named memory cell the inline asm reads directly | each a named zero-page cell the inline asm reads directly | `__reg()`-pinned into `r0..r7` (a `char` takes the next **even** slot), then `btmp0`/`btmp1` for `long`, then a soft stack |
+| pointers | two bytes like anything else | a whole aligned `__rc` **pair** | pinned zero-page slots the library manages itself | zero-page parameters, indirected as `(name),y` | a register **pair** `rN/rN+1` |
+| `char` return | `A`, plus `ldx #0` for int promotion | `A` alone | `A` alone | the `accu` zero-page slot | `A` alone |
+| pointer return | `A`/`X` | **`__rc2`/`__rc3`** | `A`/`X` | `accu`/`accu+1` | `A`/`X` (`long` in `btmp0`) |
+| declaration | `__fastcall__` | nothing | nothing | nothing | `__reg("…")` per argument |
 
 **KickC and Oscar64 are source distributions.** Neither has a linker or
 an archive format: both compile the whole program at once and strip
@@ -76,6 +79,27 @@ The cx16 target leaves only ninety bytes of zero page, clang's LTO claims
 as many as it likes, and this library reserves sixteen for its argument
 block. Without the flag the link fails outright with `section '.zp.bss'
 will not fit in region 'zp'`. See [include_llvm/x16/x16.h](include_llvm/x16/x16.h).
+
+**vbcc uses its own native `+x16` target** -- `vc +x16` drives
+`vbcc6502`, `vasm6502_oldstyle` and `vlink`. Like cc65 and llvm-mos it is
+an archive build, so `dist_vbcc\libx16c.a` is prebuilt and you link
+against it:
+
+```
+vc +x16 -Iinclude_vbcc yourprog.c dist_vbcc\libx16c.a -o YOURPROG.PRG
+```
+
+Every prototype pins its arguments to the zero-page pseudo-registers the
+hand-written routine already reads, with `__reg()`, so most calls compile
+to a single `jmp` into the assembly. Two things to know: a program that
+returns to BASIC must call `x16_irq_remove()` itself (vbcc has no exit
+destructors); and `-cbmascii` stores string literals in PETSCII, which is
+what you want on screen but means the test harness maps them back to
+ASCII on its way to stdout. The vbcc suite lives in one `test_vbcc\runner.c`,
+so run it with `-Source test_vbcc\runner.c`. For the full ABI -- register
+placement, the `long`/soft-stack rules, and the shim pattern -- see the
+[porting notes below](#porting-notes-ca65-to-vbcc) and
+[include_vbcc/x16/x16.h](include_vbcc/x16/x16.h).
 
 ## What it gives you that cc65 does not
 
@@ -529,10 +553,11 @@ examples/        hello.c, bounce.c, numbers.c
 test_ca65/       runner.c, runner2.c, testlib.h, fsroot/
 build_ca65/      objects, PRGs, transcripts             (gitignored)
 dist_ca65/       x16c.lib, the finished archive         (committed)
-src_llvm/ include_llvm/ test_llvm/ build_llvm/ dist_llvm/   the llvm-mos third
-src_kickc/ include_kickc/ test_kickc/ build_kickc/            the KickC quarter
-src_oscar64/ test_oscar64/ build_oscar64/     the Oscar64 quarter (headers live in src_oscar64/x16/)
-tools/           ca65_to_llvm.py, ca65_to_kickc.py, kickc_to_oscar64.py
+src_llvm/ include_llvm/ test_llvm/ build_llvm/ dist_llvm/   the llvm-mos build
+src_kickc/ include_kickc/ test_kickc/ build_kickc/            the KickC build
+src_oscar64/ test_oscar64/ build_oscar64/     the Oscar64 build (headers live in src_oscar64/x16/)
+src_vbcc/ include_vbcc/ test_vbcc/ build_vbcc/ dist_vbcc/     the vbcc build
+tools/    ca65_to_llvm.py, ca65_to_kickc.py, kickc_to_oscar64.py, ca65_to_vbcc.py
 ```
 
 Each `.s` holds the ported routine under its original bare label plus an
@@ -707,6 +732,43 @@ outright on parts of the suite (the build script ships the default
 optimization, which with `-n` is already the smallest of the four
 builds), and `//` comments inside `__asm` blocks break the parser.
 The full list is in [tutorial/oscar64_guide.md](tutorial/oscar64_guide.md).
+
+## Porting notes: ca65 to vbcc
+
+`tools/ca65_to_vbcc.py` translates the mechanical half of each `.s` into
+`vasm6502_oldstyle` syntax -- `.segment "CODE"` to `section text`,
+`.res`/`.byte`/`.word` to `reserve`/`byte`/`word`, `.export`/`.importzp` to
+`global`/`zpage`, ca65's `@local` and `:+`/`:-` to vasm's `.local` and
+`+`/`-` -- and leaves cc65's `popa`/`popax` **in place** so any C shim not
+yet rewritten by hand fails loudly at link, never silently. What it does
+NOT translate is the entry points: vbcc's ABI shares nothing with cc65's,
+and a plausible-looking automatic conversion would be wrong in ways a test
+might not catch.
+
+The ABI, spike-verified against the compiler and then on the emulator:
+vbcc lays arguments left to right into the zero-page pseudo-registers
+`r0..r7`; a 16-bit value takes an **aligned pair** (`r0/r1`, `r2/r3`, …),
+and a `char` takes the next **even** register (`r0`, `r2`, `r4`, `r6` --
+the odd ones are skipped). A 32-bit `long` or far pointer rides `btmp0`
+(a second one `btmp1`, as `x16_fx_copy` needs); anything past `r0..r7`
+spills to the C soft stack, which a frameless asm entry reads at `(sp),y`.
+Returns: `char` in `A`, int/near-pointer in `A`/`X`, `long` in `btmp0`.
+Each header pins its arguments with `__reg("rN/rN+1")` so vbcc places them
+exactly where the hand-written routine already reads -- most shims are one
+`jmp`.
+
+Three things the ca65 source assumes had to be rebuilt rather than
+translated. The KERNAL block-op routines (`mem`, `bank`, `load`) reference
+the half-register names `r0L`/`r0H`/… which vbcc does not provide, so the
+converter keeps ca65's `rNL`/`rNH` definitions while dropping the plain
+`rN` ones that would clash with vbcc's own. ca65's `^x` byte-2 operator
+has no vasm equivalent, so the `vera_addr` macro uses `(x) >> 16`. And
+`system/irq.s`, which saved cc65's runtime zero page around a C callback,
+now saves vbcc's -- `r0..r31`, `sp` and `btmp0..btmp3` -- and drops the
+`.destructor` auto-unhook vbcc cannot emit, so a program that installs a
+handler must call `x16_irq_remove()` itself. Every hand-written shim is
+covered by an ABI test proven to go red under a deliberately transposed
+argument.
 
 ## A bug in llvm-mos-sdk v23.0.1
 
