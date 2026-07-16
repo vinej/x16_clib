@@ -339,7 +339,9 @@ and could not strip dead code, so the modules had to be selected by hand.
 **Every symbol is prefixed `x16_`.** cc65's `<cx16.h>`, `<conio.h>` and
 `<cbm.h>` stay usable alongside it. Where cc65 already does a job well
 this library does not duplicate it: use cc65's `vpeek`/`vpoke` for single
-VRAM bytes, `conio` for text, `printf` for formatting.
+VRAM bytes, `conio` for text, `printf` for formatting. (The one exception
+is llvm-mos's `vpoke()`, which is broken in the SDK and which this
+library therefore replaces — see the end of this file.)
 
 **All entry points are `__fastcall__`**, cc65's default. (Only there:
 llvm-mos and KickC express their conventions in the compiler, and their
@@ -770,15 +772,29 @@ handler must call `x16_irq_remove()` itself. Every hand-written shim is
 covered by an ABI test proven to go red under a deliberately transposed
 argument.
 
-## A bug in llvm-mos-sdk v23.0.1
+## A bug in llvm-mos-sdk v23.0.1, and the fix
 
-**The cx16 target's `vpoke()` is broken.** `vpeek(addr)` correctly reads
-the address from `A`, `X` and `__rc2`. `vpoke(data, addr)` reads it from
-`__rc2`, `__rc3` and `__rc4` — never touching `X`, where the compiler puts
-`addr`'s first byte. Every write therefore lands at `addr >> 8`. Verified
-on the machine: `vpoke(0xAB, 0x08000)` stores at `$00080`, and
-`vpoke(0xCD, 0x01234)` at `$00012`.
+**The cx16 target's `vpoke()` is broken — linking this library repairs
+it.** `vpeek(addr)` correctly reads the address from `A`, `X` and
+`__rc2`. `vpoke(data, addr)` reads it from `__rc2`, `__rc3` and `__rc4`
+— never touching `X`, where the compiler puts `addr`'s first byte. It is
+off by one register, taking address bytes 3, 2 and 1 where it wants 2, 1
+and 0, so every write lands at `addr >> 8`. Verified on the machine:
+`vpoke(0xAB, 0x08000)` stores at `$00080`, and `vpoke(0xCD, 0x01234)` at
+`$00012`.
 
-`test_llvm/testlib.h` defines its own `t_vpoke()` and keeps the SDK's
-`vpeek()` as the independent read-back path. If you use `vpoke()` in your
-own cx16 program under this SDK, it is not doing what you think.
+`src_llvm/core/vpoke.s` defines a correct `vpoke` and `libx16c.a` is
+named ahead of the platform libraries on the link line, so the linker
+resolves the symbol there and never pulls `libc.a(vpoke.s.obj)` in. The
+SDK's member defines nothing else, so there is no collision and no flag
+to pass: link the library and your existing `vpoke()` calls simply start
+landing where you asked. `ABI_VPOKE_OVERRIDE` in the llvm suite writes to
+`$12345` — nonzero low byte, bank bit set — and checks both that the byte
+arrived and that `$00123`, where the SDK's version would have put it,
+stayed clean; remove the override and that test alone goes red.
+
+Only `vpoke` is replaced. The SDK's `vpeek()` is correct and is left
+alone — `test_llvm/testlib.h` still writes through its own `t_vpoke()`
+and reads through the SDK's `vpeek()`, because the read-back principle
+wants the write and read paths to be independent implementations, which
+matters more in a test than convenience does.

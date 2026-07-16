@@ -34,9 +34,13 @@
 ** reads A, X, __rc2 -- that one is fine, and the tests rely on it as
 ** their independent read-back path.
 **
-** So the suite writes through t_vpoke() below and reads through the
-** SDK's vpeek(). The two are still independent implementations, which is
-** what the read-back principle actually requires.
+** src_llvm/core/vpoke.s now replaces the SDK's vpoke() out of
+** libx16c.a, so a program that links this library gets a working one
+** (ABI_VPOKE_OVERRIDE proves it). The suite still writes through
+** t_vpoke() below and reads through the SDK's vpeek(): those are two
+** independent implementations, which is what the read-back principle
+** actually requires -- a test should not write through the same code it
+** is trying to check.
 ** ------------------------------------------------------------------- */
 static void t_vpoke (unsigned char value, unsigned long addr)
 {

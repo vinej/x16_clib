@@ -584,6 +584,30 @@ static void test_zx0_ptr_return(void)
 
 
 /* ------------------------------------------------------------------ */
+/* the SDK function this library replaces                              */
+/* ------------------------------------------------------------------ */
+
+/* llvm-mos-sdk v23.0.1's cx16 vpoke() never reads X, where the compiler
+** puts the address's low byte, so every write lands at addr >> 8.
+** core/vpoke.s overrides it out of libx16c.a. $12345 is chosen to catch
+** both halves of that: a nonzero low byte, and bit 16 set so the bank
+** bit has to survive too. The broken version would write $00123 --
+** which is checked to be still clean, so this test also fails if the
+** override silently stops being linked.
+*/
+static void test_abi_vpoke_override(void)
+{
+    t_vpoke(0x00, 0x12345UL);
+    t_vpoke(0x00, 0x00123UL);           /* where the SDK's would land */
+
+    vpoke(0xA5, 0x12345UL);
+
+    t_check(vpeek(0x12345UL) == 0xA5 &&
+            vpeek(0x00123UL) == 0x00,
+            "ABI_VPOKE_OVERRIDE");
+}
+
+/* ------------------------------------------------------------------ */
 /* gfx2: every 640x480@2bpp shim, transposition-proof                  */
 /* ------------------------------------------------------------------ */
 
@@ -799,6 +823,8 @@ int main(void)
 
     test_float_ptr_operands();
     test_zx0_ptr_return();
+
+    test_abi_vpoke_override();
 
     /* Last: x16_gfx2_init() reprograms the display and palette 0-3. */
     test_abi_g2_rect();

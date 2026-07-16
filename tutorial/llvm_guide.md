@@ -148,9 +148,14 @@ VERA register struct. **`vpoke()` in SDK v23.0.1 is broken**: it reads
 the address from `__rc2/__rc3/__rc4`, but the compiler puts the first
 address byte in `X`. Every write lands at `addr >> 8` — verified on
 hardware: `vpoke(0xAB, 0x08000)` stores at `$00080`. `vpeek()` is
-fine. Until the SDK fixes it, write single VRAM bytes through
-`x16_vera_addr0()` + a `VERA_DATA0` store, or define your own macro
-(the test suite's `test_llvm/testlib.h` has one).
+fine.
+
+**Linking this library fixes it.** `src_llvm/core/vpoke.s` defines a
+correct `vpoke`, and because `libx16c.a` is named ahead of the platform
+libraries the linker takes ours and never pulls the SDK's member in.
+There is no flag and nothing to rename: your `vpoke()` calls just work.
+Without the library, write single VRAM bytes through `x16_vera_addr0()`
+plus a `VERA_DATA0` store, or your own macro.
 
 ### Character sets: the opposite trap from cc65
 
@@ -221,7 +226,8 @@ is the same, and the same advice applies:
 ## 8. Gotcha checklist
 
 1. **`-mreserve-zp=16` or the link fails** — the one flag to remember.
-2. The SDK's `vpoke()` writes to `addr >> 8`. Don't use it.
+2. The SDK's `vpoke()` writes to `addr >> 8` — but this library
+   replaces it, so it is correct as long as you link `libx16c.a`.
 3. `char` is **unsigned** by default.
 4. `float` works, `printf("%f")` works — but `<math.h>` has no `sqrt`,
    no `sin`. Use the library's tables, fixed point, or the ROM FP.
