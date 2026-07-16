@@ -43,6 +43,7 @@
 #include <x16/palette.h>
 #include <x16/sprite.h>
 #include <x16/bitmap.h>
+#include <x16/bitmap2.h>
 #include <x16/collide.h>
 #include <x16/fixed.h>
 #include <x16/tile.h>
@@ -3354,6 +3355,223 @@ static void test_abi_stack_balance(void)
 
 /* ------------------------------------------------------------------ */
 
+
+#if SUITE == 2
+
+/* ------------------------------------------------------------------ */
+/* gfx2: 640x480 at 2bpp -- 4 pixels per byte, MSB-first, rows of 160
+** bytes. A pixel byte sits at y*160 + (x>>2). These tests run LAST:
+** x16_gfx2_init() reprograms the display and palette entries 0-3.
+*/
+
+#define G2_L0_CONFIG    (*(volatile unsigned char *)0x9F2DU)
+#define G2_L0_TILEBASE  (*(volatile unsigned char *)0x9F2FU)
+
+static void test_g2_init(void)
+{
+    x16_gfx2_init();
+    t_check(G2_L0_CONFIG == 0x05 &&     /* bitmap | 2bpp */
+            G2_L0_TILEBASE == 0x01,     /* base $00000, 640 wide */
+            "G2_INIT");
+}
+
+static void test_g2_pset(void)
+{
+    vpoke(0x00, 10UL * 160 + 1);
+    x16_gfx2_pset(5, 10, 2);            /* byte 1, pixel 1 */
+    t_check(vpeek(10UL * 160 + 1) == 0x20, "G2_PSET");
+}
+
+/* Unclipped, (640,0) would land at byte 160 and (0,480) at 76,800. */
+static void test_g2_clip(void)
+{
+    vpoke(0x11, 160UL);
+    vpoke(0x22, 76800UL);
+    x16_gfx2_pset(640, 0, 3);
+    x16_gfx2_pset(0, 480, 3);
+    t_check(vpeek(160UL) == 0x11 && vpeek(76800UL) == 0x22, "G2_CLIP");
+}
+
+static void test_g2_read(void)
+{
+    vpoke(0x1B, 12UL * 160);            /* pixels 0,1,2,3 left to right */
+    t_check(x16_gfx2_read(0, 12) == 0 &&
+            x16_gfx2_read(1, 12) == 1 &&
+            x16_gfx2_read(2, 12) == 2 &&
+            x16_gfx2_read(3, 12) == 3 &&
+            x16_gfx2_read(640, 12) == 0xFF,
+            "G2_READ");
+}
+
+/* x=5 len=13: head = byte 1 pixels 1-3, middle bytes 2-3, tail = byte 4
+** pixels 0-1. The bytes either side must survive.
+*/
+static void test_g2_hline(void)
+{
+    unsigned char i;
+    for (i = 0; i < 6; ++i) {
+        vpoke(0x00, 20UL * 160 + i);
+    }
+    x16_gfx2_hline(5, 20, 13, 3);
+    t_check(vpeek(20UL * 160 + 0) == 0x00 &&
+            vpeek(20UL * 160 + 1) == 0x3F &&
+            vpeek(20UL * 160 + 2) == 0xFF &&
+            vpeek(20UL * 160 + 3) == 0xFF &&
+            vpeek(20UL * 160 + 4) == 0xF0 &&
+            vpeek(20UL * 160 + 5) == 0x00,
+            "G2_HLINE");
+}
+
+/* Colour 0 ink onto $FF: proves the column really is read-modify-write. */
+static void test_g2_vline(void)
+{
+    unsigned char i;
+    for (i = 30; i <= 34; ++i) {
+        vpoke(0xFF, (unsigned long)i * 160 + 1);
+    }
+    x16_gfx2_vline(6, 30, 4, 0);        /* byte 1, pixel 2 */
+    t_check(vpeek(30UL * 160 + 1) == 0xF3 &&
+            vpeek(33UL * 160 + 1) == 0xF3 &&
+            vpeek(34UL * 160 + 1) == 0xFF,
+            "G2_VLINE");
+}
+
+static void test_g2_rect(void)
+{
+    unsigned char i;
+    for (i = 0; i < 4; ++i) {
+        vpoke(0x00, 40UL * 160 + i);
+        vpoke(0x00, 41UL * 160 + i);
+        vpoke(0x00, 42UL * 160 + i);
+    }
+    x16_gfx2_rect(4, 40, 8, 2, 1);
+    t_check(vpeek(40UL * 160 + 0) == 0x00 &&
+            vpeek(40UL * 160 + 1) == 0x55 &&
+            vpeek(40UL * 160 + 2) == 0x55 &&
+            vpeek(40UL * 160 + 3) == 0x00 &&
+            vpeek(41UL * 160 + 1) == 0x55 &&
+            vpeek(42UL * 160 + 1) == 0x00,
+            "G2_RECT");
+}
+
+static void test_g2_frame(void)
+{
+    unsigned char i;
+    for (i = 0; i < 4; ++i) {
+        vpoke(0x00, 50UL * 160 + i);
+        vpoke(0x00, 51UL * 160 + i);
+        vpoke(0x00, 52UL * 160 + i);
+    }
+    x16_gfx2_frame(0, 50, 16, 3, 3);
+    t_check(vpeek(50UL * 160 + 0) == 0xFF &&    /* top edge */
+            vpeek(50UL * 160 + 3) == 0xFF &&
+            vpeek(51UL * 160 + 0) == 0xC0 &&    /* left edge only */
+            vpeek(51UL * 160 + 1) == 0x00 &&    /* hollow */
+            vpeek(51UL * 160 + 3) == 0x03 &&    /* right edge only */
+            vpeek(52UL * 160 + 2) == 0xFF,      /* bottom edge */
+            "G2_FRAME");
+}
+
+static void test_g2_line(void)
+{
+    unsigned char i;
+    for (i = 60; i <= 67; ++i) {
+        vpoke(0x00, (unsigned long)i * 160);
+        vpoke(0x00, (unsigned long)i * 160 + 1);
+    }
+    x16_gfx2_line(0, 60, 7, 67, 3);     /* the 45-degree diagonal */
+    t_check(vpeek(60UL * 160) == 0xC0 &&
+            vpeek(63UL * 160) == 0x03 &&
+            vpeek(64UL * 160 + 1) == 0xC0 &&
+            vpeek(67UL * 160 + 1) == 0x03,
+            "G2_LINE");
+}
+
+/* Pattern $F0 (left half ink): even bytes $FF, odd bytes $00. Patterns
+** anchor to the screen, so an x=2 fill gets a phase head and the even
+** byte again in its tail.
+*/
+static const unsigned char g2_pat_half[8] = {
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0
+};
+
+static void test_g2_pattern(void)
+{
+    unsigned char i;
+    for (i = 0; i < 5; ++i) {
+        vpoke(0x55, 70UL * 160 + i);
+    }
+    for (i = 0; i < 4; ++i) {
+        vpoke(0x00, 74UL * 160 + i);
+    }
+    x16_gfx2_pattern_set(g2_pat_half, 0x03);    /* bg 0, fg 3 */
+    x16_gfx2_pattern_rect(0, 70, 16, 1);
+    x16_gfx2_pattern_rect(2, 74, 8, 1);
+    t_check(vpeek(70UL * 160 + 0) == 0xFF &&
+            vpeek(70UL * 160 + 1) == 0x00 &&
+            vpeek(70UL * 160 + 2) == 0xFF &&
+            vpeek(70UL * 160 + 3) == 0x00 &&
+            vpeek(70UL * 160 + 4) == 0x55 &&    /* untouched */
+            vpeek(74UL * 160 + 0) == 0x0F &&    /* phase-2 head */
+            vpeek(74UL * 160 + 1) == 0x00 &&
+            vpeek(74UL * 160 + 2) == 0xF0,      /* tail */
+            "G2_PATTERN");
+}
+
+static const unsigned char g2_img[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+
+static void test_g2_blit(void)
+{
+    vpoke(0x00, 80UL * 160 + 2);
+    vpoke(0x00, 80UL * 160 + 3);
+    vpoke(0x00, 81UL * 160 + 2);
+    vpoke(0x00, 81UL * 160 + 3);
+    x16_gfx2_blit(8, 80, 2, 2, g2_img, 0);      /* copy */
+    if (vpeek(80UL * 160 + 2) != 0xDE || vpeek(80UL * 160 + 3) != 0xAD ||
+        vpeek(81UL * 160 + 2) != 0xBE || vpeek(81UL * 160 + 3) != 0xEF) {
+        t_check(0, "G2_BLIT");
+        return;
+    }
+    x16_gfx2_blit(8, 80, 2, 2, g2_img, 3);      /* XOR it away again */
+    t_check(vpeek(80UL * 160 + 2) == 0x00 &&
+            vpeek(81UL * 160 + 3) == 0x00,
+            "G2_BLIT");
+}
+
+/* Onto a solid $FF background: keep pixels 2-3 (mask $0F), ink pixels
+** 0-1 with colour 1 (data $50) -> every touched byte reads $5F.
+*/
+static const unsigned char g2_mcol[8] = {   /* (mask,data) x 4 rows */
+    0x0F, 0x50, 0x0F, 0x50, 0x0F, 0x50, 0x0F, 0x50
+};
+
+static void test_g2_blitm(void)
+{
+    unsigned char i;
+    for (i = 90; i <= 94; ++i) {
+        vpoke(0xFF, (unsigned long)i * 160 + 3);
+    }
+    x16_gfx2_blitm(12, 90, 4, 1, g2_mcol);
+    t_check(vpeek(90UL * 160 + 3) == 0x5F &&
+            vpeek(93UL * 160 + 3) == 0x5F &&
+            vpeek(94UL * 160 + 3) == 0xFF,      /* one past the end */
+            "G2_BLITM");
+}
+
+/* Exactly the 76,800 framebuffer bytes and not one more. */
+static void test_g2_clear(void)
+{
+    vpoke(0x77, 76800UL);
+    x16_gfx2_clear(2);
+    t_check(vpeek(0UL) == 0xAA &&
+            vpeek(38400UL) == 0xAA &&           /* the second fill half */
+            vpeek(76799UL) == 0xAA &&
+            vpeek(76800UL) == 0x77,
+            "G2_CLEAR");
+}
+
+#endif /* SUITE == 2 */
+
 int main(void)
 {
     t_init();
@@ -3592,6 +3810,25 @@ int main(void)
     test_adpcm();
     test_adpcm_sliced();
     test_adpcm_state();
+
+    /* Last: x16_gfx2_init() reprograms the display and palette 0-3. */
+    test_g2_init();
+    test_g2_pset();
+    test_g2_clip();
+    test_g2_read();
+    test_g2_hline();
+    test_g2_vline();
+    test_g2_rect();
+    test_g2_frame();
+    test_g2_line();
+    test_g2_pattern();
+    test_g2_blit();
+    test_g2_blitm();
+    if (x16_vera_has_fx()) {
+        test_g2_clear();
+    } else {
+        t_skip("G2_CLEAR");
+    }
 
 #endif
 

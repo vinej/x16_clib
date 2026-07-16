@@ -41,6 +41,7 @@
         .export         _x16_fx_off
         .export         _x16_fx_mult
         .export         _x16_fx_fill
+        .export         fx_fill        ; internal: bitmap2 clears through it
         .export         _x16_fx_clear
         .export         _x16_fx_line
         .export         _x16_fx_triangle
