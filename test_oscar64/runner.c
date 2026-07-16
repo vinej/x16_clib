@@ -561,6 +561,25 @@ void test_gfx_line(void) {
             "GFX_LINE");
 }
 
+/* Down-right, with literal endpoints. The KickC build hung here: its
+ * constant folder dropped the negation in `dy = 0 - dy`, err started at
+ * dx+|dy|, and the walk never reached its end point. This source has the
+ * same shape, so the case is worth pinning on every compiler that folds
+ * it -- a regression HANGS the suite rather than failing it.
+ */
+void test_gfx_line_down(void) {
+    t_vpoke(0, PX(3, 5), 0x00);
+    t_vpoke(0, PX(11, 13), 0x00);
+    t_vpoke(0, PX(7, 9), 0x00);
+
+    x16_gfx_line(3, 5, 11, 13, 0x77);
+
+    t_check((t_vpeek(0, PX(3, 5)) == 0x77 &&
+            t_vpeek(0, PX(7, 9)) == 0x77 &&     /* the 45-degree midpoint */
+            t_vpeek(0, PX(11, 13)) == 0x77) ? 1 : 0,
+            "GFX_LINE_DOWN");
+}
+
 void test_gfx_circle(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 12800);         /* rows 0..39 */
@@ -1058,6 +1077,7 @@ int main(void) {
     test_gfx_hline();
     test_gfx_vline();
     test_gfx_line();
+    test_gfx_line_down();
     test_gfx_circle();
     test_gfx_disc();
     test_gfx_char();
