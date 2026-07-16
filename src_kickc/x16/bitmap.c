@@ -223,9 +223,15 @@ void x16_gfx_line(unsigned int x0, unsigned char y0, unsigned int x1,
     lx1 = (int)x1;
     ly1 = (int)y1;
 
+    // Written as subtractions rather than `d = 0 - d`: KickC constant-
+    // folds a call with literal endpoints, and folding `0 - d` drops the
+    // negation. gfx_line(3, 5, 11, 13, c) folded to .const dy = ly1-y0
+    // -- +8, not -8 -- so err started at dx+|dy|, `e2 <= dx` never held,
+    // y never advanced, and the walk ran past its end point forever.
+    // Same values, folded correctly. Covered by GFX_LINE_DOWN.
     dx = lx1 - lx0;
     if (dx < 0) {
-        dx = 0 - dx;
+        dx = lx0 - lx1;                 // dx = |dx|
         sx = -1;
     } else {
         sx = 1;
@@ -234,7 +240,7 @@ void x16_gfx_line(unsigned int x0, unsigned char y0, unsigned int x1,
     if (dy < 0) {
         sy = -1;
     } else {
-        dy = 0 - dy;                    // dy = -|dy|
+        dy = ly0 - ly1;                 // dy = -|dy|
         sy = 1;
     }
     err = dx + dy;
