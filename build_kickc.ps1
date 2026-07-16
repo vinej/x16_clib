@@ -111,7 +111,8 @@ function Build-Prg([string]$srcRel) {
 # zero page silently.
 $suites = @()
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test_kickc\runner.c', 'test_kickc\runner2.c', 'test_kickc\runner3.c')
+    $suites = @('test_kickc\runner.c', 'test_kickc\runner2.c', 'test_kickc\runner3.c',
+                'test_kickc\runner4.c')
 } else {
     $suites = @($Source)
 }
