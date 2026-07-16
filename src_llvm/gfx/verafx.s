@@ -47,6 +47,7 @@
         .globl  x16_fx_off
         .globl  x16_fx_mult
         .globl  x16_fx_fill
+        .globl  fx_fill        ; internal: bitmap2 clears through it
         .globl  x16_fx_clear
         .globl  x16_fx_line
         .globl  x16_fx_triangle

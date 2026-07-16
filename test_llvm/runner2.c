@@ -582,6 +582,184 @@ static void test_zx0_ptr_return(void)
 
 /* ------------------------------------------------------------------ */
 
+
+/* ------------------------------------------------------------------ */
+/* gfx2: every 640x480@2bpp shim, transposition-proof                  */
+/* ------------------------------------------------------------------ */
+
+/* A 2bpp framebuffer byte sits at y*160 + (x>>2). All values distinct
+** and nonzero, so any swapped register lands somewhere it can be seen.
+** x16_gfx2_init() reprograms the display and palette 0-3, so this block
+** runs last.
+*/
+
+/* rect(4, 40, 8, 2, 1): quad_marshal + colour in __rc8. */
+static void test_abi_g2_rect(void)
+{
+    unsigned char i;
+
+    x16_gfx2_init();
+    for (i = 0; i < 4; ++i) {
+        t_vpoke(0x00, 40UL * 160 + i);
+        t_vpoke(0x00, 41UL * 160 + i);
+        t_vpoke(0x00, 42UL * 160 + i);
+    }
+    x16_gfx2_rect(4, 40, 8, 2, 1);
+    t_check(vpeek(40UL * 160 + 0) == 0x00 &&
+            vpeek(40UL * 160 + 1) == 0x55 &&
+            vpeek(40UL * 160 + 2) == 0x55 &&
+            vpeek(40UL * 160 + 3) == 0x00 &&
+            vpeek(41UL * 160 + 1) == 0x55 &&
+            vpeek(42UL * 160 + 1) == 0x00,
+            "ABI_G2_RECT");
+}
+
+/* hline(5, 20, 13, 3): span_marshal + colour in __rc6. The head, middle
+** and tail bytes only land right if x, y and len each reach their slot.
+*/
+static void test_abi_g2_hline(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 6; ++i) {
+        t_vpoke(0x00, 20UL * 160 + i);
+    }
+    x16_gfx2_hline(5, 20, 13, 3);
+    t_check(vpeek(20UL * 160 + 0) == 0x00 &&
+            vpeek(20UL * 160 + 1) == 0x3F &&
+            vpeek(20UL * 160 + 2) == 0xFF &&
+            vpeek(20UL * 160 + 3) == 0xFF &&
+            vpeek(20UL * 160 + 4) == 0xF0 &&
+            vpeek(20UL * 160 + 5) == 0x00,
+            "ABI_G2_HLINE");
+}
+
+/* pset + read prove the x/y pairs in BOTH directions plus the returns:
+** pset(5, 10, 2) puts colour 2 in byte 1 pixel 1 of row 10; read must
+** find it at (5,10), see background at (6,10), and answer $FF off screen.
+*/
+static void test_abi_g2_pset_read(void)
+{
+    t_vpoke(0x00, 10UL * 160 + 1);
+    x16_gfx2_pset(5, 10, 2);
+    t_check(vpeek(10UL * 160 + 1) == 0x20 &&
+            x16_gfx2_read(5, 10) == 2 &&
+            x16_gfx2_read(6, 10) == 0 &&
+            x16_gfx2_read(640, 10) == 0xFF,
+            "ABI_G2_PSET_READ");
+}
+
+/* setptr(inc, x, y): the byte argument goes in A and the first int
+** STRADDLES X and __rc2 -- the placement most worth proving. inc 0
+** keeps the port still, so two writes land on the same byte.
+*/
+static void test_abi_g2_setptr(void)
+{
+    unsigned char phase;
+
+    t_vpoke(0x00, 7UL * 160 + 80);
+    phase = x16_gfx2_setptr(0, 322, 7);     /* byte 80 of row 7, pixel 2 */
+    VERA.data0 = 0x5A;
+    VERA.data0 = 0xA5;                      /* INC_0: same byte again */
+    t_check(phase == 2 && vpeek(7UL * 160 + 80) == 0xA5,
+            "ABI_G2_SETPTR");
+}
+
+/* line(0, 60, 7, 67, 3): four words through quad_marshal, colour after. */
+static void test_abi_g2_line(void)
+{
+    unsigned char i;
+
+    for (i = 60; i <= 67; ++i) {
+        t_vpoke(0x00, (unsigned long)i * 160);
+        t_vpoke(0x00, (unsigned long)i * 160 + 1);
+    }
+    x16_gfx2_line(0, 60, 7, 67, 3);
+    t_check(vpeek(60UL * 160) == 0xC0 &&
+            vpeek(63UL * 160) == 0x03 &&
+            vpeek(64UL * 160 + 1) == 0xC0 &&
+            vpeek(67UL * 160 + 1) == 0x03,
+            "ABI_G2_LINE");
+}
+
+/* pattern_set(pattern, colors): the pointer hides in __rc2/__rc3 while
+** the colour byte takes A. Pattern $F0 with fg 3 makes even bytes $FF
+** and odd bytes $00 -- swap anything and the parity signature is gone.
+*/
+static const unsigned char g2_pat[8] = {
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0
+};
+
+static void test_abi_g2_pattern(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 4; ++i) {
+        t_vpoke(0x55, 70UL * 160 + i);
+    }
+    x16_gfx2_pattern_set(g2_pat, 0x03);
+    x16_gfx2_pattern_rect(0, 70, 12, 1);
+    t_check(vpeek(70UL * 160 + 0) == 0xFF &&
+            vpeek(70UL * 160 + 1) == 0x00 &&
+            vpeek(70UL * 160 + 2) == 0xFF &&
+            vpeek(70UL * 160 + 3) == 0x55,      /* untouched */
+            "ABI_G2_PATTERN");
+}
+
+/* blit(8, 80, 2, 2, img, 0) then XOR: six arguments -- two words, two
+** single bytes, an aligned pointer pair in __rc6/__rc7 and op in __rc8.
+*/
+static const unsigned char g2_img[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+
+static void test_abi_g2_blit(void)
+{
+    t_vpoke(0x00, 80UL * 160 + 2);
+    t_vpoke(0x00, 80UL * 160 + 3);
+    t_vpoke(0x00, 81UL * 160 + 2);
+    t_vpoke(0x00, 81UL * 160 + 3);
+    x16_gfx2_blit(8, 80, 2, 2, g2_img, 0);
+    if (vpeek(80UL * 160 + 2) != 0xDE || vpeek(81UL * 160 + 3) != 0xEF) {
+        t_check(0, "ABI_G2_BLIT");
+        return;
+    }
+    x16_gfx2_blit(8, 80, 2, 2, g2_img, 3);
+    t_check(vpeek(80UL * 160 + 2) == 0x00 &&
+            vpeek(81UL * 160 + 3) == 0x00,
+            "ABI_G2_BLIT");
+}
+
+/* blitm(12, 90, 4, 1, mcol): h and cols are the two singles before the
+** pointer pair. (fb & $0F) | $50 over $FF reads $5F on every row.
+*/
+static const unsigned char g2_mcol[8] = {
+    0x0F, 0x50, 0x0F, 0x50, 0x0F, 0x50, 0x0F, 0x50
+};
+
+static void test_abi_g2_blitm(void)
+{
+    unsigned char i;
+
+    for (i = 90; i <= 94; ++i) {
+        t_vpoke(0xFF, (unsigned long)i * 160 + 3);
+    }
+    x16_gfx2_blitm(12, 90, 4, 1, g2_mcol);
+    t_check(vpeek(90UL * 160 + 3) == 0x5F &&
+            vpeek(93UL * 160 + 3) == 0x5F &&
+            vpeek(94UL * 160 + 3) == 0xFF,
+            "ABI_G2_BLITM");
+}
+
+/* clear(2): one byte in A, and exactly 76,800 bytes covered. FX only. */
+static void test_abi_g2_clear(void)
+{
+    t_vpoke(0x77, 76800UL);
+    x16_gfx2_clear(2);
+    t_check(vpeek(0UL) == 0xAA &&
+            vpeek(76799UL) == 0xAA &&
+            vpeek(76800UL) == 0x77,
+            "ABI_G2_CLEAR");
+}
+
 int main(void)
 {
     t_init();
@@ -621,6 +799,21 @@ int main(void)
 
     test_float_ptr_operands();
     test_zx0_ptr_return();
+
+    /* Last: x16_gfx2_init() reprograms the display and palette 0-3. */
+    test_abi_g2_rect();
+    test_abi_g2_hline();
+    test_abi_g2_pset_read();
+    test_abi_g2_setptr();
+    test_abi_g2_line();
+    test_abi_g2_pattern();
+    test_abi_g2_blit();
+    test_abi_g2_blitm();
+    if (x16_vera_has_fx()) {
+        test_abi_g2_clear();
+    } else {
+        t_skip("ABI_G2_CLEAR");
+    }
 
     t_done();
     return 0;
