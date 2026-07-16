@@ -16,7 +16,6 @@
 ; parameter block.
 ; =====================================================================
 
-        .feature        labels_without_colons
 
         .include        "macros.inc"
         .include        "x16zp.inc"
@@ -269,7 +268,7 @@ GFX2_STRIDE = 160
 ; caller had them. Palette entries 0-3 get the default ramp. The
 ; framebuffer contents are NOT cleared -- call gfx2_clear.
 ; ---------------------------------------------------------------------
-gfx2_init
+gfx2_init:
     vera_dcsel 0
     lda #$80                    ; 1:1 scale -> full 640x480
     sta VERA_DC_HSCALE
@@ -288,7 +287,7 @@ gfx2_init
     ; palette 0-3: white paper, two grays, black ink
     vera_addr 0, VRAM_PALETTE, VERA_INC_1
     ldx #0
-@pal
+@pal:
     lda bitmap2_defpal,x
     sta VERA_DATA0
     inx
@@ -301,7 +300,7 @@ gfx2_init
     tsb VERA_DC_VIDEO
     rts
 
-bitmap2_defpal
+bitmap2_defpal:
     .byte $FF, $0F, $AA, $0A, $55, $05, $00, $00
 
 ; ---------------------------------------------------------------------
@@ -311,7 +310,7 @@ bitmap2_defpal
 ; Uses the FX 32-bit cache write (~4x a CPU byte loop; measured 1.25
 ; frames per full screen against 5.25). Clobbers X16_P0..P4.
 ; ---------------------------------------------------------------------
-gfx2_clear
+gfx2_clear:
     and #3
     tax
     lda bitmap2_colbyte,x
@@ -345,7 +344,7 @@ gfx2_clear
 ; y*160 = (y<<5) + (y<<5)<<2, so no multiply is needed; the result is
 ; 17-bit. Stepping by VERA_INC_160 then walks straight down a column.
 ; ---------------------------------------------------------------------
-gfx2_setptr
+gfx2_setptr:
     pha
     jsr bitmap2_addr_calc
     pla
@@ -358,7 +357,7 @@ gfx2_setptr
 ; gfx2_pset -- set one pixel, clipped
 ;   in:  A = colour (0-3), X16_P0/P1 = x, X16_P2/P3 = y
 ; ---------------------------------------------------------------------
-gfx2_pset
+gfx2_pset:
     and #3
     sta g2_c
     jsr bitmap2_onscreen
@@ -379,7 +378,7 @@ gfx2_pset
     and bitmap2_pix,x
     ora g2_t
     sta VERA_DATA0
-@off
+@off:
     rts
 
 ; ---------------------------------------------------------------------
@@ -388,7 +387,7 @@ gfx2_pset
 ;   out: carry clear, A = colour (0-3); carry set if (x,y) is off
 ;        screen (A undefined)
 ; ---------------------------------------------------------------------
-gfx2_read
+gfx2_read:
     jsr bitmap2_onscreen
     bcs @roff
 
@@ -400,17 +399,17 @@ gfx2_read
     and #3
     tax
     lda VERA_DATA0
-@shift
+@shift:
     cpx #3                      ; pixel 3 sits in bits 1:0 already
     beq @done
     lsr
     lsr
     inx
     bra @shift
-@done
+@done:
     and #3
     clc
-@roff
+@roff:
     rts
 
 ; ---------------------------------------------------------------------
@@ -421,7 +420,7 @@ gfx2_read
 ; Head and tail partials are read-modify-write; the middle whole bytes
 ; are one vera_fill.
 ; ---------------------------------------------------------------------
-gfx2_hline
+gfx2_hline:
     and #3
     tax
     lda bitmap2_colbyte,x
@@ -432,7 +431,7 @@ gfx2_hline
     ora X16_P5
     bne @hgo                    ; zero length: nothing to draw
     rts
-@hgo
+@hgo:
     lda X16_P5
     sta g2_n+1
 
@@ -450,7 +449,7 @@ gfx2_hline
     cmp #4
     bcs @middle
 
-@head
+@head:
     ; q = last pixel of the head byte = min(3, p + n - 1)
     lda g2_n+1
     bne @qmax                   ; a long span always reaches pixel 3
@@ -461,9 +460,9 @@ gfx2_hline
     dec a
     cmp #4
     bcc @qgot
-@qmax
+@qmax:
     lda #3
-@qgot
+@qgot:
     tay                         ; Y = q
     sec                         ; head pixel count = q - p + 1
     iny
@@ -486,7 +485,7 @@ gfx2_hline
     sta g2_n+1
     jsr bitmap2_a_inc                  ; step to the first whole byte
 
-@middle
+@middle:
     ; m = n >> 2 whole bytes
     lda g2_n+1
     sta g2_m+1
@@ -517,7 +516,7 @@ gfx2_hline
     adc #0
     sta g2_a2
 
-@tail
+@tail:
     lda g2_n
     and #3
     beq @hdone
@@ -525,7 +524,7 @@ gfx2_hline
     dey                         ; tail covers pixels 0..n-1
     lda bitmap2_upto,y
     jsr bitmap2_rmw
-@hdone
+@hdone:
     rts
 
 ; ---------------------------------------------------------------------
@@ -536,7 +535,7 @@ gfx2_hline
 ; One column of read-modify-writes: port 1 reads, port 0 writes, both
 ; stepping a whole row per access.
 ; ---------------------------------------------------------------------
-gfx2_vline
+gfx2_vline:
     and #3
     tax
     lda bitmap2_colbyte,x
@@ -569,8 +568,8 @@ gfx2_vline
     txa
     beq @vfull                  ; low byte 0 -> exactly hi*256 rows
     iny                         ; otherwise one extra partial page
-@vfull
-@vloop
+@vfull:
+@vloop:
     lda VERA_DATA1
     and g2_msk
     ora g2_ink
@@ -579,7 +578,7 @@ gfx2_vline
     bne @vloop
     dey
     bne @vloop
-@vdone
+@vdone:
     rts
 
 ; ---------------------------------------------------------------------
@@ -587,7 +586,7 @@ gfx2_vline
 ;   in:  A = colour (0-3), X16_P0/P1 = x, X16_P2/P3 = y,
 ;        X16_P4/P5 = width, X16_P6/P7 = height
 ; ---------------------------------------------------------------------
-gfx2_rect
+gfx2_rect:
     sta g2_rc
     lda X16_P4
     sta g2_rw
@@ -597,7 +596,7 @@ gfx2_rect
     sta g2_rh
     lda X16_P7
     sta g2_rh+1
-@rrow
+@rrow:
     lda g2_rh
     ora g2_rh+1
     beq @rdone
@@ -610,21 +609,21 @@ gfx2_rect
     inc X16_P2                  ; y += 1
     bne @ry_ok
     inc X16_P3
-@ry_ok
+@ry_ok:
     lda g2_rh
     bne @rh_ok
     dec g2_rh+1
-@rh_ok
+@rh_ok:
     dec g2_rh
     bra @rrow
-@rdone
+@rdone:
     rts
 
 ; ---------------------------------------------------------------------
 ; gfx2_frame -- rectangle outline (no clipping)
 ;   same arguments as gfx2_rect
 ; ---------------------------------------------------------------------
-gfx2_frame
+gfx2_frame:
     sta g2_rc
     lda X16_P0                  ; private copies: the edges reuse the
     sta g2_fx                   ; parameter block as they go
@@ -657,7 +656,7 @@ gfx2_frame
     lda X16_P2
     bne @f_nb1
     dec X16_P3
-@f_nb1
+@f_nb1:
     dec X16_P2
     lda g2_rc
     jsr gfx2_hline
@@ -676,13 +675,13 @@ gfx2_frame
     lda X16_P0
     bne @f_nb2
     dec X16_P1
-@f_nb2
+@f_nb2:
     dec X16_P0
     lda g2_rc
     jmp gfx2_vline
 
 ; x, y, width in the block, colour in A -- arguments for gfx2_hline
-bitmap2_f_span
+bitmap2_f_span:
     lda g2_fx
     sta X16_P0
     lda g2_fx+1
@@ -699,7 +698,7 @@ bitmap2_f_span
     rts
 
 ; x, y, height in the block, colour in A -- arguments for gfx2_vline
-bitmap2_f_col
+bitmap2_f_col:
     lda g2_fx
     sta X16_P0
     lda g2_fx+1
@@ -722,7 +721,7 @@ bitmap2_f_col
 ;        X16_P0/P1 = x0, X16_P2/P3 = y0
 ;        X16_P4/P5 = x1, X16_P6/P7 = y1
 ; ---------------------------------------------------------------------
-gfx2_line
+gfx2_line:
     sta g2_lc
     lda X16_P0
     sta g2_lx0
@@ -761,11 +760,11 @@ gfx2_line
     sta g2_lsx
     sta g2_lsx+1
     bra @dx_done
-@dx_pos
+@dx_pos:
     lda #$01
     sta g2_lsx
     stz g2_lsx+1
-@dx_done
+@dx_done:
 
     ; dy = -|y1 - y0|, sy = sign
     sec
@@ -787,11 +786,11 @@ gfx2_line
     sta g2_lsy
     sta g2_lsy+1
     bra @dy_done
-@dy_pos
+@dy_pos:
     lda #$01
     sta g2_lsy
     stz g2_lsy+1
-@dy_done
+@dy_done:
     sec                         ; g2_ldy = -|dy|
     lda #0
     sbc g2_lt
@@ -808,7 +807,7 @@ gfx2_line
     adc g2_ldy+1
     sta g2_lerr+1
 
-@loop
+@loop:
     lda g2_lx0                  ; plot (x0, y0)
     sta X16_P0
     lda g2_lx0+1
@@ -834,7 +833,7 @@ gfx2_line
     bne @step
     rts
 
-@step
+@step:
     lda g2_lerr                 ; e2 = err * 2
     asl
     sta g2_le2
@@ -850,7 +849,7 @@ gfx2_line
     sbc g2_ldy+1
     bvc @nv1
     eor #$80                    ; signed compare: fold overflow into sign
-@nv1
+@nv1:
     bmi @skip_x
     clc
     lda g2_lerr
@@ -866,7 +865,7 @@ gfx2_line
     lda g2_lx0+1
     adc g2_lsx+1
     sta g2_lx0+1
-@skip_x
+@skip_x:
 
     ; if e2 <= dx  ->  err += dx, y0 += sy
     sec
@@ -876,7 +875,7 @@ gfx2_line
     sbc g2_le2+1
     bvc @nv2
     eor #$80
-@nv2
+@nv2:
     bmi @skip_y
     clc
     lda g2_lerr
@@ -892,7 +891,7 @@ gfx2_line
     lda g2_ly0+1
     adc g2_lsy+1
     sta g2_ly0+1
-@skip_y
+@skip_y:
     jmp @loop
 
 ; ---------------------------------------------------------------------
@@ -905,7 +904,7 @@ gfx2_line
 ; two 2bpp bytes (16 bits); which of the pair a framebuffer byte uses
 ; is the parity of its address. The expansion is cached in g2_pat.
 ; ---------------------------------------------------------------------
-gfx2_pattern_set
+gfx2_pattern_set:
     sta X16_T6                  ; T6/T7 = pattern pointer
     stx X16_T7
     tya
@@ -923,7 +922,7 @@ gfx2_pattern_set
 
     ldx #0                      ; cache index (2 bytes per row)
     ldy #0                      ; pattern row
-@prow
+@prow:
     sty g2_t
     lda (X16_T6),y
     sta g2_pr                   ; the row's 8 bits, consumed by asl
@@ -941,17 +940,17 @@ gfx2_pattern_set
 
 ; expand the next 4 bits of g2_pr (MSB first) into one 2bpp byte:
 ; a set bit becomes the foreground colour, a clear one the background
-bitmap2_p_half
+bitmap2_p_half:
     stz g2_t2
     ldy #0                      ; pixel 0..3 within the byte
-@pbit
+@pbit:
     asl g2_pr
     bcs @pfg
     lda g2_pbg
     bra @pmix
-@pfg
+@pfg:
     lda g2_pfg
-@pmix
+@pmix:
     and bitmap2_pix,y                  ; keep just this pixel's two bits
     ora g2_t2
     sta g2_t2
@@ -966,7 +965,7 @@ bitmap2_p_half
 ;   in:  X16_P0/P1 = x, X16_P2/P3 = y, X16_P4/P5 = width,
 ;        X16_P6/P7 = height   (no clipping)
 ; ---------------------------------------------------------------------
-gfx2_pattern_rect
+gfx2_pattern_rect:
     lda X16_P4
     sta g2_rw
     lda X16_P5
@@ -975,7 +974,7 @@ gfx2_pattern_rect
     sta g2_rh
     lda X16_P7
     sta g2_rh+1
-@yrow
+@yrow:
     lda g2_rh
     ora g2_rh+1
     beq @ydone
@@ -983,24 +982,24 @@ gfx2_pattern_rect
     inc X16_P2
     bne @py_ok
     inc X16_P3
-@py_ok
+@py_ok:
     lda g2_rh
     bne @ph_ok
     dec g2_rh+1
-@ph_ok
+@ph_ok:
     dec g2_rh
     bra @yrow
-@ydone
+@ydone:
     rts
 
 ; one pattern row at (P0..P3), width g2_rw
-bitmap2_p_row
+bitmap2_p_row:
     lda g2_rw
     sta g2_n
     ora g2_rw+1
     bne @prgo
     rts
-@prgo
+@prgo:
     lda g2_rw+1
     sta g2_n+1
 
@@ -1021,13 +1020,13 @@ bitmap2_p_row
     lda g2_pat,x
     sta g2_pb1
     bra @parity_done
-@even
+@even:
     lda g2_pat,x
     sta g2_pb0
     inx
     lda g2_pat,x
     sta g2_pb1
-@parity_done
+@parity_done:
 
     lda X16_P0
     and #3
@@ -1039,7 +1038,7 @@ bitmap2_p_row
     cmp #4
     bcs @pmiddle
 
-@phead
+@phead:
     lda g2_n+1
     bne @pqmax
     clc
@@ -1049,9 +1048,9 @@ bitmap2_p_row
     dec a
     cmp #4
     bcc @pqgot
-@pqmax
+@pqmax:
     lda #3
-@pqgot
+@pqgot:
     tay
     sec
     iny
@@ -1079,7 +1078,7 @@ bitmap2_p_row
     sta g2_pb1
     stx g2_pb0
 
-@pmiddle
+@pmiddle:
     lda g2_n+1
     sta g2_m+1
     lda g2_n
@@ -1098,8 +1097,8 @@ bitmap2_p_row
     txa
     beq @pfull
     iny
-@pfull
-@ploop
+@pfull:
+@ploop:
     lda g2_pb0
     sta VERA_DATA0
     lda g2_pb0                  ; swap the parity pair
@@ -1124,7 +1123,7 @@ bitmap2_p_row
     adc #0
     sta g2_a2
 
-@ptail
+@ptail:
     lda g2_n
     and #3
     beq @prdone
@@ -1134,7 +1133,7 @@ bitmap2_p_row
     tax
     lda g2_pb0
     jsr bitmap2_rmwp
-@prdone
+@prdone:
     rts
 
 ; ---------------------------------------------------------------------
@@ -1147,13 +1146,13 @@ bitmap2_p_row
 ; The source pointer is X16_PTR3 -- P6/P7 double as real zero page, so
 ; (PTR3),y addressing costs nothing extra. No clipping.
 ; ---------------------------------------------------------------------
-gfx2_blit
+gfx2_blit:
     and #3
     sta g2_op
     jsr bitmap2_addr_calc
     lda X16_P5
     sta g2_h
-@brow
+@brow:
     lda #VERA_INC_1
     jsr bitmap2_aim1                   ; ops read through port 1...
     lda #VERA_INC_1
@@ -1165,7 +1164,7 @@ gfx2_blit
     beq @bor
     cmp #2
     beq @band
-@bxor
+@bxor:
     lda VERA_DATA1
     eor (X16_PTR3),y
     sta VERA_DATA0
@@ -1173,14 +1172,14 @@ gfx2_blit
     cpy X16_P4
     bne @bxor
     bra @brow_done
-@bcopy
+@bcopy:
     lda (X16_PTR3),y
     sta VERA_DATA0
     iny
     cpy X16_P4
     bne @bcopy
     bra @brow_done
-@bor
+@bor:
     lda VERA_DATA1
     ora (X16_PTR3),y
     sta VERA_DATA0
@@ -1188,21 +1187,21 @@ gfx2_blit
     cpy X16_P4
     bne @bor
     bra @brow_done
-@band
+@band:
     lda VERA_DATA1
     and (X16_PTR3),y
     sta VERA_DATA0
     iny
     cpy X16_P4
     bne @band
-@brow_done
+@brow_done:
     clc                         ; src += width
     lda X16_PTR3
     adc X16_P4
     sta X16_PTR3
     bcc @bsrc_ok
     inc X16_PTR3+1
-@bsrc_ok
+@bsrc_ok:
     jsr bitmap2_a_row                  ; dest += one row
     dec g2_h
     bne @brow
@@ -1221,18 +1220,18 @@ gfx2_blit
 ; glyph this is what makes proportional text affordable (spike-proven;
 ; see the CXGEOS project). No clipping.
 ; ---------------------------------------------------------------------
-gfx2_blitm
+gfx2_blitm:
     jsr bitmap2_addr_calc
     lda X16_P5
     sta g2_w
-@mcol
+@mcol:
     lda #VERA_INC_160
     jsr bitmap2_aim1
     lda #VERA_INC_160
     jsr bitmap2_aim0
     ldy #0
     ldx X16_P4
-@mrow
+@mrow:
     lda VERA_DATA1
     and (X16_PTR3),y            ; mask byte
     iny
@@ -1248,7 +1247,7 @@ gfx2_blitm
     sta X16_PTR3
     bcc @msrc_ok
     inc X16_PTR3+1
-@msrc_ok
+@msrc_ok:
     jsr bitmap2_a_inc                  ; dest: next byte column
     dec g2_w
     bne @mcol
@@ -1259,7 +1258,7 @@ gfx2_blitm
 ; ---------------------------------------------------------------------
 
 ; carry clear if (P0/P1, P2/P3) is on screen
-bitmap2_onscreen
+bitmap2_onscreen:
     lda X16_P1                  ; x < 640?
     cmp #>GFX2_WIDTH
     bcc @x_ok
@@ -1267,7 +1266,7 @@ bitmap2_onscreen
     lda X16_P0
     cmp #<GFX2_WIDTH
     bcs @bad
-@x_ok
+@x_ok:
     lda X16_P3                  ; y < 480?
     cmp #>GFX2_HEIGHT
     bcc @ok
@@ -1275,15 +1274,15 @@ bitmap2_onscreen
     lda X16_P2
     cmp #<GFX2_HEIGHT
     bcs @bad
-@ok
+@ok:
     clc
     rts
-@bad
+@bad:
     sec
     rts
 
 ; g2_a2:a1:a0 = y*160 + (x>>2)   (from X16_P0..P3; clobbers T0..T2)
-bitmap2_addr_calc
+bitmap2_addr_calc:
     lda X16_P2                  ; t = y << 5
     sta g2_a0
     lda X16_P3
@@ -1343,7 +1342,7 @@ bitmap2_addr_calc
 ; point port 0 (write side) at g2_a; A = increment index.
 ; Scratch is g2_inc, NOT g2_t: hline/pattern hold a pixel count in
 ; g2_t across the bitmap2_rmw call, and bitmap2_rmw aims through here.
-bitmap2_aim0
+bitmap2_aim0:
     asl
     asl
     asl
@@ -1362,7 +1361,7 @@ bitmap2_aim0
     rts
 
 ; point port 1 (read side) at g2_a; A = increment index
-bitmap2_aim1
+bitmap2_aim1:
     asl
     asl
     asl
@@ -1385,10 +1384,10 @@ bitmap2_aim1
 ; place, so one aim serves both the read and the write.
 ;   bitmap2_rmw:  A = mask, ink is the solid colour byte g2_cb
 ;   bitmap2_rmwp: A = ink byte, X = mask (the pattern-row variant)
-bitmap2_rmw
+bitmap2_rmw:
     tax
     lda g2_cb
-bitmap2_rmwp
+bitmap2_rmwp:
     sta g2_ink
     stx g2_msk
     lda #VERA_INC_0
@@ -1404,17 +1403,17 @@ bitmap2_rmwp
     rts
 
 ; g2_a += 1 (24-bit)
-bitmap2_a_inc
+bitmap2_a_inc:
     inc g2_a0
     bne @ai_done
     inc g2_a1
     bne @ai_done
     inc g2_a2
-@ai_done
+@ai_done:
     rts
 
 ; g2_a += one framebuffer row
-bitmap2_a_row
+bitmap2_a_row:
     clc
     lda g2_a0
     adc #GFX2_STRIDE
@@ -1430,58 +1429,58 @@ bitmap2_a_row
 ; ---------------------------------------------------------------------
 ; module variables (never live across a call boundary)
 ; ---------------------------------------------------------------------
-g2_a0  .byte 0
-g2_a1  .byte 0
-g2_a2  .byte 0
-g2_c   .byte 0
-g2_cb  .byte 0
-g2_p   .byte 0
-g2_n   .word 0
-g2_m   .word 0
-g2_t   .byte 0
-g2_t2  .byte 0
-g2_inc .byte 0
-g2_msk .byte 0
-g2_ink .byte 0
-g2_op  .byte 0
-g2_h   .byte 0
-g2_w   .byte 0
+g2_a0: .byte 0
+g2_a1: .byte 0
+g2_a2: .byte 0
+g2_c:  .byte 0
+g2_cb: .byte 0
+g2_p:  .byte 0
+g2_n:  .word 0
+g2_m:  .word 0
+g2_t:  .byte 0
+g2_t2: .byte 0
+g2_inc: .byte 0
+g2_msk: .byte 0
+g2_ink: .byte 0
+g2_op: .byte 0
+g2_h:  .byte 0
+g2_w:  .byte 0
 
-g2_rc  .byte 0
-g2_rw  .word 0
-g2_rh  .word 0
-g2_fx  .word 0
-g2_fy  .word 0
+g2_rc: .byte 0
+g2_rw: .word 0
+g2_rh: .word 0
+g2_fx: .word 0
+g2_fy: .word 0
 
-g2_pfg .byte 0
-g2_pbg .byte 0
-g2_pr  .byte 0
-g2_pb0 .byte 0
-g2_pb1 .byte 0
-g2_pat .res 16, 0
+g2_pfg: .byte 0
+g2_pbg: .byte 0
+g2_pr: .byte 0
+g2_pb0: .byte 0
+g2_pb1: .byte 0
+g2_pat: .res 16, 0
 
-g2_lc   .byte 0
-g2_lx0  .word 0
-g2_ly0  .word 0
-g2_lx1  .word 0
-g2_ly1  .word 0
-g2_ldx  .word 0
-g2_ldy  .word 0
-g2_lerr .word 0
-g2_le2  .word 0
-g2_lsx  .word 0
-g2_lsy  .word 0
-g2_lt   .word 0
+g2_lc:  .byte 0
+g2_lx0: .word 0
+g2_ly0: .word 0
+g2_lx1: .word 0
+g2_ly1: .word 0
+g2_ldx: .word 0
+g2_ldy: .word 0
+g2_lerr: .word 0
+g2_le2: .word 0
+g2_lsx: .word 0
+g2_lsy: .word 0
+g2_lt:  .word 0
 
-bitmap2_colbyte
+bitmap2_colbyte:
     .byte $00, $55, $AA, $FF   ; a colour in all four pixels
-bitmap2_pix
+bitmap2_pix:
     .byte $C0, $30, $0C, $03   ; the bits of pixel 0..3
-bitmap2_keep
+bitmap2_keep:
     .byte $3F, $CF, $F3, $FC   ; everything but pixel 0..3
-bitmap2_from
+bitmap2_from:
     .byte $FF, $3F, $0F, $03   ; pixels p..3
-bitmap2_upto
+bitmap2_upto:
     .byte $C0, $F0, $FC, $FF   ; pixels 0..q
 
 ; (end zone)
