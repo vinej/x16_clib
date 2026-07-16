@@ -52,6 +52,7 @@
         global	_x16_fx_off
         global	_x16_fx_mult
         global	_x16_fx_fill
+        global	fx_fill	; internal: bitmap2 clears through it
         global	_x16_fx_clear
         global	_x16_fx_line
         global	_x16_fx_triangle

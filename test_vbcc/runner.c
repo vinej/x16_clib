@@ -33,6 +33,7 @@
 #include <x16/bmx.h>
 #include <x16/verafx.h>
 #include <x16/bitmap.h>
+#include <x16/bitmap2.h>
 #include <x16/psg.h>
 
 /* From x16/x16.h; declared here directly so this runner does not pull in
@@ -885,6 +886,240 @@ static void test_psg_set_freq(void)
             t_vpeek(0x1F9C0UL + 3 * 4 + 1) == 0x12, "PSG_SET_FREQ");
 }
 
+/* ------------------------------------------------------------------ */
+/* gfx2: 640x480 at 2bpp                                              */
+/* ------------------------------------------------------------------ */
+/* A framebuffer byte sits at y*160 + (x>>2), 4 pixels per byte,
+** MSB-first. Every gfx2 coordinate is a 16-bit int, so x fills r0/r1
+** and y r2/r3; rect, frame, line and blit are wide enough to push their
+** last argument onto the C soft stack, which is where a shim is most
+** likely to be silently wrong -- so each of those is checked here.
+** These run last: x16_gfx2_init() reprograms the display and palette.
+*/
+#define G2ROW(y)  ((unsigned long)(y) * 160)
+
+static const unsigned char g2_pat_half[8] = {
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0
+};
+static const unsigned char g2_img[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+static const unsigned char g2_mcol[8] = {       /* (mask,data) x 4 rows */
+    0x0F, 0x50, 0x0F, 0x50, 0x0F, 0x50, 0x0F, 0x50
+};
+
+static void test_g2_init(void)
+{
+    x16_gfx2_init();
+    t_check(*(volatile unsigned char *)0x9F2D == 0x05 &&    /* bitmap|2bpp */
+            *(volatile unsigned char *)0x9F2F == 0x01,      /* $00000/640 */
+            "G2_INIT");
+}
+
+static void test_g2_pset_read(void)
+{
+    t_vpoke(0x00, G2ROW(10) + 1);
+    x16_gfx2_pset(5, 10, 2);                    /* byte 1, pixel 1 */
+    t_check(t_vpeek(G2ROW(10) + 1) == 0x20 &&
+            x16_gfx2_read(5, 10) == 2 &&
+            x16_gfx2_read(6, 10) == 0 &&
+            x16_gfx2_read(640, 10) == 0xFF,     /* off screen */
+            "G2_PSET_READ");
+}
+
+/* Unclipped, (640,0) would land at byte 160 and (0,480) at 76,800. */
+static void test_g2_clip(void)
+{
+    t_vpoke(0x11, 160UL);
+    t_vpoke(0x22, 76800UL);
+    x16_gfx2_pset(640, 0, 3);
+    x16_gfx2_pset(0, 480, 3);
+    t_check(t_vpeek(160UL) == 0x11 && t_vpeek(76800UL) == 0x22, "G2_CLIP");
+}
+
+/* setptr's byte argument shares registers with a 16-bit pair, and
+** increment 0 keeps the port still, so two writes hit one byte.
+*/
+static void test_g2_setptr(void)
+{
+    unsigned char phase;
+
+    t_vpoke(0x00, G2ROW(7) + 80);
+    phase = x16_gfx2_setptr(0, 322, 7);         /* byte 80 of row 7, px 2 */
+    *(volatile unsigned char *)0x9F23 = 0x5A;
+    *(volatile unsigned char *)0x9F23 = 0xA5;
+    t_check(phase == 2 && t_vpeek(G2ROW(7) + 80) == 0xA5, "G2_SETPTR");
+}
+
+/* x=5 len=13: head = byte 1 pixels 1-3, middle bytes 2-3, tail = byte 4
+** pixels 0-1. The bytes either side must survive.
+*/
+static void test_g2_hline(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 6; ++i) {
+        t_vpoke(0x00, G2ROW(20) + i);
+    }
+    x16_gfx2_hline(5, 20, 13, 3);
+    t_check(t_vpeek(G2ROW(20) + 0) == 0x00 &&
+            t_vpeek(G2ROW(20) + 1) == 0x3F &&
+            t_vpeek(G2ROW(20) + 2) == 0xFF &&
+            t_vpeek(G2ROW(20) + 3) == 0xFF &&
+            t_vpeek(G2ROW(20) + 4) == 0xF0 &&
+            t_vpeek(G2ROW(20) + 5) == 0x00,
+            "G2_HLINE");
+}
+
+/* Colour 0 ink onto $FF: proves the column really is read-modify-write. */
+static void test_g2_vline(void)
+{
+    unsigned char i;
+
+    for (i = 30; i <= 34; ++i) {
+        t_vpoke(0xFF, G2ROW(i) + 1);
+    }
+    x16_gfx2_vline(6, 30, 4, 0);                /* byte 1, pixel 2 */
+    t_check(t_vpeek(G2ROW(30) + 1) == 0xF3 &&
+            t_vpeek(G2ROW(33) + 1) == 0xF3 &&
+            t_vpeek(G2ROW(34) + 1) == 0xFF,     /* one past the end */
+            "G2_VLINE");
+}
+
+/* rect's colour is the fifth argument: it rides the soft stack. */
+static void test_g2_rect(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 4; ++i) {
+        t_vpoke(0x00, G2ROW(40) + i);
+        t_vpoke(0x00, G2ROW(41) + i);
+        t_vpoke(0x00, G2ROW(42) + i);
+    }
+    x16_gfx2_rect(4, 40, 8, 2, 1);
+    t_check(t_vpeek(G2ROW(40) + 0) == 0x00 &&
+            t_vpeek(G2ROW(40) + 1) == 0x55 &&
+            t_vpeek(G2ROW(40) + 2) == 0x55 &&
+            t_vpeek(G2ROW(40) + 3) == 0x00 &&
+            t_vpeek(G2ROW(41) + 1) == 0x55 &&
+            t_vpeek(G2ROW(42) + 1) == 0x00,
+            "G2_RECT");
+}
+
+static void test_g2_frame(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 4; ++i) {
+        t_vpoke(0x00, G2ROW(50) + i);
+        t_vpoke(0x00, G2ROW(51) + i);
+        t_vpoke(0x00, G2ROW(52) + i);
+    }
+    x16_gfx2_frame(0, 50, 16, 3, 3);
+    t_check(t_vpeek(G2ROW(50) + 0) == 0xFF &&   /* top edge */
+            t_vpeek(G2ROW(50) + 3) == 0xFF &&
+            t_vpeek(G2ROW(51) + 0) == 0xC0 &&   /* left edge only */
+            t_vpeek(G2ROW(51) + 1) == 0x00 &&   /* hollow */
+            t_vpeek(G2ROW(51) + 3) == 0x03 &&   /* right edge only */
+            t_vpeek(G2ROW(52) + 2) == 0xFF,     /* bottom edge */
+            "G2_FRAME");
+}
+
+/* The 45-degree diagonal, down-right: four words in registers and the
+** colour on the stack.
+*/
+static void test_g2_line(void)
+{
+    unsigned char i;
+
+    for (i = 60; i <= 67; ++i) {
+        t_vpoke(0x00, G2ROW(i));
+        t_vpoke(0x00, G2ROW(i) + 1);
+    }
+    x16_gfx2_line(0, 60, 7, 67, 3);
+    t_check(t_vpeek(G2ROW(60)) == 0xC0 &&
+            t_vpeek(G2ROW(63)) == 0x03 &&
+            t_vpeek(G2ROW(64) + 1) == 0xC0 &&
+            t_vpeek(G2ROW(67) + 1) == 0x03,
+            "G2_LINE");
+}
+
+/* Pattern $F0 with fg 3: even bytes $FF, odd bytes $00. Patterns anchor
+** to the screen, so the x=2 fill gets a phase-2 head and the even byte
+** again in its tail.
+*/
+static void test_g2_pattern(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 5; ++i) {
+        t_vpoke(0x55, G2ROW(70) + i);
+    }
+    for (i = 0; i < 4; ++i) {
+        t_vpoke(0x00, G2ROW(74) + i);
+    }
+    x16_gfx2_pattern_set(g2_pat_half, 0x03);    /* bg 0, fg 3 */
+    x16_gfx2_pattern_rect(0, 70, 16, 1);
+    x16_gfx2_pattern_rect(2, 74, 8, 1);
+    t_check(t_vpeek(G2ROW(70) + 0) == 0xFF &&
+            t_vpeek(G2ROW(70) + 1) == 0x00 &&
+            t_vpeek(G2ROW(70) + 2) == 0xFF &&
+            t_vpeek(G2ROW(70) + 3) == 0x00 &&
+            t_vpeek(G2ROW(70) + 4) == 0x55 &&   /* untouched */
+            t_vpeek(G2ROW(74) + 0) == 0x0F &&   /* phase-2 head */
+            t_vpeek(G2ROW(74) + 1) == 0x00 &&
+            t_vpeek(G2ROW(74) + 2) == 0xF0,     /* tail */
+            "G2_PATTERN");
+}
+
+/* blit's op is the sixth argument, on the soft stack: copy it down,
+** then XOR the same image away again.
+*/
+static void test_g2_blit(void)
+{
+    t_vpoke(0x00, G2ROW(80) + 2);
+    t_vpoke(0x00, G2ROW(80) + 3);
+    t_vpoke(0x00, G2ROW(81) + 2);
+    t_vpoke(0x00, G2ROW(81) + 3);
+    x16_gfx2_blit(8, 80, 2, 2, g2_img, 0);
+    if (t_vpeek(G2ROW(80) + 2) != 0xDE || t_vpeek(G2ROW(80) + 3) != 0xAD ||
+        t_vpeek(G2ROW(81) + 2) != 0xBE || t_vpeek(G2ROW(81) + 3) != 0xEF) {
+        t_check(0, "G2_BLIT");
+        return;
+    }
+    x16_gfx2_blit(8, 80, 2, 2, g2_img, 3);
+    t_check(t_vpeek(G2ROW(80) + 2) == 0x00 &&
+            t_vpeek(G2ROW(81) + 3) == 0x00,
+            "G2_BLIT");
+}
+
+/* Onto $FF: keep pixels 2-3 (mask $0F), ink pixels 0-1 with colour 1
+** (data $50) -> every touched byte reads $5F.
+*/
+static void test_g2_blitm(void)
+{
+    unsigned char i;
+
+    for (i = 90; i <= 94; ++i) {
+        t_vpoke(0xFF, G2ROW(i) + 3);
+    }
+    x16_gfx2_blitm(12, 90, 4, 1, g2_mcol);
+    t_check(t_vpeek(G2ROW(90) + 3) == 0x5F &&
+            t_vpeek(G2ROW(93) + 3) == 0x5F &&
+            t_vpeek(G2ROW(94) + 3) == 0xFF,     /* one past the end */
+            "G2_BLITM");
+}
+
+/* Exactly the 76,800 framebuffer bytes and not one more. FX only. */
+static void test_g2_clear(void)
+{
+    t_vpoke(0x77, 76800UL);
+    x16_gfx2_clear(2);
+    t_check(t_vpeek(0UL) == 0xAA &&
+            t_vpeek(38400UL) == 0xAA &&         /* the second fill half */
+            t_vpeek(76799UL) == 0xAA &&
+            t_vpeek(76800UL) == 0x77,           /* the sentinel */
+            "G2_CLEAR");
+}
+
 int main(void)
 {
     t_init();
@@ -961,6 +1196,25 @@ int main(void)
     test_gfx_text();
 
     test_psg_set_freq();
+
+    /* Last: x16_gfx2_init() reprograms the display and palette 0-3. */
+    test_g2_init();
+    test_g2_pset_read();
+    test_g2_clip();
+    test_g2_setptr();
+    test_g2_hline();
+    test_g2_vline();
+    test_g2_rect();
+    test_g2_frame();
+    test_g2_line();
+    test_g2_pattern();
+    test_g2_blit();
+    test_g2_blitm();
+    if (x16_vera_has_fx()) {
+        test_g2_clear();
+    } else {
+        t_skip("G2_CLEAR");
+    }
 
     t_done();
     return 0;

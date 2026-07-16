@@ -144,11 +144,13 @@ function Build-Prg([string]$srcRel) {
     return $prg
 }
 
-# -Test with no explicit -Source runs the whole suite. runner.c covers the
-# modules; runner2.c the C entry points, where the ABI is silent if wrong;
-# runner3.c the storage/file paths.
+# -Test with no explicit -Source runs the whole suite. Only runner.c
+# exists so far: it covers the modules and the C entry points, where the
+# ABI is silent if wrong. The list grows when a runner does -- a name
+# here with no file behind it fails the build with "missing source",
+# which is what runner2.c and runner3.c did to a bare -Test.
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test_vbcc\runner.c', 'test_vbcc\runner2.c', 'test_vbcc\runner3.c')
+    $suites = @('test_vbcc\runner.c')
 } else {
     $suites = @($Source)
 }
