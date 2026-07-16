@@ -103,7 +103,8 @@ function Build-Prg([string]$srcRel) {
 # comparable, and failures triage to a third of the tests.
 $suites = @()
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test_oscar64\runner.c', 'test_oscar64\runner2.c', 'test_oscar64\runner3.c')
+    $suites = @('test_oscar64\runner.c', 'test_oscar64\runner2.c', 'test_oscar64\runner3.c',
+                'test_oscar64\runner4.c')
 } else {
     $suites = @($Source)
 }

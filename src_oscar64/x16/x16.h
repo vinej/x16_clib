@@ -45,6 +45,7 @@
 #include <x16/tile.h>           /* tilemap cells, layer config, scroll */
 #include <x16/sprite.h>         /* 128 hardware sprites */
 #include <x16/bitmap.h>         /* 320x240x256 drawing */
+#include <x16/bitmap2.h>        /* 640x480x4 drawing (2bpp) */
 #include <x16/verafx.h>         /* hardware multiply, fills, lines, triangles */
 #include <x16/irq.h>            /* VSYNC, raster and collision interrupts */
 #include <x16/psg.h>            /* 16-voice PSG, and ASR envelopes */
