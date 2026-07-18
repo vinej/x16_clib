@@ -854,6 +854,32 @@ static void test_shapes_flood2(void)
             "SHAPES_FLOOD2");
 }
 
+/* ellipse: 5 arguments, so the 8bpp call proves the deepest char slot
+** (__rc5) and the 2bpp call the deepest of all (__rc6). */
+static void test_shapes_ellipse8(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+    x16_gfx_ellipse(50, 20, 15, 8, 0x9A);
+    t_check(vpeek(PIXEL(65, 20)) == 0x9A &&     /* east / west / south */
+            vpeek(PIXEL(35, 20)) == 0x9A &&
+            vpeek(PIXEL(50, 28)) == 0x9A &&
+            vpeek(PIXEL(50, 20)) == 0x00,       /* hollow */
+            "SHAPES_ELLIPSE8");
+}
+
+static void test_shapes_fellipse2(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+    x16_gfx2_fellipse(40, 30, 12, 9, 2);
+    t_check(x16_gfx2_read(40, 30) == 2 &&       /* centre + east rim */
+            x16_gfx2_read(52, 30) == 2 &&
+            x16_gfx2_read(53, 30) == 0 &&       /* one past the rim */
+            x16_gfx2_read(40, 20) == 0,         /* one past the top rim */
+            "SHAPES_FELLIPSE2");
+}
+
 int main(void)
 {
     t_init();
@@ -916,6 +942,8 @@ int main(void)
     test_shapes_flood8();
     test_shapes_disc2();
     test_shapes_flood2();
+    test_shapes_ellipse8();
+    test_shapes_fellipse2();
 
     t_done();
     return 0;

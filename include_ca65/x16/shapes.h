@@ -32,6 +32,17 @@ void __fastcall__ x16_gfx_circle (unsigned int cx, unsigned char cy,
 void __fastcall__ x16_gfx_disc (unsigned int cx, unsigned char cy,
                                 unsigned char r, unsigned char color);
 
+/* Axis-aligned ellipse outline / filled ellipse (the error-form midpoint
+** walk). rx and ry each 0-255; the outline clips through pset, the fill
+** does not (keep it on screen).
+*/
+void __fastcall__ x16_gfx_ellipse (unsigned int cx, unsigned char cy,
+                                   unsigned char rx, unsigned char ry,
+                                   unsigned char color);
+void __fastcall__ x16_gfx_fellipse (unsigned int cx, unsigned char cy,
+                                    unsigned char rx, unsigned char ry,
+                                    unsigned char color);
+
 /* Scanline flood fill of the 4-connected region under the seed. Filling
 ** with the colour already there is a no-op. Returns 1 when the fill was
 ** complete, 0 when the span stack (96 seeds) overflowed and the fill is
@@ -46,6 +57,13 @@ void __fastcall__ x16_gfx2_circle (unsigned int cx, unsigned int cy,
                                    unsigned char r, unsigned char color);
 void __fastcall__ x16_gfx2_disc (unsigned int cx, unsigned int cy,
                                  unsigned char r, unsigned char color);
+
+void __fastcall__ x16_gfx2_ellipse (unsigned int cx, unsigned int cy,
+                                    unsigned char rx, unsigned char ry,
+                                    unsigned char color);
+void __fastcall__ x16_gfx2_fellipse (unsigned int cx, unsigned int cy,
+                                     unsigned char rx, unsigned char ry,
+                                     unsigned char color);
 
 unsigned char __fastcall__ x16_gfx2_flood (unsigned int x, unsigned int y,
                                            unsigned char color);

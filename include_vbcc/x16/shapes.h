@@ -27,6 +27,17 @@ void x16_gfx_circle(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy
 void x16_gfx_disc(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
                   __reg("r4") unsigned char r, __reg("r6") unsigned char color);
 
+/* Axis-aligned ellipse outline / filled ellipse (the error-form midpoint
+** walk). rx and ry each 0-255; the outline clips through pset, the fill
+** does not (keep it on screen). Five args: color rides the C soft stack.
+*/
+void x16_gfx_ellipse(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
+                     __reg("r4") unsigned char rx, __reg("r6") unsigned char ry,
+                     unsigned char color);
+void x16_gfx_fellipse(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
+                      __reg("r4") unsigned char rx, __reg("r6") unsigned char ry,
+                      unsigned char color);
+
 /* Returns 1 when the region was filled completely, 0 when the span stack
 ** (96 seeds) overflowed and the fill is INCOMPLETE. */
 unsigned char x16_gfx_flood(__reg("r0/r1") unsigned int x, __reg("r2") unsigned char y,
@@ -38,6 +49,13 @@ void x16_gfx2_circle(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int
                      __reg("r4") unsigned char r, __reg("r6") unsigned char color);
 void x16_gfx2_disc(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
                    __reg("r4") unsigned char r, __reg("r6") unsigned char color);
+
+void x16_gfx2_ellipse(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
+                      __reg("r4") unsigned char rx, __reg("r6") unsigned char ry,
+                      unsigned char color);
+void x16_gfx2_fellipse(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
+                       __reg("r4") unsigned char rx, __reg("r6") unsigned char ry,
+                       unsigned char color);
 
 unsigned char x16_gfx2_flood(__reg("r0/r1") unsigned int x, __reg("r2/r3") unsigned int y,
                              __reg("r4") unsigned char color);

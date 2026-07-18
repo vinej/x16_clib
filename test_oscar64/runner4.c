@@ -289,6 +289,18 @@ void test_shapes_flood2(void) {
             "SHAPES_FLOOD2");
 }
 
+void test_shapes_fellipse2(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 41);              /* rows 0..40 */
+    x16_gfx2_fellipse(40, 30, 12, 9, 2);
+    t_check((x16_gfx2_read(40, 30) == 2 &&
+            x16_gfx2_read(52, 30) == 2 &&       /* east rim */
+            x16_gfx2_read(53, 30) == 0 &&       /* one past it */
+            x16_gfx2_read(40, 21) == 2 &&       /* north rim */
+            x16_gfx2_read(40, 20) == 0) ? 1 : 0,
+            "SHAPES_FELLIPSE2");
+}
+
 int main(void) {
     t_init();
 
@@ -312,6 +324,7 @@ int main(void) {
     }
     test_shapes_disc2();
     test_shapes_flood2();
+    test_shapes_fellipse2();
 
     t_done();
     return 0;

@@ -589,6 +589,21 @@ void test_gfx_circle(void) {
             "GFX_CIRCLE");
 }
 
+void test_gfx_ellipse(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 12800);         /* rows 0..39 */
+
+    x16_gfx_ellipse(50, 20, 15, 8, 0x9A);
+
+    t_check((t_vpeek(0, PX(65, 20)) == 0x9A &&  /* east */
+            t_vpeek(0, PX(35, 20)) == 0x9A &&   /* west */
+            t_vpeek(0, PX(50, 12)) == 0x9A &&   /* north */
+            t_vpeek(0, PX(50, 28)) == 0x9A &&   /* south */
+            t_vpeek(0, PX(50, 20)) == 0x00 &&   /* hollow */
+            t_vpeek(0, PX(66, 20)) == 0x00) ? 1 : 0, /* nothing outside */
+            "GFX_ELLIPSE");
+}
+
 void test_gfx_disc(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 12800);
@@ -1073,6 +1088,7 @@ void main(void) {
     test_gfx_line();
     test_gfx_line_down();
     test_gfx_circle();
+    test_gfx_ellipse();
     test_gfx_disc();
     test_gfx_char();
     test_gfx_flood();

@@ -157,6 +157,67 @@ void x16__shp_walk(unsigned int r, unsigned char fill) {
     }
 }
 
+// --- ellipse / fellipse ------------------------------------------------
+// The error-form midpoint ellipse (Zingl): quadrant II from (-rx, 0) up
+// to (0, ry), mirrored 4 ways by the circle's own plot4 / span2. The
+// decision terms reach 2*rx*ry^2 (about 33M at 255/255), so they are
+// long -- Oscar64 compiles real 32-bit arithmetic, no asm needed. A
+// centre column finishes the flat tips (small rx).
+void x16__shp_ewalk(unsigned char rx, unsigned char ry, unsigned char fill) {
+    int x;
+    unsigned char y;
+    unsigned int ox;
+    unsigned int a2;
+    unsigned int b2;
+    long dx;
+    long dy;
+    long err;
+    long e2;
+    long ta2;
+    long tb2;
+
+    a2 = (unsigned int)rx * rx;
+    b2 = (unsigned int)ry * ry;
+    tb2 = (long)b2 << 1;                // 2*ry^2
+    ta2 = (long)a2 << 1;                // 2*rx^2
+    dx = (long)b2 - (long)rx * tb2;     // ry^2 - rx*2ry^2
+    dy = (long)a2;                      // rx^2
+    err = dx + dy;
+
+    x = -(int)rx;
+    y = 0;
+    for (;;) {
+        ox = (unsigned int)-x;          // |x|: x stays <= 0 in the walk
+        if (fill != 0) {
+            x16__shp_span2(ox, (unsigned int)y);
+        } else {
+            x16__shp_plot4(ox, (unsigned int)y);
+        }
+        e2 = err << 1;
+        if (e2 >= dx) {                 // x step
+            x++;
+            dx += tb2;
+            err += dx;
+        }
+        if (e2 <= dy) {                 // y step
+            y++;
+            dy += ta2;
+            err += dy;
+        }
+        if (x > 0) {
+            break;
+        }
+    }
+    while (y < ry) {                    // flat tip: the centre column
+        y++;
+        if (fill != 0) {
+            x16__shp_span2(0, (unsigned int)y);
+        } else {
+            x16__shp_plot4(0, (unsigned int)y);
+        }
+    }
+}
+
 // --- flood fill ------------------------------------------------------
 unsigned char x16__fq_xl[SHP_FMAX];
 unsigned char x16__fq_xh[SHP_FMAX];
@@ -275,6 +336,28 @@ void x16_gfx_disc(unsigned int cx, unsigned char cy, unsigned char r,
     x16__shp_walk((unsigned int)r, 1);
 }
 
+void x16_gfx_ellipse(unsigned int cx, unsigned char cy, unsigned char rx,
+                     unsigned char ry, unsigned char color) {
+    x16__shp2 = 0;
+    x16__shp_w = 320;
+    x16__shp_h = 240;
+    x16__sc_cx = cx;
+    x16__sc_cy = (unsigned int)cy;
+    x16__sc_col = color;
+    x16__shp_ewalk(rx, ry, 0);
+}
+
+void x16_gfx_fellipse(unsigned int cx, unsigned char cy, unsigned char rx,
+                      unsigned char ry, unsigned char color) {
+    x16__shp2 = 0;
+    x16__shp_w = 320;
+    x16__shp_h = 240;
+    x16__sc_cx = cx;
+    x16__sc_cy = (unsigned int)cy;
+    x16__sc_col = color;
+    x16__shp_ewalk(rx, ry, 1);
+}
+
 unsigned char x16_gfx_flood(unsigned int x, unsigned char y,
                             unsigned char color) {
     x16__shp2 = 0;
@@ -303,6 +386,28 @@ void x16_gfx2_disc(unsigned int cx, unsigned int cy, unsigned char r,
     x16__sc_cy = cy;
     x16__sc_col = color;
     x16__shp_walk((unsigned int)r, 1);
+}
+
+void x16_gfx2_ellipse(unsigned int cx, unsigned int cy, unsigned char rx,
+                      unsigned char ry, unsigned char color) {
+    x16__shp2 = 1;
+    x16__shp_w = 640;
+    x16__shp_h = 480;
+    x16__sc_cx = cx;
+    x16__sc_cy = cy;
+    x16__sc_col = color;
+    x16__shp_ewalk(rx, ry, 0);
+}
+
+void x16_gfx2_fellipse(unsigned int cx, unsigned int cy, unsigned char rx,
+                       unsigned char ry, unsigned char color) {
+    x16__shp2 = 1;
+    x16__shp_w = 640;
+    x16__shp_h = 480;
+    x16__sc_cx = cx;
+    x16__sc_cy = cy;
+    x16__sc_col = color;
+    x16__shp_ewalk(rx, ry, 1);
 }
 
 unsigned char x16_gfx2_flood(unsigned int x, unsigned int y,

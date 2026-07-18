@@ -882,6 +882,40 @@ static void test_gfx_disc(void)
             "GFX_DISC");
 }
 
+/* Ellipse outline: extremes at cx +/- rx and cy +/- ry, hollow centre,
+** nothing past the poles.
+*/
+static void test_gfx_ellipse(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+
+    x16_gfx_ellipse(50, 20, 15, 8, 0x9A);
+
+    t_check(vpeek(PIXEL(65, 20)) == 0x9A &&     /* east */
+            vpeek(PIXEL(35, 20)) == 0x9A &&     /* west */
+            vpeek(PIXEL(50, 28)) == 0x9A &&     /* south */
+            vpeek(PIXEL(50, 29)) == 0x00 &&     /* one past the pole */
+            vpeek(PIXEL(50, 20)) == 0x00,       /* hollow */
+            "GFX_ELLIPSE");
+}
+
+/* Filled ellipse: solid to both rims, clear one past each. */
+static void test_gfx_fellipse(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+
+    x16_gfx_fellipse(50, 20, 12, 9, 0x9B);
+
+    t_check(vpeek(PIXEL(50, 20)) == 0x9B &&     /* centre */
+            vpeek(PIXEL(62, 20)) == 0x9B &&     /* east rim */
+            vpeek(PIXEL(63, 20)) == 0x00 &&     /* one past it */
+            vpeek(PIXEL(50, 11)) == 0x9B &&     /* north rim */
+            vpeek(PIXEL(50, 10)) == 0x00,       /* one past it */
+            "GFX_FELLIPSE");
+}
+
 /* Circle OUTLINES clip: the midpoint walk plots through the clipping
 ** x16_gfx_pset, so an outline centred off the left edge draws only its
 ** on-screen pixels and never wraps to the far side of a row. (Disc FILLS
@@ -3593,6 +3627,38 @@ static void test_g2_disc(void)
             "G2_DISC");
 }
 
+/* The ellipse bound to the 2bpp module: outline extremes and a filled
+** rim, through the independent gfx2_read. */
+static void test_g2_ellipse(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);            /* rows 0..40 */
+
+    x16_gfx2_ellipse(40, 30, 15, 8, 3);
+
+    t_check(x16_gfx2_read(55, 30) == 3 &&       /* east */
+            x16_gfx2_read(25, 30) == 3 &&       /* west */
+            x16_gfx2_read(40, 38) == 3 &&       /* south */
+            x16_gfx2_read(40, 39) == 0 &&       /* one past the pole */
+            x16_gfx2_read(40, 30) == 0,         /* hollow */
+            "G2_ELLIPSE");
+}
+
+static void test_g2_fellipse(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+
+    x16_gfx2_fellipse(40, 30, 12, 9, 2);
+
+    t_check(x16_gfx2_read(40, 30) == 2 &&       /* centre */
+            x16_gfx2_read(52, 30) == 2 &&       /* east rim */
+            x16_gfx2_read(53, 30) == 0 &&       /* one past it */
+            x16_gfx2_read(40, 21) == 2 &&       /* north rim */
+            x16_gfx2_read(40, 20) == 0,         /* one past it */
+            "G2_FELLIPSE");
+}
+
 static void test_g2_flood(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
@@ -3809,6 +3875,8 @@ int main(void)
     test_gfx_circle();
     test_gfx_circle_r0();
     test_gfx_disc();
+    test_gfx_ellipse();
+    test_gfx_fellipse();
     test_gfx_circle_clips();
     test_gfx_char();
     test_gfx_text();
@@ -3868,6 +3936,8 @@ int main(void)
         t_skip("G2_CLEAR");
     }
     test_g2_disc();
+    test_g2_ellipse();
+    test_g2_fellipse();
     test_g2_flood();
 
 #endif

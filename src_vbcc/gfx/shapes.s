@@ -22,6 +22,10 @@
         global  _x16_gfx2_circle
         global  _x16_gfx2_disc
         global  _x16_gfx2_flood
+        global  _x16_gfx_ellipse
+        global  _x16_gfx_fellipse
+        global  _x16_gfx2_ellipse
+        global  _x16_gfx2_fellipse
 
         section text
 
@@ -174,6 +178,65 @@ _x16_gfx2_flood:
         rol     a
         eor     #1                      ; report completeness, not overflow
         rts
+
+; gfx_ellipse/fellipse(cx:int, cy:char, rx:char, ry:char, color:char)
+; color (the 5th argument) rides the C soft stack, like rect/frame/line.
+_x16_gfx_ellipse:
+        jsr     shp_emarshal8
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_ellipse
+_x16_gfx_fellipse:
+        jsr     shp_emarshal8
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_fellipse
+shp_emarshal8:                          ; cx->r0/r1, cy->r2, rx->r4, ry->r6
+        lda     r0
+        sta     X16_P0
+        lda     r1
+        sta     X16_P1
+        lda     r2
+        sta     X16_P2
+        stz     X16_P3
+        lda     r4
+        sta     X16_P4
+        lda     r6
+        sta     X16_P5
+        ldy     #0
+        lda     (sp),y
+        sta     shp_mcol                ; color (stacked 5th arg)
+        rts
+
+; gfx2_ellipse/fellipse(cx:int, cy:int, rx:char, ry:char, color:char)
+_x16_gfx2_ellipse:
+        jsr     shp_emarshal2
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_ellipse
+_x16_gfx2_fellipse:
+        jsr     shp_emarshal2
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_fellipse
+shp_emarshal2:                          ; cx->r0/r1, cy->r2/r3, rx->r4, ry->r6
+        lda     r0
+        sta     X16_P0
+        lda     r1
+        sta     X16_P1
+        lda     r2
+        sta     X16_P2
+        lda     r3
+        sta     X16_P3
+        lda     r4
+        sta     X16_P4
+        lda     r6
+        sta     X16_P5
+        ldy     #0
+        lda     (sp),y
+        sta     shp_mcol                ; color (stacked 5th arg)
+        rts
+
 
 shape_circle:
 	sta shp_col
@@ -385,6 +448,264 @@ shp_esgo:
 	inc X16_P5
 shp_g2:	lda shp_col
 	jmp shp_do_hline
+
+; ---------------------------------------------------------------------
+; shape_ellipse / shape_fellipse
+; ---------------------------------------------------------------------
+; One walk serves both: the error-form midpoint ellipse (Zingl),
+; quadrant II from (-rx, 0) up to (0, ry), mirrored 4 ways by the
+; circle's own shp_pair4 / shp_span2. The decision terms reach 2*rx*ry^2
+; (about 33M at 255/255), so the arithmetic is 32-bit; the one setup
+; product rx * 2ry^2 is a repeated subtract, a few thousand cycles at
+; the very worst -- noise against the drawing itself.
+;   dx = ry^2 - rx*2ry^2, dy = rx^2, err = dx + dy
+;   each step: e2 = 2*err;
+;     e2 >= dx ?  x++, err += dx += 2ry^2
+;     e2 <= dy ?  y++, err += dy += 2rx^2
+;   while x <= 0; then a centre column finishes the flat tips (small
+;   rx). A row's widest span always lands before its narrower echoes,
+;   so the fill's overdraw is harmless, same as the disc's.
+; ---------------------------------------------------------------------
+shape_ellipse:
+	sta shp_col
+	stz shp_efl
+	bra shp_etake
+shape_fellipse:
+	sta shp_col
+	lda #1
+	sta shp_efl
+shp_etake:
+	lda X16_P0                  ; centre out of the P block
+	sta shp_cx
+	lda X16_P1
+	sta shp_cx+1
+	lda X16_P2
+	sta shp_cy
+	lda X16_P3
+	sta shp_cy+1
+	lda X16_P4
+	sta shp_ew
+	lda X16_P5
+	sta shp_eh
+
+	lda shp_eh                     ; shp_sq = ry^2
+	jsr shp_sq16
+	lda shp_sq                     ; dx = ry^2 (the rx*2ry^2 comes off below)
+	sta shp_edx
+	lda shp_sq+1
+	sta shp_edx+1
+	stz shp_edx+2
+	stz shp_edx+3
+	lda shp_sq                     ; shp_e2b = 2ry^2
+	sta shp_e2b
+	lda shp_sq+1
+	sta shp_e2b+1
+	stz shp_e2b+2
+	stz shp_e2b+3
+	asl shp_e2b
+	rol shp_e2b+1
+	rol shp_e2b+2
+	ldx shp_ew                     ; dx -= rx * 2ry^2, one 2ry^2 at a time
+	beq shp_exset
+shp_emul:
+	sec
+	lda shp_edx
+	sbc shp_e2b
+	sta shp_edx
+	lda shp_edx+1
+	sbc shp_e2b+1
+	sta shp_edx+1
+	lda shp_edx+2
+	sbc shp_e2b+2
+	sta shp_edx+2
+	lda shp_edx+3
+	sbc shp_e2b+3
+	sta shp_edx+3
+	dex
+	bne shp_emul
+shp_exset:
+	lda shp_ew                     ; shp_sq = rx^2
+	jsr shp_sq16
+	lda shp_sq                     ; dy = rx^2
+	sta shp_edy
+	lda shp_sq+1
+	sta shp_edy+1
+	stz shp_edy+2
+	stz shp_edy+3
+	lda shp_sq                     ; shp_e2a = 2rx^2
+	sta shp_e2a
+	lda shp_sq+1
+	sta shp_e2a+1
+	stz shp_e2a+2
+	stz shp_e2a+3
+	asl shp_e2a
+	rol shp_e2a+1
+	rol shp_e2a+2
+	clc                         ; err = dx + dy
+	lda shp_edx
+	adc shp_edy
+	sta shp_eerr
+	lda shp_edx+1
+	adc shp_edy+1
+	sta shp_eerr+1
+	lda shp_edx+2
+	adc shp_edy+2
+	sta shp_eerr+2
+	lda shp_edx+3
+	adc shp_edy+3
+	sta shp_eerr+3
+	sec                         ; x = -rx (16-bit signed), y = 0
+	lda #0
+	sbc shp_ew
+	sta shp_ex
+	lda #0
+	sbc #0
+	sta shp_ex+1
+	stz shp_ey
+
+shp_eloop:
+	sec                         ; this step's quadrant point: (|x|, y)
+	lda #0
+	sbc shp_ex
+	sta shp_a
+	lda shp_ey
+	sta shp_b
+	jsr shp_eplot
+	lda shp_eerr                   ; e2 = 2*err
+	sta shp_ee2
+	lda shp_eerr+1
+	sta shp_ee2+1
+	lda shp_eerr+2
+	sta shp_ee2+2
+	lda shp_eerr+3
+	sta shp_ee2+3
+	asl shp_ee2
+	rol shp_ee2+1
+	rol shp_ee2+2
+	rol shp_ee2+3
+	sec                         ; e2 >= dx?  sign of e2 - dx decides
+	lda shp_ee2
+	sbc shp_edx
+	lda shp_ee2+1
+	sbc shp_edx+1
+	lda shp_ee2+2
+	sbc shp_edx+2
+	lda shp_ee2+3
+	sbc shp_edx+3
+	bmi shp_noxstep
+	inc shp_ex                     ; x++
+	bne shp_exdx
+	inc shp_ex+1
+shp_exdx:
+	clc                         ; err += dx += 2ry^2
+	lda shp_edx
+	adc shp_e2b
+	sta shp_edx
+	lda shp_edx+1
+	adc shp_e2b+1
+	sta shp_edx+1
+	lda shp_edx+2
+	adc shp_e2b+2
+	sta shp_edx+2
+	lda shp_edx+3
+	adc shp_e2b+3
+	sta shp_edx+3
+	clc
+	lda shp_eerr
+	adc shp_edx
+	sta shp_eerr
+	lda shp_eerr+1
+	adc shp_edx+1
+	sta shp_eerr+1
+	lda shp_eerr+2
+	adc shp_edx+2
+	sta shp_eerr+2
+	lda shp_eerr+3
+	adc shp_edx+3
+	sta shp_eerr+3
+shp_noxstep:
+	sec                         ; e2 <= dy?  sign of dy - e2 decides
+	lda shp_edy
+	sbc shp_ee2
+	lda shp_edy+1
+	sbc shp_ee2+1
+	lda shp_edy+2
+	sbc shp_ee2+2
+	lda shp_edy+3
+	sbc shp_ee2+3
+	bmi shp_noystep
+	inc shp_ey                     ; y++
+	clc                         ; err += dy += 2rx^2
+	lda shp_edy
+	adc shp_e2a
+	sta shp_edy
+	lda shp_edy+1
+	adc shp_e2a+1
+	sta shp_edy+1
+	lda shp_edy+2
+	adc shp_e2a+2
+	sta shp_edy+2
+	lda shp_edy+3
+	adc shp_e2a+3
+	sta shp_edy+3
+	clc
+	lda shp_eerr
+	adc shp_edy
+	sta shp_eerr
+	lda shp_eerr+1
+	adc shp_edy+1
+	sta shp_eerr+1
+	lda shp_eerr+2
+	adc shp_edy+2
+	sta shp_eerr+2
+	lda shp_eerr+3
+	adc shp_edy+3
+	sta shp_eerr+3
+shp_noystep:
+	lda shp_ex+1                   ; while x <= 0
+	bmi shp_econt
+	ora shp_ex
+	bne shp_etip
+shp_econt:
+	jmp shp_eloop
+shp_etip:
+	lda shp_ey                     ; flat tip: the centre column on to ry
+	cmp shp_eh
+	bcs shp_edone
+	inc shp_ey
+	stz shp_a
+	lda shp_ey
+	sta shp_b
+	jsr shp_eplot
+	bra shp_etip
+shp_edone:
+	rts
+
+shp_eplot:
+	lda shp_efl
+	beq shp_eout
+	jmp shp_span2
+shp_eout:
+	jmp shp_pair4
+
+shp_sq16:
+	sta shp_sm
+	stz shp_sq
+	stz shp_sq+1
+	tax
+	beq shp_sqdone
+shp_sqlp:
+	clc
+	lda shp_sq
+	adc shp_sm
+	sta shp_sq
+	bcc shp_sqnc
+	inc shp_sq+1
+shp_sqnc:
+	dex
+	bne shp_sqlp
+shp_sqdone:
+	rts
 
 ; ---------------------------------------------------------------------
 ; shape_flood
@@ -659,6 +980,20 @@ shp_sx: reserve 1
 shp_sy: reserve 1
 shp_err: reserve 2
 shp_t: reserve 2
+
+shp_efl: reserve 1
+shp_ew: reserve 1
+shp_eh: reserve 1
+shp_ex: reserve 2
+shp_ey: reserve 1
+shp_sm: reserve 1
+shp_sq: reserve 2
+shp_edx: reserve 4
+shp_edy: reserve 4
+shp_eerr: reserve 4
+shp_ee2: reserve 4
+shp_e2a: reserve 4
+shp_e2b: reserve 4
 
 shp_tgt: reserve 1
 shp_ovf: reserve 1

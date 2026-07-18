@@ -17,20 +17,20 @@ The same modules and the same API build under **cc65**, under
 any; they share no object code.
 
 ```
-include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      158 tests
-include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos   46 tests
-include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     119 tests
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   119 tests
-include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc       54 tests
+include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      173 tests
+include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos   63 tests
+include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     138 tests
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   138 tests
+include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc       74 tests
 examples/       doc/        emulator/      tools/             shared
 ```
 
 ```powershell
-.\build_ca65.ps1 -Test                 # cc65:     158/158
-.\build_llvm.ps1 -Test                 # llvm-mos:  46/46
-.\build_kickc.ps1 -Test                # KickC:    119/119
-.\build_oscar64.ps1 -Test              # Oscar64:  119/119
-.\build_vbcc.ps1  -Test -Source test_vbcc\runner.c   # vbcc: 54/54
+.\build_ca65.ps1 -Test                 # cc65:     173/173
+.\build_llvm.ps1 -Test                 # llvm-mos:  63/63
+.\build_kickc.ps1 -Test                # KickC:    138/138
+.\build_oscar64.ps1 -Test              # Oscar64:  138/138
+.\build_vbcc.ps1  -Test -Source test_vbcc\runner.c   # vbcc: 74/74
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
@@ -116,7 +116,7 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/sprite.h` | all 128 hardware sprites |
 | `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham, glyphs and text |
 | `x16/bitmap2.h` | **640x480x4 (2bpp)**: pset, read, spans, rects, Bresenham, screen-anchored patterns, raster-op blits, masked pre-shifted blits |
-| `x16/shapes.h` | **circles, discs and flood fill for BOTH bitmap modes** from one implementation: `x16_gfx_*` on the 8bpp plane, `x16_gfx2_*` on the 2bpp plane |
+| `x16/shapes.h` | **circles, discs, ellipses and flood fill for BOTH bitmap modes** from one implementation: `x16_gfx_*` on the 8bpp plane, `x16_gfx2_*` on the 2bpp plane |
 | `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines, filled triangles, blits, transparency** |
 | `x16/psg.h` | the 16-voice PSG, and **ASR envelopes** |
 | `x16/ym.h` | the YM2151 FM chip |
@@ -460,11 +460,11 @@ next deep call; the wrapper copies it into yours before returning.
 ## Tests
 
 ```powershell
-.\build_ca65.ps1 -Test           # cc65, headless: 158 in a few seconds
+.\build_ca65.ps1 -Test           # cc65, headless: 173 in a few seconds
 .\build_ca65.ps1 -Test -Windowed # ...with video: 165, one skip
 .\build_llvm.ps1 -Test           # llvm-mos: 46, all ABI-focused
-.\build_kickc.ps1 -Test          # KickC: 119, in three PRGs
-.\build_oscar64.ps1 -Test        # Oscar64: the same 119
+.\build_kickc.ps1 -Test          # KickC: 138, in four PRGs
+.\build_oscar64.ps1 -Test        # Oscar64: the same 138
 ```
 
 **The suite is two programs.** All 30 library modules plus 170-odd test
