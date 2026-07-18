@@ -51,11 +51,8 @@ void x16_gfx_line(__reg("r0/r1") unsigned int x0, __reg("r2") unsigned char y0,
                   __reg("r4/r5") unsigned int x1, __reg("r6") unsigned char y1,
                   unsigned char color);
 
-/* Circles DO clip, at every edge. Radius 0-120. */
-void x16_gfx_circle(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
-                    __reg("r4") unsigned char r, __reg("r6") unsigned char color);
-void x16_gfx_disc(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
-                  __reg("r4") unsigned char r, __reg("r6") unsigned char color);
+/* circle / disc / flood moved to <x16/shapes.h>: one implementation now
+** serves both this 8bpp module and the 2bpp bitmap2 module. */
 
 /* Draw one glyph from the charset the KERNAL keeps at VRAM $1F000. Set
 ** bits become `color`; clear bits stay transparent. `code` is a SCREEN
@@ -67,11 +64,5 @@ void x16_gfx_char(__reg("r0/r1") unsigned int x, __reg("r2") unsigned char y,
 ** to screen codes. */
 void x16_gfx_text(__reg("r0/r1") unsigned int x, __reg("r2") unsigned char y,
                   __reg("r4") unsigned char color, __reg("r6/r7") const char *s);
-
-/* Scanline flood fill of the 4-connected region under the seed. Returns 1
-** when the region was filled completely, 0 when the span stack (170 deep)
-** overflowed and the fill is INCOMPLETE. */
-unsigned char x16_gfx_flood(__reg("r0/r1") unsigned int x, __reg("r2") unsigned char y,
-                            __reg("r4") unsigned char color);
 
 #endif /* X16_BITMAP_H */

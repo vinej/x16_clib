@@ -43,6 +43,11 @@
         .globl  x16_gfx2_blit
         .globl  x16_gfx2_blitm
 
+        ; primitives the shared shape module (gfx/shapes.s) plots through
+        .globl  gfx2_pset
+        .globl  gfx2_hline
+        .globl  gfx2_read
+
         .section .text,"ax",@progbits
 
 ; =====================================================================

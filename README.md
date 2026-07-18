@@ -114,8 +114,9 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/palette.h` | 256 entries of 12-bit colour, single and bulk |
 | `x16/tile.h` | tilemap cells, layer config, 12-bit hardware scroll |
 | `x16/sprite.h` | all 128 hardware sprites |
-| `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham, **circles, discs, text, flood fill** |
+| `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham, glyphs and text |
 | `x16/bitmap2.h` | **640x480x4 (2bpp)**: pset, read, spans, rects, Bresenham, screen-anchored patterns, raster-op blits, masked pre-shifted blits |
+| `x16/shapes.h` | **circles, discs and flood fill for BOTH bitmap modes** from one implementation: `x16_gfx_*` on the 8bpp plane, `x16_gfx2_*` on the 2bpp plane |
 | `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines, filled triangles, blits, transparency** |
 | `x16/psg.h` | the 16-voice PSG, and **ASR envelopes** |
 | `x16/ym.h` | the YM2151 FM chip |
@@ -466,7 +467,7 @@ next deep call; the wrapper copies it into yours before returning.
 .\build_oscar64.ps1 -Test        # Oscar64: the same 119
 ```
 
-**The suite is two programs.** All 29 library modules plus 170-odd test
+**The suite is two programs.** All 30 library modules plus 170-odd test
 functions no longer fit in the X16's 38.6 KB of program RAM — the code
 alone reaches 33 KB, leaving nothing for BSS. So `test_ca65/runner.c`
 compiles twice: `test_ca65/runner2.c` is three lines that set `SUITE` to 2 and

@@ -259,6 +259,31 @@ void test_g2_clear(void) {
             "G2_CLEAR");
 }
 
+/* The shared shape engine bound to the 2bpp module (cy / y are 16-bit
+** here, so these also exercise the wider path). Verified through the
+** independent x16_gfx2_read(). */
+void test_shapes_disc2(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 41);              /* rows 0..40 */
+    x16_gfx2_disc(40, 30, 8, 3);
+    t_check((x16_gfx2_read(40, 30) == 3 &&
+            x16_gfx2_read(47, 30) == 3 &&
+            x16_gfx2_read(60, 30) == 0) ? 1 : 0,
+            "SHAPES_DISC2");
+}
+
+void test_shapes_flood2(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 25);              /* rows 0..24 */
+    x16_gfx2_frame(20, 4, 20, 20, 3);
+    t_check((x16_gfx2_flood(25, 10, 2) == 1 &&
+            x16_gfx2_read(25, 10) == 2 &&
+            x16_gfx2_read(38, 22) == 2 &&       /* far DOWN corner */
+            x16_gfx2_read(20, 4) == 3 &&
+            x16_gfx2_read(19, 10) == 0) ? 1 : 0,
+            "SHAPES_FLOOD2");
+}
+
 int main(void) {
     t_init();
 
@@ -280,6 +305,8 @@ int main(void) {
     } else {
         t_skip("G2_CLEAR");
     }
+    test_shapes_disc2();
+    test_shapes_flood2();
 
     t_done();
     return 0;

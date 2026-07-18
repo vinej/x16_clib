@@ -39,6 +39,9 @@
         .export         _x16_gfx2_blit
         .export         _x16_gfx2_blitm
 
+        ; primitives the shared shape module (gfx/shapes.s) plots through
+        .export         gfx2_pset, gfx2_hline, gfx2_read
+
         .segment        "CODE"
 
 ; =====================================================================

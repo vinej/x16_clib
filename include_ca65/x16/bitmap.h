@@ -56,13 +56,9 @@ void __fastcall__ x16_gfx_line (unsigned int x0, unsigned char y0,
                                 unsigned int x1, unsigned char y1,
                                 unsigned char color);
 
-/* Circles DO clip, at every edge: the outline plots through the clipped
-** x16_gfx_pset() and the fill through clamped spans. Radius 0-120.
+/* circle / disc / flood moved to <x16/shapes.h>: one implementation now
+** serves both this 8bpp module and the 2bpp bitmap2 module.
 */
-void __fastcall__ x16_gfx_circle (unsigned int cx, unsigned char cy,
-                                  unsigned char r, unsigned char color);
-void __fastcall__ x16_gfx_disc (unsigned int cx, unsigned char cy,
-                                unsigned char r, unsigned char color);
 
 /* Draw one glyph from the charset the KERNAL keeps at VRAM $1F000. Set
 ** bits become `color`; clear bits stay transparent, so glyphs overlay
@@ -76,15 +72,5 @@ void __fastcall__ x16_gfx_char (unsigned int x, unsigned char y,
 */
 void __fastcall__ x16_gfx_text (unsigned int x, unsigned char y,
                                 unsigned char color, const char *s);
-
-/* Scanline flood fill of the 4-connected region under the seed. Filling
-** with the colour already there is a no-op.
-**
-** Returns 1 when the region was filled completely, 0 when the span stack
-** (170 deep) overflowed and the fill is INCOMPLETE. Pathological shapes
-** -- long thin spirals -- are what overflow it.
-*/
-unsigned char __fastcall__ x16_gfx_flood (unsigned int x, unsigned char y,
-                                          unsigned char color);
 
 #endif /* X16_BITMAP_H */

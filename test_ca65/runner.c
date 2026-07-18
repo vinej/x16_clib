@@ -44,6 +44,7 @@
 #include <x16/sprite.h>
 #include <x16/bitmap.h>
 #include <x16/bitmap2.h>
+#include <x16/shapes.h>
 #include <x16/collide.h>
 #include <x16/fixed.h>
 #include <x16/tile.h>
@@ -881,20 +882,23 @@ static void test_gfx_disc(void)
             "GFX_DISC");
 }
 
-/* Circles clip: a disc centred off the left edge paints only the part on
-** screen, and never wraps to the right-hand side of the row above.
+/* Circle OUTLINES clip: the midpoint walk plots through the clipping
+** x16_gfx_pset, so an outline centred off the left edge draws only its
+** on-screen pixels and never wraps to the far side of a row. (Disc FILLS
+** are unclipped by module policy -- keep a disc on screen -- so this tests
+** the outline, whose west extreme at x=-8 must simply vanish.)
 */
 static void test_gfx_circle_clips(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 12800);
 
-    x16_gfx_disc(2, 20, 10, 0x94);
+    x16_gfx_circle(2, 20, 10, 0x94);            /* west extreme off-screen */
 
-    t_check(vpeek(PIXEL(0, 20)) == 0x94 &&      /* the visible sliver */
-            vpeek(PIXEL(319, 19)) == 0x00 &&    /* did not wrap */
-            vpeek(PIXEL(12, 20)) == 0x94 &&
-            vpeek(PIXEL(13, 20)) == 0x00,
+    t_check(vpeek(PIXEL(12, 20)) == 0x94 &&     /* east extreme, on screen */
+            vpeek(PIXEL(2, 10)) == 0x94 &&      /* north extreme, on screen */
+            vpeek(PIXEL(319, 20)) == 0x00 &&    /* west did not wrap */
+            vpeek(PIXEL(319, 19)) == 0x00,
             "GFX_CIRCLE_CLIPS");
 }
 
@@ -3570,6 +3574,40 @@ static void test_g2_clear(void)
             "G2_CLEAR");
 }
 
+/* <x16/shapes.h> bound to the 2bpp module. The same algorithm the 8bpp
+** tests above exercise, now plotting through gfx2_pset/hline/read: a disc
+** inks its centre and rim and leaves the outside clear, and a flood fills
+** a framed interior up to (but not over) the border. VRAM is cleared with
+** a direct fill (not x16_gfx2_clear, which wants VERA FX).
+*/
+static void test_g2_disc(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);            /* rows 0..40 */
+
+    x16_gfx2_disc(40, 30, 8, 3);
+
+    t_check(x16_gfx2_read(40, 30) == 3 &&       /* centre */
+            x16_gfx2_read(47, 30) == 3 &&       /* inside the rim */
+            x16_gfx2_read(60, 30) == 0,         /* well outside */
+            "G2_DISC");
+}
+
+static void test_g2_flood(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 25);            /* rows 0..24 */
+
+    x16_gfx2_frame(20, 4, 20, 20, 3);           /* colour-3 border, 0 inside */
+
+    t_check(x16_gfx2_flood(25, 10, 2) == 1 &&   /* fills completely */
+            x16_gfx2_read(25, 10) == 2 &&       /* interior painted */
+            x16_gfx2_read(38, 22) == 2 &&       /* far interior corner */
+            x16_gfx2_read(20, 4) == 3 &&        /* border not crossed */
+            x16_gfx2_read(19, 10) == 0,         /* nothing leaked out */
+            "G2_FLOOD");
+}
+
 #endif /* SUITE == 2 */
 
 int main(void)
@@ -3829,6 +3867,8 @@ int main(void)
     } else {
         t_skip("G2_CLEAR");
     }
+    test_g2_disc();
+    test_g2_flood();
 
 #endif
 

@@ -784,6 +784,76 @@ static void test_abi_g2_clear(void)
             "ABI_G2_CLEAR");
 }
 
+/* ------------------------------------------------------------------ */
+/* shapes: circle / disc / flood, the same engine bound to both bitmaps */
+/* ------------------------------------------------------------------ */
+
+/* 8bpp. The outline clips through the clipping pset; the disc fill and the
+** flood do not need a particular DISPLAY mode -- they only touch VRAM.
+*/
+static void test_shapes_circle8(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+    x16_gfx_circle(50, 20, 10, 0x91);
+    t_check(vpeek(PIXEL(60, 20)) == 0x91 &&     /* east / west / north */
+            vpeek(PIXEL(40, 20)) == 0x91 &&
+            vpeek(PIXEL(50, 10)) == 0x91 &&
+            vpeek(PIXEL(50, 20)) == 0x00,       /* hollow */
+            "SHAPES_CIRCLE8");
+}
+
+static void test_shapes_disc8(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+    x16_gfx_disc(50, 20, 10, 0x93);
+    t_check(vpeek(PIXEL(50, 20)) == 0x93 &&     /* centre + rim, empty past */
+            vpeek(PIXEL(60, 20)) == 0x93 &&
+            vpeek(PIXEL(61, 20)) == 0x00,
+            "SHAPES_DISC8");
+}
+
+static void test_shapes_flood8(void)
+{
+    unsigned char ok;
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 12800);
+    x16_gfx_frame(200, 4, 20, 20, 0x97);
+    ok = x16_gfx_flood(205, 10, 0x98);
+    t_check(ok == 1 &&
+            vpeek(PIXEL(205, 10)) == 0x98 &&    /* seed */
+            vpeek(PIXEL(218, 22)) == 0x98 &&    /* far DOWN-right corner */
+            vpeek(PIXEL(200, 4)) == 0x97 &&     /* border intact */
+            vpeek(PIXEL(199, 10)) == 0x00,      /* no leak */
+            "SHAPES_FLOOD8");
+}
+
+/* 2bpp: cy / y are 16-bit here, so these also prove the wider marshalling. */
+static void test_shapes_disc2(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+    x16_gfx2_disc(40, 30, 8, 3);
+    t_check(x16_gfx2_read(40, 30) == 3 &&
+            x16_gfx2_read(47, 30) == 3 &&
+            x16_gfx2_read(60, 30) == 0,
+            "SHAPES_DISC2");
+}
+
+static void test_shapes_flood2(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 25);
+    x16_gfx2_frame(20, 4, 20, 20, 3);
+    t_check(x16_gfx2_flood(25, 10, 2) == 1 &&
+            x16_gfx2_read(25, 10) == 2 &&
+            x16_gfx2_read(38, 22) == 2 &&       /* far DOWN corner */
+            x16_gfx2_read(20, 4) == 3 &&
+            x16_gfx2_read(19, 10) == 0,
+            "SHAPES_FLOOD2");
+}
+
 int main(void)
 {
     t_init();
@@ -840,6 +910,12 @@ int main(void)
     } else {
         t_skip("ABI_G2_CLEAR");
     }
+
+    test_shapes_circle8();
+    test_shapes_disc8();
+    test_shapes_flood8();
+    test_shapes_disc2();
+    test_shapes_flood2();
 
     t_done();
     return 0;

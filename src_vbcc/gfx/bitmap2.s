@@ -51,6 +51,11 @@
         global	_x16_gfx2_blit
         global	_x16_gfx2_blitm
 
+        ; primitives the shared shape module (gfx/shapes.s) plots through
+        global	gfx2_pset
+        global	gfx2_hline
+        global	gfx2_read
+
         section text
 
 ; =====================================================================
