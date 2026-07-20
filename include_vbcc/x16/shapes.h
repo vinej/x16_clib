@@ -43,6 +43,27 @@ void x16_gfx_fellipse(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char 
 unsigned char x16_gfx_flood(__reg("r0/r1") unsigned int x, __reg("r2") unsigned char y,
                             __reg("r4") unsigned char color);
 
+void x16_gfx_polygon(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
+                     __reg("r4") unsigned char r, __reg("r6") unsigned char sides,
+                     unsigned char rotation, unsigned char color);
+void x16_gfx_fpolygon(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
+                      __reg("r4") unsigned char r, __reg("r6") unsigned char sides,
+                      unsigned char rotation, unsigned char color);
+void x16_gfx_rrect(__reg("r0/r1") unsigned int x, __reg("r2/r3") unsigned int y,
+                   __reg("r4/r5") unsigned int w, __reg("r6/r7") unsigned int h,
+                   unsigned char r, unsigned char color);
+void x16_gfx_frrect(__reg("r0/r1") unsigned int x, __reg("r2/r3") unsigned int y,
+                    __reg("r4/r5") unsigned int w, __reg("r6/r7") unsigned int h,
+                    unsigned char r, unsigned char color);
+void x16_gfx_arc(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
+                 __reg("r4") unsigned char r, __reg("r6") unsigned char a0,
+                 unsigned char a1, unsigned char color);
+void x16_gfx_pie(__reg("r0/r1") unsigned int cx, __reg("r2") unsigned char cy,
+                 __reg("r4") unsigned char r, __reg("r6") unsigned char a0,
+                 unsigned char a1, unsigned char color);
+void x16_gfx_bezier(__reg("r0/r1") const unsigned int *pts, __reg("r2") unsigned char color);
+
+
 /* --- 2bpp (640x480) -------------------------------------------------- */
 
 void x16_gfx2_circle(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
@@ -59,5 +80,26 @@ void x16_gfx2_fellipse(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned i
 
 unsigned char x16_gfx2_flood(__reg("r0/r1") unsigned int x, __reg("r2/r3") unsigned int y,
                              __reg("r4") unsigned char color);
+
+void x16_gfx2_polygon(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
+                      __reg("r4") unsigned char r, __reg("r6") unsigned char sides,
+                      unsigned char rotation, unsigned char color);
+void x16_gfx2_fpolygon(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
+                       __reg("r4") unsigned char r, __reg("r6") unsigned char sides,
+                       unsigned char rotation, unsigned char color);
+void x16_gfx2_rrect(__reg("r0/r1") unsigned int x, __reg("r2/r3") unsigned int y,
+                    __reg("r4/r5") unsigned int w, __reg("r6/r7") unsigned int h,
+                    unsigned char r, unsigned char color);
+void x16_gfx2_frrect(__reg("r0/r1") unsigned int x, __reg("r2/r3") unsigned int y,
+                     __reg("r4/r5") unsigned int w, __reg("r6/r7") unsigned int h,
+                     unsigned char r, unsigned char color);
+void x16_gfx2_arc(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
+                  __reg("r4") unsigned char r, __reg("r6") unsigned char a0,
+                  unsigned char a1, unsigned char color);
+void x16_gfx2_pie(__reg("r0/r1") unsigned int cx, __reg("r2/r3") unsigned int cy,
+                  __reg("r4") unsigned char r, __reg("r6") unsigned char a0,
+                  unsigned char a1, unsigned char color);
+void x16_gfx2_bezier(__reg("r0/r1") const unsigned int *pts, __reg("r2") unsigned char color);
+
 
 #endif /* X16_SHAPES_H */

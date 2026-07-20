@@ -35,6 +35,8 @@
         global	_x16_cos8u
         global	_x16_atan2
         global	_x16_lerp8
+        global	sin8
+        global	cos8
 
         section text
 

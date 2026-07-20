@@ -1,1178 +1,205 @@
-; ca65
 ; =====================================================================
-; x16clib :: gfx/shapes.s -- circle / disc / flood for BOTH bitmap modes
-; =====================================================================
-; The engine-agnostic shape algorithm (ported from x16_library's
-; gfx/shapes.asm) plus C shims for the 8bpp module (x16_gfx_*) AND the
-; 2bpp module (x16_gfx2_*). One copy of the algorithm; each C shim binds
-; it to its engine at runtime (shp_bind8 / shp_bind2) before calling.
-;
-;   x16_gfx_circle / _disc  (unsigned int cx, unsigned char cy,
-;                            unsigned char r, unsigned char color)
-;   x16_gfx_flood           (unsigned int x, unsigned char y,
-;                            unsigned char color) -> 1 if filled completely
-;   x16_gfx2_circle / _disc (unsigned int cx, unsigned int cy,
-;                            unsigned char r, unsigned char color)
-;   x16_gfx2_flood          (unsigned int x, unsigned int y,
-;                            unsigned char color) -> 1 if filled completely
+; x16clib :: gfx/shapes_curves.s -- v0.8.0 curve shapes (separate object
+; so a program using only the basic shapes does not link this code/state;
+; vbcc's vlink has no dead-stripping). Uses shp_bind*/shp_do_*/shp_mcol
+; from gfx/shapes.s and sin8/cos8 from util/math.s.
 ; =====================================================================
 
-        .feature        labels_without_colons
+        include        "macros.inc"
+        include        "x16zp.inc"
 
-        .include        "macros.inc"
-        .include        "x16zp.inc"
+        zpage   r0
+        zpage   r1
+        zpage   r2
+        zpage   r3
+        zpage   r4
+        zpage   r5
+        zpage   r6
+        zpage   r7
 
-        .import         popa, popax
-        .import         gfx_pset, gfx_hline, gfx_read
-        .import         gfx2_pset, gfx2_hline, gfx2_read
-        .import         sin8, cos8              ; polygon / arc / pie vertices
+        global  _x16_gfx_polygon
+        global  _x16_gfx_fpolygon
+        global  _x16_gfx2_polygon
+        global  _x16_gfx2_fpolygon
+        global  _x16_gfx_rrect
+        global  _x16_gfx_frrect
+        global  _x16_gfx2_rrect
+        global  _x16_gfx2_frrect
+        global  _x16_gfx_arc
+        global  _x16_gfx2_arc
+        global  _x16_gfx_pie
+        global  _x16_gfx2_pie
+        global  _x16_gfx_bezier
+        global  _x16_gfx2_bezier
 
-        .export         _x16_gfx_circle, _x16_gfx_disc, _x16_gfx_flood
-        .export         _x16_gfx2_circle, _x16_gfx2_disc, _x16_gfx2_flood
-        .export         _x16_gfx_ellipse, _x16_gfx_fellipse
-        .export         _x16_gfx2_ellipse, _x16_gfx2_fellipse
-        .export         _x16_gfx_polygon, _x16_gfx_fpolygon
-        .export         _x16_gfx2_polygon, _x16_gfx2_fpolygon
-        .export         _x16_gfx_rrect, _x16_gfx_frrect
-        .export         _x16_gfx2_rrect, _x16_gfx2_frrect
-        .export         _x16_gfx_arc, _x16_gfx2_arc
-        .export         _x16_gfx_pie, _x16_gfx2_pie
-        .export         _x16_gfx_bezier, _x16_gfx2_bezier
-
-; --- runtime binding: the shape code plots/reads through these ---------
-shp_psetv:  .word 0
-shp_hlinev: .word 0
-shp_readv:  .word 0
-shp_w:      .word 0
-shp_h:      .word 0
-shp_mcol:   .byte 0
-
-shp_do_pset:  jmp (shp_psetv)
-shp_do_hline: jmp (shp_hlinev)
-shp_do_read:  jmp (shp_readv)
-
-; the 8bpp primitives want the colour in X16_P3; the shape code hands it
-; in A, so bind through these two-byte shims.
-shp_pset8:  sta X16_P3
-            jmp gfx_pset
-shp_hline8: sta X16_P3
-            jmp gfx_hline
-
-shp_bind8:
-        lda #<shp_pset8
-        sta shp_psetv
-        lda #>shp_pset8
-        sta shp_psetv+1
-        lda #<shp_hline8
-        sta shp_hlinev
-        lda #>shp_hline8
-        sta shp_hlinev+1
-        lda #<gfx_read
-        sta shp_readv
-        lda #>gfx_read
-        sta shp_readv+1
-        lda #<320
-        sta shp_w
-        lda #>320
-        sta shp_w+1
-        lda #<240
-        sta shp_h
-        lda #>240
-        sta shp_h+1
-        rts
-
-shp_bind2:
-        lda #<gfx2_pset
-        sta shp_psetv
-        lda #>gfx2_pset
-        sta shp_psetv+1
-        lda #<gfx2_hline
-        sta shp_hlinev
-        lda #>gfx2_hline
-        sta shp_hlinev+1
-        lda #<gfx2_read
-        sta shp_readv
-        lda #>gfx2_read
-        sta shp_readv+1
-        lda #<640
-        sta shp_w
-        lda #>640
-        sta shp_w+1
-        lda #<480
-        sta shp_h
-        lda #>480
-        sta shp_h+1
-        rts
-
-; --- marshals: cc65 __fastcall pops right-to-left, colour arrives in A --
-; circle/disc: (cx, cy, r, colour)
-shp_marshal8:                           ; cy is 8-bit
-        sta shp_mcol
-        jsr popa
-        sta X16_P4                      ; r
-        jsr popa
-        sta X16_P2                      ; cy
-        stz X16_P3
-        jsr popax
-        sta X16_P0                      ; cx
-        stx X16_P1
-        rts
-shp_marshal2:                           ; cy is 16-bit
-        sta shp_mcol
-        jsr popa
-        sta X16_P4
-        jsr popax
-        sta X16_P2
-        stx X16_P3
-        jsr popax
-        sta X16_P0
-        stx X16_P1
-        rts
-; flood: (x, y, colour)
-shp_fmarshal8:
-        sta shp_mcol
-        jsr popa
-        sta X16_P2
-        stz X16_P3
-        jsr popax
-        sta X16_P0
-        stx X16_P1
-        rts
-shp_fmarshal2:
-        sta shp_mcol
-        jsr popax
-        sta X16_P2
-        stx X16_P3
-        jsr popax
-        sta X16_P0
-        stx X16_P1
-        rts
-
-; --- the C entry points -----------------------------------------------
-_x16_gfx_circle:
-        jsr shp_marshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_circle
-_x16_gfx_disc:
-        jsr shp_marshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_disc
-_x16_gfx2_circle:
-        jsr shp_marshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_circle
-_x16_gfx2_disc:
-        jsr shp_marshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_disc
-_x16_gfx_flood:
-        jsr shp_fmarshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jsr shape_flood                 ; carry set = the fill is incomplete
-        lda #0
-        rol
-        eor #1                          ; report completeness, not overflow
-        rts
-_x16_gfx2_flood:
-        jsr shp_fmarshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jsr shape_flood                 ; carry set = the fill is incomplete
-        lda #0
-        rol
-        eor #1                          ; report completeness, not overflow
-        rts
-
-; ellipse / fellipse: (cx, cy, rx, ry, colour) -- colour arrives in A
-shp_emarshal8:                          ; cy is 8-bit
-        sta shp_mcol
-        jsr popa
-        sta X16_P5                      ; ry
-        jsr popa
-        sta X16_P4                      ; rx
-        jsr popa
-        sta X16_P2                      ; cy
-        stz X16_P3
-        jsr popax
-        sta X16_P0                      ; cx
-        stx X16_P1
-        rts
-shp_emarshal2:                          ; cy is 16-bit
-        sta shp_mcol
-        jsr popa
-        sta X16_P5
-        jsr popa
-        sta X16_P4
-        jsr popax
-        sta X16_P2
-        stx X16_P3
-        jsr popax
-        sta X16_P0
-        stx X16_P1
-        rts
-
-_x16_gfx_ellipse:
-        jsr shp_emarshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_ellipse
-_x16_gfx_fellipse:
-        jsr shp_emarshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_fellipse
-_x16_gfx2_ellipse:
-        jsr shp_emarshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_ellipse
-_x16_gfx2_fellipse:
-        jsr shp_emarshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_fellipse
-
-; --- curve-shape marshals ---------------------------------------------
-; polygon (cx, cy, r, sides, rot, colour) and arc/pie (cx, cy, r, a0, a1,
-; colour) share a P-block layout: three bytes at P4/P5/P6 then cy then cx.
-shp_pmarshal8:                          ; cy is 8-bit
-        sta shp_mcol
-        jsr popa
-        sta X16_P6
-        jsr popa
-        sta X16_P5
-        jsr popa
-        sta X16_P4
-        jsr popa
-        sta X16_P2
-        stz X16_P3
-        jsr popax
-        sta X16_P0
-        stx X16_P1
-        rts
-shp_pmarshal2:                          ; cy is 16-bit
-        sta shp_mcol
-        jsr popa
-        sta X16_P6
-        jsr popa
-        sta X16_P5
-        jsr popa
-        sta X16_P4
-        jsr popax
-        sta X16_P2
-        stx X16_P3
-        jsr popax
-        sta X16_P0
-        stx X16_P1
-        rts
-; rrect (x, y, w, h, r, colour): rr_* are 16-bit, same for both engines.
-shp_rmarshal:
-        sta shp_mcol
-        jsr popa
-        sta rr_r
-        jsr popax
-        sta rr_h
-        stx rr_h+1
-        jsr popax
-        sta rr_w
-        stx rr_w+1
-        jsr popax
-        sta rr_y
-        stx rr_y+1
-        jsr popax
-        sta rr_x
-        stx rr_x+1
-        rts
-; bezier (const unsigned int *pts, colour): pts[0..7] = x0,y0..x3,y3, a
-; 16-byte block copied straight into bez_x0.. (too many scalars for the
-; register-ABI toolchains, so a pointer travels well). The P block is free
-; here (shape_bezier uses bez_*), so borrow P0/P1 for the indirection.
-shp_bmarshal:
-        sta shp_mcol
-        jsr popax
-        sta X16_P0
-        stx X16_P1
-        ldy #0
-shp_bmcopy:
-        lda (X16_P0),y
-        sta bez_x0,y
+        section text
+; --- v0.8.0 curve-shape marshals (vbcc: args 0-3 in r0-r7, 4+ on (sp)) ---
+shp_pmarshal8:                  ; polygon/arc/pie 8bpp
+        lda     r0
+        sta     X16_P0
+        lda     r1
+        sta     X16_P1
+        lda     r2
+        sta     X16_P2
+        stz     X16_P3
+        lda     r4
+        sta     X16_P4
+        lda     r6
+        sta     X16_P5
+        ldy     #0
+        lda     (sp),y
+        sta     X16_P6                  ; rot/a1 (stacked arg4)
         iny
-        cpy #16
-        bne shp_bmcopy
+        lda     (sp),y
+        sta     shp_mcol                ; col (stacked arg5)
+        rts
+shp_pmarshal2:                  ; polygon/arc/pie 2bpp
+        lda     r0
+        sta     X16_P0
+        lda     r1
+        sta     X16_P1
+        lda     r2
+        sta     X16_P2
+        lda     r3
+        sta     X16_P3
+        lda     r4
+        sta     X16_P4
+        lda     r6
+        sta     X16_P5
+        ldy     #0
+        lda     (sp),y
+        sta     X16_P6
+        iny
+        lda     (sp),y
+        sta     shp_mcol
+        rts
+shp_rmarshal:                   ; rrect (x,y,w,h 16-bit, r, col)
+        lda     r0
+        sta     rr_x
+        lda     r1
+        sta     rr_x+1
+        lda     r2
+        sta     rr_y
+        lda     r3
+        sta     rr_y+1
+        lda     r4
+        sta     rr_w
+        lda     r5
+        sta     rr_w+1
+        lda     r6
+        sta     rr_h
+        lda     r7
+        sta     rr_h+1
+        ldy     #0
+        lda     (sp),y
+        sta     rr_r                    ; stacked arg4
+        iny
+        lda     (sp),y
+        sta     shp_mcol                ; stacked arg5
+        rts
+shp_bmarshal:                   ; bezier: pts in r0/r1 (zp), col in r2
+        lda     r2
+        sta     shp_mcol
+        ldy     #0
+shp_bmcopy:
+        lda     (r0),y
+        sta     bez_x0,y
+        iny
+        cpy     #16
+        bne     shp_bmcopy
         rts
 
-; --- curve-shape C entry points ---------------------------------------
 _x16_gfx_polygon:
-        jsr shp_pmarshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_polygon
+        jsr     shp_pmarshal8
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_polygon
 _x16_gfx_fpolygon:
-        jsr shp_pmarshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_fpolygon
+        jsr     shp_pmarshal8
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_fpolygon
 _x16_gfx2_polygon:
-        jsr shp_pmarshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_polygon
+        jsr     shp_pmarshal2
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_polygon
 _x16_gfx2_fpolygon:
-        jsr shp_pmarshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_fpolygon
-
+        jsr     shp_pmarshal2
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_fpolygon
 _x16_gfx_rrect:
-        jsr shp_rmarshal
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_rrect
+        jsr     shp_rmarshal
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_rrect
 _x16_gfx_frrect:
-        jsr shp_rmarshal
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_frrect
+        jsr     shp_rmarshal
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_frrect
 _x16_gfx2_rrect:
-        jsr shp_rmarshal
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_rrect
+        jsr     shp_rmarshal
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_rrect
 _x16_gfx2_frrect:
-        jsr shp_rmarshal
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_frrect
-
+        jsr     shp_rmarshal
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_frrect
 _x16_gfx_arc:
-        jsr shp_pmarshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_arc
+        jsr     shp_pmarshal8
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_arc
 _x16_gfx2_arc:
-        jsr shp_pmarshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_arc
+        jsr     shp_pmarshal2
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_arc
 _x16_gfx_pie:
-        jsr shp_pmarshal8
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_pie
+        jsr     shp_pmarshal8
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_pie
 _x16_gfx2_pie:
-        jsr shp_pmarshal2
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_pie
-
+        jsr     shp_pmarshal2
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_pie
 _x16_gfx_bezier:
-        jsr shp_bmarshal
-        jsr shp_bind8
-        lda shp_mcol
-        jmp shape_bezier
+        jsr     shp_bmarshal
+        jsr     shp_bind8
+        lda     shp_mcol
+        jmp     shape_bezier
 _x16_gfx2_bezier:
-        jsr shp_bmarshal
-        jsr shp_bind2
-        lda shp_mcol
-        jmp shape_bezier
+        jsr     shp_bmarshal
+        jsr     shp_bind2
+        lda     shp_mcol
+        jmp     shape_bezier
 
-; --- the shared algorithm (x16_library gfx/shapes.asm, runtime-bound) --
-
-
-; ---------------------------------------------------------------------
-; shape_circle
-; ---------------------------------------------------------------------
-shape_circle
-	sta shp_col
-	jsr shp_take_cxy               ; cx/cy out of the P block, x=r, y=0
-shp_cloop
-	lda shp_y                      ; while y <= x
-	cmp shp_x
-	beq shp_cplot                  ; the diagonal point still plots
-	bcs shp_cdone
-shp_cplot
-	lda shp_x                      ; the (x,y) octant pair...
-	sta shp_a
-	lda shp_y
-	sta shp_b
-	jsr shp_pair4
-	lda shp_y                      ; ..shp_and the (y,x) pair
-	sta shp_a
-	lda shp_x
-	sta shp_b
-	jsr shp_pair4
-	jsr shp_step                   ; the midpoint error walk
-	bra shp_cloop
-shp_cdone
-	rts
-
-; ---------------------------------------------------------------------
-; shape_disc
-; ---------------------------------------------------------------------
-shape_disc
-	sta shp_col
-	jsr shp_take_cxy
-shp_dloop
-	lda shp_y
-	cmp shp_x
-	beq shp_dspan
-	bcs shp_ddone
-shp_dspan
-	lda shp_x                      ; spans at cy +/- y, half-width x...
-	sta shp_a
-	lda shp_y
-	sta shp_b
-	jsr shp_span2
-	lda shp_y                      ; ..shp_and at cy +/- x, half-width y
-	sta shp_a
-	lda shp_x
-	sta shp_b
-	jsr shp_span2
-	jsr shp_step
-	bra shp_dloop
-shp_ddone
-	rts
-
-; --- shared circle/disc machinery -------------------------------------
-shp_take_cxy                       ; P -> locals; x = r, y = 0, err = 1 - r
-	lda X16_P0
-	sta shp_cx
-	lda X16_P1
-	sta shp_cx+1
-	lda X16_P2
-	sta shp_cy
-	lda X16_P3
-	sta shp_cy+1
-	lda X16_P4
-	sta shp_x
-	lda #0
-	sta shp_y
-	sec                         ; err = 1 - r, signed 16-bit
-	lda #1
-	sbc shp_x
-	sta shp_err
-	lda #0
-	sbc #0
-	sta shp_err+1
-	rts
-
-shp_step                           ; y++; err < 0 ? err += 2y+1
-	inc shp_y                      ;      else x--, err += 2(y-x)+1
-	bit shp_err+1
-	bmi shp_grow
-	dec shp_x
-	sec                         ; t = y - x, sign-extended
-	lda shp_y
-	sbc shp_x
-	sta shp_t
-	lda #0
-	sbc #0
-	sta shp_t+1
-	bra shp_apply
-shp_grow
-	lda shp_y                      ; t = y (positive)
-	sta shp_t
-	lda #0
-	sta shp_t+1
-shp_apply
-	asl shp_t                      ; err += 2t + 1
-	rol shp_t+1
-	inc shp_t
-	bne :+
-	inc shp_t+1
-:	clc
-	lda shp_err
-	adc shp_t
-	sta shp_err
-	lda shp_err+1
-	adc shp_t+1
-	sta shp_err+1
-	rts
-
-shp_pair4                          ; pset the 4 sign combos of (cx±a, cy±b)
-	lda #0
-	sta shp_sx
-	sta shp_sy
-shp_p4go
-	jsr shp_emit1
-	lda shp_sx                     ; walk ++, -+, +-, -- via two flags
-	eor #1
-	sta shp_sx
-	bne shp_p4go
-	lda shp_sy
-	eor #1
-	sta shp_sy
-	bne shp_p4go
-	rts
-
-shp_emit1                          ; one pset at (cx sx? -a : +a, cy sy? -b : +b)
-	lda shp_sx
-	bne shp_e1xm
-	clc                         ; x = cx + a
-	lda shp_cx
-	adc shp_a
-	sta X16_P0
-	lda shp_cx+1
-	adc #0
-	sta X16_P1
-	bra shp_e1y
-shp_e1xm
-	sec                         ; x = cx - a
-	lda shp_cx
-	sbc shp_a
-	sta X16_P0
-	lda shp_cx+1
-	sbc #0
-	sta X16_P1
-shp_e1y
-	lda shp_sy
-	bne shp_e1ym
-	clc
-	lda shp_cy
-	adc shp_b
-	sta X16_P2
-	lda shp_cy+1
-	adc #0
-	sta X16_P3
-	bra shp_e1go
-shp_e1ym
-	sec
-	lda shp_cy
-	sbc shp_b
-	sta X16_P2
-	lda shp_cy+1
-	sbc #0
-	sta X16_P3
-shp_e1go
-	lda shp_col
-	jmp shp_do_pset
-
-shp_span2                          ; hline half-width a at cy+b and cy-b
-	lda #0
-	sta shp_sy
-	jsr shp_espan
-	lda #1
-	sta shp_sy
-	; fall through
-shp_espan
-	sec                         ; x = cx - a
-	lda shp_cx
-	sbc shp_a
-	sta X16_P0
-	lda shp_cx+1
-	sbc #0
-	sta X16_P1
-	lda shp_sy
-	bne shp_esym
-	clc
-	lda shp_cy
-	adc shp_b
-	sta X16_P2
-	lda shp_cy+1
-	adc #0
-	sta X16_P3
-	bra shp_esgo
-shp_esym
-	sec
-	lda shp_cy
-	sbc shp_b
-	sta X16_P2
-	lda shp_cy+1
-	sbc #0
-	sta X16_P3
-shp_esgo
-	lda shp_a                      ; len = 2a + 1
-	sta X16_P4
-	lda #0
-	sta X16_P5
-	asl X16_P4
-	rol X16_P5
-	inc X16_P4
-	bne :+
-	inc X16_P5
-:	lda shp_col
-	jmp shp_do_hline
-
-; ---------------------------------------------------------------------
-; shape_ellipse / shape_fellipse
-; ---------------------------------------------------------------------
-; One walk serves both: the error-form midpoint ellipse (Zingl),
-; quadrant II from (-rx, 0) up to (0, ry), mirrored 4 ways by the
-; circle's own shp_pair4 / shp_span2. The decision terms reach 2*rx*ry^2
-; (about 33M at 255/255), so the arithmetic is 32-bit; the one setup
-; product rx * 2ry^2 is a repeated subtract, a few thousand cycles at
-; the very worst -- noise against the drawing itself.
-;   dx = ry^2 - rx*2ry^2, dy = rx^2, err = dx + dy
-;   each step: e2 = 2*err;
-;     e2 >= dx ?  x++, err += dx += 2ry^2
-;     e2 <= dy ?  y++, err += dy += 2rx^2
-;   while x <= 0; then a centre column finishes the flat tips (small
-;   rx). A row's widest span always lands before its narrower echoes,
-;   so the fill's overdraw is harmless, same as the disc's.
-; ---------------------------------------------------------------------
-shape_ellipse
-	sta shp_col
-	stz shp_efl
-	bra shp_etake
-shape_fellipse
-	sta shp_col
-	lda #1
-	sta shp_efl
-shp_etake
-	lda X16_P0                  ; centre out of the P block
-	sta shp_cx
-	lda X16_P1
-	sta shp_cx+1
-	lda X16_P2
-	sta shp_cy
-	lda X16_P3
-	sta shp_cy+1
-	lda X16_P4
-	sta shp_ew
-	lda X16_P5
-	sta shp_eh
-
-	lda shp_eh                     ; shp_sq = ry^2
-	jsr shp_sq16
-	lda shp_sq                     ; dx = ry^2 (the rx*2ry^2 comes off below)
-	sta shp_edx
-	lda shp_sq+1
-	sta shp_edx+1
-	stz shp_edx+2
-	stz shp_edx+3
-	lda shp_sq                     ; shp_e2b = 2ry^2
-	sta shp_e2b
-	lda shp_sq+1
-	sta shp_e2b+1
-	stz shp_e2b+2
-	stz shp_e2b+3
-	asl shp_e2b
-	rol shp_e2b+1
-	rol shp_e2b+2
-	ldx shp_ew                     ; dx -= rx * 2ry^2, one 2ry^2 at a time
-	beq shp_exset
-shp_emul
-	sec
-	lda shp_edx
-	sbc shp_e2b
-	sta shp_edx
-	lda shp_edx+1
-	sbc shp_e2b+1
-	sta shp_edx+1
-	lda shp_edx+2
-	sbc shp_e2b+2
-	sta shp_edx+2
-	lda shp_edx+3
-	sbc shp_e2b+3
-	sta shp_edx+3
-	dex
-	bne shp_emul
-shp_exset
-	lda shp_ew                     ; shp_sq = rx^2
-	jsr shp_sq16
-	lda shp_sq                     ; dy = rx^2
-	sta shp_edy
-	lda shp_sq+1
-	sta shp_edy+1
-	stz shp_edy+2
-	stz shp_edy+3
-	lda shp_sq                     ; shp_e2a = 2rx^2
-	sta shp_e2a
-	lda shp_sq+1
-	sta shp_e2a+1
-	stz shp_e2a+2
-	stz shp_e2a+3
-	asl shp_e2a
-	rol shp_e2a+1
-	rol shp_e2a+2
-	clc                         ; err = dx + dy
-	lda shp_edx
-	adc shp_edy
-	sta shp_eerr
-	lda shp_edx+1
-	adc shp_edy+1
-	sta shp_eerr+1
-	lda shp_edx+2
-	adc shp_edy+2
-	sta shp_eerr+2
-	lda shp_edx+3
-	adc shp_edy+3
-	sta shp_eerr+3
-	sec                         ; x = -rx (16-bit signed), y = 0
-	lda #0
-	sbc shp_ew
-	sta shp_ex
-	lda #0
-	sbc #0
-	sta shp_ex+1
-	stz shp_ey
-
-shp_eloop
-	sec                         ; this step's quadrant point: (|x|, y)
-	lda #0
-	sbc shp_ex
-	sta shp_a
-	lda shp_ey
-	sta shp_b
-	jsr shp_eplot
-	lda shp_eerr                   ; e2 = 2*err
-	sta shp_ee2
-	lda shp_eerr+1
-	sta shp_ee2+1
-	lda shp_eerr+2
-	sta shp_ee2+2
-	lda shp_eerr+3
-	sta shp_ee2+3
-	asl shp_ee2
-	rol shp_ee2+1
-	rol shp_ee2+2
-	rol shp_ee2+3
-	sec                         ; e2 >= dx?  sign of e2 - dx decides
-	lda shp_ee2
-	sbc shp_edx
-	lda shp_ee2+1
-	sbc shp_edx+1
-	lda shp_ee2+2
-	sbc shp_edx+2
-	lda shp_ee2+3
-	sbc shp_edx+3
-	bmi shp_noxstep
-	inc shp_ex                     ; x++
-	bne shp_exdx
-	inc shp_ex+1
-shp_exdx
-	clc                         ; err += dx += 2ry^2
-	lda shp_edx
-	adc shp_e2b
-	sta shp_edx
-	lda shp_edx+1
-	adc shp_e2b+1
-	sta shp_edx+1
-	lda shp_edx+2
-	adc shp_e2b+2
-	sta shp_edx+2
-	lda shp_edx+3
-	adc shp_e2b+3
-	sta shp_edx+3
-	clc
-	lda shp_eerr
-	adc shp_edx
-	sta shp_eerr
-	lda shp_eerr+1
-	adc shp_edx+1
-	sta shp_eerr+1
-	lda shp_eerr+2
-	adc shp_edx+2
-	sta shp_eerr+2
-	lda shp_eerr+3
-	adc shp_edx+3
-	sta shp_eerr+3
-shp_noxstep
-	sec                         ; e2 <= dy?  sign of dy - e2 decides
-	lda shp_edy
-	sbc shp_ee2
-	lda shp_edy+1
-	sbc shp_ee2+1
-	lda shp_edy+2
-	sbc shp_ee2+2
-	lda shp_edy+3
-	sbc shp_ee2+3
-	bmi shp_noystep
-	inc shp_ey                     ; y++
-	clc                         ; err += dy += 2rx^2
-	lda shp_edy
-	adc shp_e2a
-	sta shp_edy
-	lda shp_edy+1
-	adc shp_e2a+1
-	sta shp_edy+1
-	lda shp_edy+2
-	adc shp_e2a+2
-	sta shp_edy+2
-	lda shp_edy+3
-	adc shp_e2a+3
-	sta shp_edy+3
-	clc
-	lda shp_eerr
-	adc shp_edy
-	sta shp_eerr
-	lda shp_eerr+1
-	adc shp_edy+1
-	sta shp_eerr+1
-	lda shp_eerr+2
-	adc shp_edy+2
-	sta shp_eerr+2
-	lda shp_eerr+3
-	adc shp_edy+3
-	sta shp_eerr+3
-shp_noystep
-	lda shp_ex+1                   ; while x <= 0
-	bmi shp_econt
-	ora shp_ex
-	bne shp_etip
-shp_econt
-	jmp shp_eloop
-shp_etip
-	lda shp_ey                     ; flat tip: the centre column on to ry
-	cmp shp_eh
-	bcs shp_edone
-	inc shp_ey
-	stz shp_a
-	lda shp_ey
-	sta shp_b
-	jsr shp_eplot
-	bra shp_etip
-shp_edone
-	rts
-
-shp_eplot
-	lda shp_efl
-	beq shp_eout
-	jmp shp_span2
-shp_eout
-	jmp shp_pair4
-
-shp_sq16
-	sta shp_sm
-	stz shp_sq
-	stz shp_sq+1
-	tax
-	beq shp_sqdone
-shp_sqlp
-	clc
-	lda shp_sq
-	adc shp_sm
-	sta shp_sq
-	bcc shp_sqnc
-	inc shp_sq+1
-shp_sqnc
-	dex
-	bne shp_sqlp
-shp_sqdone
-	rts
-
-; ---------------------------------------------------------------------
-; shape_flood
-; ---------------------------------------------------------------------
-; Pop a seed, widen it into a span of the target colour, fill the span,
-; then scan the rows above and below for runs of target and push one
-; seed per run. The stack holds seeds as xshp_w yshp_w; when it is full a
-; seed is dropped and the overflow is remembered in the carry.
-; ---------------------------------------------------------------------
-FLOOD_MAX = 96                  ; seeds; 4 bytes each
-
-shape_flood
-	sta shp_col
-	lda #0
-	sta shp_ovf
-	sta shp_sp
-	jsr shp_rd_p                   ; the target = the seed's own colour
-	sta shp_tgt
-	cmp shp_col                    ; filling with itself never ends: done
-	bne shp_fseed
-	clc                         ; (no overflow could have happened yet)
-	rts
-shp_fseed
-	lda X16_P0                  ; push the seed
-	sta shp_qx
-	lda X16_P1
-	sta shp_qx+1
-	lda X16_P2
-	sta shp_qy
-	lda X16_P3
-	sta shp_qy+1
-	jsr shp_push
-shp_floop
-	lda shp_sp                     ; stack empty: finished
-	bne shp_fbody
-	jmp shp_fexit
-shp_fbody
-	jsr shp_pop                    ; seed -> shp_qx/shp_qy
-	jsr shp_rd_q                   ; still target? (may have been filled)
-	cmp shp_tgt
-	bne shp_floop
-
-	lda shp_qx                     ; widen left: xl = leftmost target
-	sta shp_xl
-	lda shp_qx+1
-	sta shp_xl+1
-shp_wleft
-	lda shp_xl
-	ora shp_xl+1
-	beq shp_wldone                 ; at column 0
-	sec                         ; probe xl-1
-	lda shp_xl
-	sbc #1
-	sta shp_qx
-	lda shp_xl+1
-	sbc #0
-	sta shp_qx+1
-	jsr shp_rd_q
-	cmp shp_tgt
-	bne shp_wldone
-	lda shp_qx
-	sta shp_xl
-	lda shp_qx+1
-	sta shp_xl+1
-	bra shp_wleft
-shp_wldone
-	lda shp_qy                     ; widen right: xr = rightmost target
-	sta shp_qy                     ; (qy already holds the row)
-	lda shp_xl
-	sta shp_xr
-	lda shp_xl+1
-	sta shp_xr+1
-shp_wright
-	clc                         ; probe xr+1, stop at shp_w-1
-	lda shp_xr
-	adc #1
-	sta shp_qx
-	lda shp_xr+1
-	adc #0
-	sta shp_qx+1
-	lda shp_qx                     ; qx == W? off the right edge
-	cmp shp_w
-	bne shp_wrprobe
-	lda shp_qx+1
-	cmp shp_w+1
-	beq shp_wrdone
-shp_wrprobe
-	jsr shp_rd_q
-	cmp shp_tgt
-	bne shp_wrdone
-	lda shp_qx
-	sta shp_xr
-	lda shp_qx+1
-	sta shp_xr+1
-	bra shp_wright
-shp_wrdone
-	lda shp_xl                     ; fill the span: hline(xl, y, xr-xl+1)
-	sta X16_P0
-	lda shp_xl+1
-	sta X16_P1
-	lda shp_qy
-	sta X16_P2
-	lda shp_qy+1
-	sta X16_P3
-	sec
-	lda shp_xr
-	sbc shp_xl
-	sta X16_P4
-	lda shp_xr+1
-	sbc shp_xl+1
-	sta X16_P5
-	inc X16_P4
-	bne :+
-	inc X16_P5
-:	lda shp_col
-	jsr shp_do_hline
-
-	lda shp_qy                     ; shp_scanrow clobbers shp_qy, so keep the
-	sta shp_row                    ; filled row here for BOTH neighbour scans
-	lda shp_qy+1
-	sta shp_row+1
-
-	lda shp_row                    ; the row above...
-	sta shp_ry
-	lda shp_row+1
-	sta shp_ry+1
-	lda shp_ry
-	ora shp_ry+1
-	beq shp_below                  ; row 0 has nothing above
-	sec
-	lda shp_ry
-	sbc #1
-	sta shp_ry
-	lda shp_ry+1
-	sbc #0
-	sta shp_ry+1
-	jsr shp_scanrow
-shp_below
-	clc                         ; ..and the row below
-	lda shp_row
-	adc #1
-	sta shp_ry
-	lda shp_row+1
-	adc #0
-	sta shp_ry+1
-	lda shp_ry                     ; ry == H? off the bottom
-	cmp shp_h
-	bne shp_bscan
-	lda shp_ry+1
-	cmp shp_h+1
-	beq shp_fnext
-shp_bscan
-	jsr shp_scanrow
-shp_fnext
-	jmp shp_floop
-shp_fexit
-	lsr shp_ovf                    ; overflow -> carry
-	rts
-
-; scan shp_xl..shp_xr on row shp_ry for runs of target; push one seed per run
-shp_scanrow
-	lda #0
-	sta shp_run
-	lda shp_xl
-	sta shp_tx
-	lda shp_xl+1
-	sta shp_tx+1
-shp_srloop
-	lda shp_tx                     ; read (tx, ry)
-	sta shp_qx
-	lda shp_tx+1
-	sta shp_qx+1
-	lda shp_ry
-	sta shp_qy
-	lda shp_ry+1
-	sta shp_qy+1
-	jsr shp_rd_q
-	cmp shp_tgt
-	bne shp_srmiss
-	lda shp_run                    ; entering a run: one seed
-	bne shp_srnext
-	lda #1
-	sta shp_run
-	jsr shp_push
-	bra shp_srnext
-shp_srmiss
-	lda #0
-	sta shp_run
-shp_srnext
-	lda shp_tx                     ; tx == xr? done
-	cmp shp_xr
-	bne shp_srinc
-	lda shp_tx+1
-	cmp shp_xr+1
-	beq shp_srdone
-shp_srinc
-	inc shp_tx
-	bne shp_srloop
-	inc shp_tx+1
-	bra shp_srloop
-shp_srdone
-	rts
-
-shp_rd_p                           ; read at the CALLER's P block (entry)
-	jmp shp_do_read
-shp_rd_q                           ; read at (shp_qx, shp_qy)
-	lda shp_qx
-	sta X16_P0
-	lda shp_qx+1
-	sta X16_P1
-	lda shp_qy
-	sta X16_P2
-	lda shp_qy+1
-	sta X16_P3
-	jmp shp_do_read
-
-shp_push                           ; (shp_qx,shp_qy) onto the stack, or drop + ovf
-	lda shp_sp
-	cmp #FLOOD_MAX
-	bcc :+
-	lda #1                      ; remembered; lsr at exit -> carry
-	sta shp_ovf
-	rts
-:	asl                         ; sp * 4
-	asl
-	tax
-	lda shp_qx
-	sta shp_stk,x
-	lda shp_qx+1
-	sta shp_stk+1,x
-	lda shp_qy
-	sta shp_stk+2,x
-	lda shp_qy+1
-	sta shp_stk+3,x
-	inc shp_sp
-	rts
-
-shp_pop                            ; the top seed -> (shp_qx,shp_qy)
-	dec shp_sp
-	lda shp_sp
-	asl
-	asl
-	tax
-	lda shp_stk,x
-	sta shp_qx
-	lda shp_stk+1,x
-	sta shp_qx+1
-	lda shp_stk+2,x
-	sta shp_qy
-	lda shp_stk+3,x
-	sta shp_qy+1
-	rts
-
-; --- the state ---------------------------------------------------------
-shp_col .byte 0
-shp_cx  .word 0
-shp_cy  .word 0
-shp_x   .byte 0
-shp_y   .byte 0
-shp_a   .byte 0
-shp_b   .byte 0
-shp_sx  .byte 0
-shp_sy  .byte 0
-shp_err .word 0
-shp_t   .word 0
-
-shp_efl .byte 0
-shp_ew  .byte 0
-shp_eh  .byte 0
-shp_ex  .word 0
-shp_ey  .byte 0
-shp_sm  .byte 0
-shp_sq  .word 0
-shp_edx  .res 4, 0
-shp_edy  .res 4, 0
-shp_eerr .res 4, 0
-shp_ee2  .res 4, 0
-shp_e2a  .res 4, 0
-shp_e2b  .res 4, 0
-
-shp_tgt .byte 0
-shp_ovf .byte 0
-shp_sp  .byte 0
-shp_qx  .word 0
-shp_qy  .word 0
-shp_xl  .word 0
-shp_xr  .word 0
-shp_ry  .word 0
-shp_row .word 0
-shp_tx  .word 0
-shp_run .byte 0
-shp_stk .res FLOOD_MAX * 4, 0
-
-; =====================================================================
-; CURVE SHAPES (ported from x16_library v0.8.0): polygon, rounded rect,
-; arc, pie, cubic bezier + the shared shp_line. Runtime-bound like the
-; shapes above; polygon/arc/pie use sin8/cos8 from util/math.s.
-; =====================================================================
-
-POLY_MAX = 24                   ; vertices; the buffers below are 2 bytes each
-
-shape_polygon
+        section text
+POLY_MAX = 24
+; ==== v0.8.0 curve-shape cores ====
+shape_polygon:
 	sta poly_col
 	stz poly_efl                ; outline
 	jmp shp_poly_begin
-shape_fpolygon
+shape_fpolygon:
 	sta poly_col
 	lda #1                      ; filled
 	sta poly_efl
 	; fall through
-shp_poly_begin
+shp_poly_begin:
 	lda X16_P5                  ; clamp the side count to 3..POLY_MAX
 	cmp #3
 	bcc shp_pg_bret                ; fewer than 3: not a polygon
 	cmp #(POLY_MAX + 1)
 	bcc shp_pg_bnok
 	lda #POLY_MAX
-shp_pg_bnok
+shp_pg_bnok:
 	sta poly_n
 	lda X16_P0
 	sta poly_cx
@@ -1191,16 +218,16 @@ shp_pg_bnok
 	lda poly_efl
 	bne shp_pg_bfill
 	jmp shp_poly_outline
-shp_pg_bfill
+shp_pg_bfill:
 	jmp shp_poly_fill
-shp_pg_bret
+shp_pg_bret:
 	rts
 
 ; compute the N vertices into poly_vx[]/poly_vy[]
-shp_poly_verts
+shp_poly_verts:
 	jsr shp_poly_step              ; poly_step = 65536 / n
 	stz poly_i
-shp_pg_vloop
+shp_pg_vloop:
 	lda poly_i
 	cmp poly_n
 	beq shp_pg_vend
@@ -1240,11 +267,11 @@ shp_pg_vloop
 	sta poly_acc+1
 	inc poly_i
 	bra shp_pg_vloop
-shp_pg_vend
+shp_pg_vend:
 	rts
 
 ; poly_off = round(poly_r * |A| / 128) with A's sign, A a signed byte
-shp_poly_scale
+shp_poly_scale:
 	stz poly_sgn
 	pha
 	and #$80
@@ -1255,9 +282,9 @@ shp_poly_scale
 	clc
 	adc #1
 	bra shp_pg_smul
-shp_pg_spos
+shp_pg_spos:
 	pla
-shp_pg_smul
+shp_pg_smul:
 	jsr shp_poly_mul8              ; poly_p16 = poly_r * |A|
 	clc
 	lda poly_p16                ; + 0.5 LSB, so >>7 rounds
@@ -1281,20 +308,20 @@ shp_pg_smul
 	lda #0
 	sbc poly_off+1
 	sta poly_off+1
-shp_pg_sdone
+shp_pg_sdone:
 	rts
 
 ; poly_p16 = poly_r * A  (8x8 -> 16, unsigned)
-shp_poly_mul8
+shp_poly_mul8:
 	sta poly_t
 	lda #0
 	ldx #8
-shp_pg_mloop
+shp_pg_mloop:
 	lsr poly_t
 	bcc shp_pg_mskip
 	clc
 	adc poly_r
-shp_pg_mskip
+shp_pg_mskip:
 	ror
 	ror poly_p16
 	dex
@@ -1303,7 +330,7 @@ shp_pg_mskip
 	rts
 
 ; poly_step = floor(65536 / poly_n), by restoring division of $010000
-shp_poly_step
+shp_poly_step:
 	stz poly_dvd
 	stz poly_dvd+1
 	lda #1
@@ -1312,7 +339,7 @@ shp_poly_step
 	stz poly_step
 	stz poly_step+1
 	ldx #24
-shp_pg_dloop
+shp_pg_dloop:
 	asl poly_dvd
 	rol poly_dvd+1
 	rol poly_dvd+2
@@ -1321,15 +348,15 @@ shp_pg_dloop
 	lda poly_rem
 	cmp poly_n
 	bcc shp_pg_dnoq
-shp_pg_dsub
+shp_pg_dsub:
 	lda poly_rem                ; carry is set on both paths here
 	sbc poly_n
 	sta poly_rem
 	sec                         ; quotient bit = 1
 	bra shp_pg_dbit
-shp_pg_dnoq
+shp_pg_dnoq:
 	clc                         ; quotient bit = 0
-shp_pg_dbit
+shp_pg_dbit:
 	rol poly_step
 	rol poly_step+1
 	dex
@@ -1337,9 +364,9 @@ shp_pg_dbit
 	rts
 
 ; --- outline ---------------------------------------------------------
-shp_poly_outline
+shp_poly_outline:
 	stz poly_i
-shp_pg_oloop
+shp_pg_oloop:
 	lda poly_i                  ; endpoint 0 = vertex i
 	asl
 	tax
@@ -1357,7 +384,7 @@ shp_pg_oloop
 	cmp poly_n
 	bne shp_pg_ojok
 	lda #0
-shp_pg_ojok
+shp_pg_ojok:
 	asl
 	tax
 	lda poly_vx,x
@@ -1377,7 +404,7 @@ shp_pg_ojok
 
 ; 16-bit Bresenham from (lx0,ly0) to (lx1,ly1), plotting through shp_do_pset
 ; (the gfx2_line algorithm, engine-agnostic and clipping via the binding)
-shp_poly_line
+shp_poly_line:
 	sec                         ; dx = |x1 - x0|, sx = direction
 	lda poly_lx1
 	sbc poly_lx0
@@ -1397,11 +424,11 @@ shp_poly_line
 	sta poly_lsx
 	sta poly_lsx+1
 	bra shp_pg_ldxd
-shp_pg_ldxp
+shp_pg_ldxp:
 	lda #1
 	sta poly_lsx
 	stz poly_lsx+1
-shp_pg_ldxd
+shp_pg_ldxd:
 	sec                         ; dy = -|y1 - y0|, sy = direction
 	lda poly_ly1
 	sbc poly_ly0
@@ -1421,11 +448,11 @@ shp_pg_ldxd
 	sta poly_lsy
 	sta poly_lsy+1
 	bra shp_pg_ldyd
-shp_pg_ldyp
+shp_pg_ldyp:
 	lda #1
 	sta poly_lsy
 	stz poly_lsy+1
-shp_pg_ldyd
+shp_pg_ldyd:
 	sec                         ; ldy = -|dy|
 	lda #0
 	sbc poly_lt
@@ -1440,7 +467,7 @@ shp_pg_ldyd
 	lda poly_ldx+1
 	adc poly_ldy+1
 	sta poly_lerr+1
-shp_pg_lloop
+shp_pg_lloop:
 	lda poly_lx0
 	sta X16_P0
 	lda poly_lx0+1
@@ -1464,7 +491,7 @@ shp_pg_lloop
 	cmp poly_ly1+1
 	bne shp_pg_lstep
 	rts
-shp_pg_lstep
+shp_pg_lstep:
 	lda poly_lerr               ; e2 = 2 * err
 	asl
 	sta poly_le2
@@ -1478,7 +505,7 @@ shp_pg_lstep
 	sbc poly_ldy+1
 	bvc shp_pg_lnv1
 	eor #$80
-shp_pg_lnv1
+shp_pg_lnv1:
 	bmi shp_pg_lskx
 	clc
 	lda poly_lerr
@@ -1494,7 +521,7 @@ shp_pg_lnv1
 	lda poly_lx0+1
 	adc poly_lsx+1
 	sta poly_lx0+1
-shp_pg_lskx
+shp_pg_lskx:
 	sec                         ; e2 <= dx ?  err += dx, y0 += sy
 	lda poly_ldx
 	sbc poly_le2
@@ -1502,7 +529,7 @@ shp_pg_lskx
 	sbc poly_le2+1
 	bvc shp_pg_lnv2
 	eor #$80
-shp_pg_lnv2
+shp_pg_lnv2:
 	bmi shp_pg_lsky
 	clc
 	lda poly_lerr
@@ -1518,38 +545,38 @@ shp_pg_lnv2
 	lda poly_ly0+1
 	adc poly_lsy+1
 	sta poly_ly0+1
-shp_pg_lsky
+shp_pg_lsky:
 	jmp shp_pg_lloop
 
 ; --- fill ------------------------------------------------------------
 ; one scanline at a time; shp_poly_scanline gathers the row's span and draws
 ; it, shp_poly_edge does the per-edge crossing. Kept apart so every branch
 ; stays in range and each routine owns its own zone-local labels.
-shp_poly_fill
+shp_poly_fill:
 	jsr shp_poly_ybounds           ; poly_ymin / poly_ymax over all vertices
 	lda poly_ymin
 	sta poly_y
 	lda poly_ymin+1
 	sta poly_y+1
-shp_pg_floop
+shp_pg_floop:
 	lda poly_ymax               ; y > ymax ? done
 	cmp poly_y
 	lda poly_ymax+1
 	sbc poly_y+1
 	bvc shp_pg_fl1
 	eor #$80
-shp_pg_fl1
+shp_pg_fl1:
 	bmi shp_pg_fret                ; ymax < y
 	jsr shp_poly_scanline
 	inc poly_y
 	bne shp_pg_floop
 	inc poly_y+1
 	bra shp_pg_floop
-shp_pg_fret
+shp_pg_fret:
 	rts
 
 ; fill row poly_y: find the span (xl..xr) across the edges, draw it
-shp_poly_scanline
+shp_poly_scanline:
 	stz poly_found
 	lda #$FF                    ; xl = +32767, xr = -32768
 	sta poly_xl
@@ -1559,14 +586,14 @@ shp_poly_scanline
 	lda #$80
 	sta poly_xr+1
 	stz poly_i
-shp_pg_slloop
+shp_pg_slloop:
 	lda poly_i
 	cmp poly_n
 	beq shp_pg_sldraw
 	jsr shp_poly_edge
 	inc poly_i
 	bra shp_pg_slloop
-shp_pg_sldraw
+shp_pg_sldraw:
 	lda poly_found
 	beq shp_pg_slret
 	lda poly_xl                 ; span (xl .. xr) on row y
@@ -1587,15 +614,15 @@ shp_pg_sldraw
 	inc X16_P4
 	bne shp_pg_sllen
 	inc X16_P5
-shp_pg_sllen
+shp_pg_sllen:
 	lda poly_col
 	jmp shp_do_hline
-shp_pg_slret
+shp_pg_slret:
 	rts
 
 ; edge poly_i crossing row poly_y: if it spans the row, fold its x into
 ; poly_xl (min) / poly_xr (max) and set poly_found
-shp_poly_edge
+shp_poly_edge:
 	lda poly_i                  ; vertex a = i
 	asl
 	tax
@@ -1605,7 +632,7 @@ shp_poly_edge
 	cmp poly_n
 	bne shp_pg_ejok
 	lda #0
-shp_pg_ejok
+shp_pg_ejok:
 	asl
 	tay
 	lda poly_vx,x
@@ -1630,7 +657,7 @@ shp_pg_ejok
 	sbc poly_yb+1
 	bvc shp_pg_escab
 	eor #$80
-shp_pg_escab
+shp_pg_escab:
 	bmi shp_pg_eatop               ; ya < yb
 	lda poly_xb                 ; b on top
 	sta poly_xtop
@@ -1649,7 +676,7 @@ shp_pg_escab
 	lda poly_ya+1
 	sta poly_ybot+1
 	bra shp_pg_eedge
-shp_pg_eatop
+shp_pg_eatop:
 	lda poly_xa                 ; a on top
 	sta poly_xtop
 	lda poly_xa+1
@@ -1666,14 +693,14 @@ shp_pg_eatop
 	sta poly_ybot
 	lda poly_yb+1
 	sta poly_ybot+1
-shp_pg_eedge
+shp_pg_eedge:
 	lda poly_y                  ; y < ytop ? out (also skips horizontals)
 	cmp poly_ytop
 	lda poly_y+1
 	sbc poly_ytop+1
 	bvc shp_pg_esct
 	eor #$80
-shp_pg_esct
+shp_pg_esct:
 	bmi shp_pg_eout
 	lda poly_y                  ; y >= ybot ? out (half-open bottom)
 	cmp poly_ybot
@@ -1681,12 +708,12 @@ shp_pg_esct
 	sbc poly_ybot+1
 	bvc shp_pg_escb
 	eor #$80
-shp_pg_escb
+shp_pg_escb:
 	bpl shp_pg_eout
 	bra shp_pg_ein
-shp_pg_eout
+shp_pg_eout:
 	rts
-shp_pg_ein
+shp_pg_ein:
 	sec                         ; md3 = dy = ybot - ytop  (> 0)
 	lda poly_ybot
 	sbc poly_ytop
@@ -1719,7 +746,7 @@ shp_pg_ein
 	lda #0
 	sbc poly_md1+1
 	sta poly_md1+1
-shp_pg_edxpos
+shp_pg_edxpos:
 	jsr shp_poly_umuldiv           ; poly_mdq = |dx| * t / dy
 	lda poly_dxs
 	bne shp_pg_exneg
@@ -1731,7 +758,7 @@ shp_pg_edxpos
 	adc poly_mdq+1
 	sta poly_x+1
 	bra shp_pg_egotx
-shp_pg_exneg
+shp_pg_exneg:
 	sec                         ; x = xtop - mdq
 	lda poly_xtop
 	sbc poly_mdq
@@ -1739,7 +766,7 @@ shp_pg_exneg
 	lda poly_xtop+1
 	sbc poly_mdq+1
 	sta poly_x+1
-shp_pg_egotx
+shp_pg_egotx:
 	lda #1
 	sta poly_found
 	lda poly_x                  ; xl = min(xl, x)
@@ -1748,30 +775,30 @@ shp_pg_egotx
 	sbc poly_xl+1
 	bvc shp_pg_escl
 	eor #$80
-shp_pg_escl
+shp_pg_escl:
 	bpl shp_pg_enoxl               ; x >= xl
 	lda poly_x
 	sta poly_xl
 	lda poly_x+1
 	sta poly_xl+1
-shp_pg_enoxl
+shp_pg_enoxl:
 	lda poly_xr                 ; xr = max(xr, x)
 	cmp poly_x
 	lda poly_xr+1
 	sbc poly_x+1
 	bvc shp_pg_escr
 	eor #$80
-shp_pg_escr
+shp_pg_escr:
 	bpl shp_pg_enoxr               ; xr >= x
 	lda poly_x
 	sta poly_xr
 	lda poly_x+1
 	sta poly_xr+1
-shp_pg_enoxr
+shp_pg_enoxr:
 	rts
 
 ; poly_ymin / poly_ymax = the y extent of the vertices
-shp_poly_ybounds
+shp_poly_ybounds:
 	lda poly_vy
 	sta poly_ymin
 	sta poly_ymax
@@ -1780,7 +807,7 @@ shp_poly_ybounds
 	sta poly_ymax+1
 	lda #1
 	sta poly_i
-shp_pg_ybloop
+shp_pg_ybloop:
 	lda poly_i
 	cmp poly_n
 	beq shp_pg_ybend
@@ -1792,37 +819,37 @@ shp_pg_ybloop
 	sbc poly_ymin+1
 	bvc shp_pg_ybc1
 	eor #$80
-shp_pg_ybc1
+shp_pg_ybc1:
 	bpl shp_pg_ybnmin
 	lda poly_vy,x
 	sta poly_ymin
 	lda poly_vy+1,x
 	sta poly_ymin+1
-shp_pg_ybnmin
+shp_pg_ybnmin:
 	lda poly_ymax               ; vy[i] > ymax ?
 	cmp poly_vy,x
 	lda poly_ymax+1
 	sbc poly_vy+1,x
 	bvc shp_pg_ybc2
 	eor #$80
-shp_pg_ybc2
+shp_pg_ybc2:
 	bpl shp_pg_ybnmax
 	lda poly_vy,x
 	sta poly_ymax
 	lda poly_vy+1,x
 	sta poly_ymax+1
-shp_pg_ybnmax
+shp_pg_ybnmax:
 	inc poly_i
 	bra shp_pg_ybloop
-shp_pg_ybend
+shp_pg_ybend:
 	rts
 
 ; poly_mdq = poly_md1 * poly_md2 / poly_md3, all unsigned (16x16->32, /16)
-shp_poly_umuldiv
+shp_poly_umuldiv:
 	stz poly_prod+2
 	stz poly_prod+3
 	ldx #16
-shp_pg_uml
+shp_pg_uml:
 	lsr poly_md2+1
 	ror poly_md2
 	bcc shp_pg_unoadd
@@ -1833,9 +860,9 @@ shp_pg_uml
 	lda poly_prod+3
 	adc poly_md1+1
 	bra shp_pg_urot
-shp_pg_unoadd
+shp_pg_unoadd:
 	lda poly_prod+3
-shp_pg_urot
+shp_pg_urot:
 	ror
 	sta poly_prod+3
 	ror poly_prod+2
@@ -1846,7 +873,7 @@ shp_pg_urot
 	stz poly_rem
 	stz poly_rem+1
 	ldx #32
-shp_pg_udv
+shp_pg_udv:
 	asl poly_prod
 	rol poly_prod+1
 	rol poly_prod+2
@@ -1863,7 +890,7 @@ shp_pg_udv
 	sta poly_rem+1
 	sty poly_rem
 	inc poly_prod
-shp_pg_udvno
+shp_pg_udvno:
 	dex
 	bne shp_pg_udv
 	lda poly_prod
@@ -1873,57 +900,8 @@ shp_pg_udvno
 	rts
 
 ; --- polygon state ---------------------------------------------------
-poly_col   .byte 0
-poly_efl   .byte 0
-poly_cx    .word 0
-poly_cy    .word 0
-poly_r     .byte 0
-poly_n     .byte 0
-poly_i     .byte 0
-poly_acc   .word 0
-poly_step  .word 0
-poly_off   .word 0
-poly_sgn   .byte 0
-poly_p16   .word 0
-poly_t     .byte 0
-poly_dvd   .res 3, 0
-poly_rem   .word 0
-poly_vx    .res POLY_MAX * 2, 0
-poly_vy    .res POLY_MAX * 2, 0
 
-poly_lx0   .word 0
-poly_ly0   .word 0
-poly_lx1   .word 0
-poly_ly1   .word 0
-poly_ldx   .word 0
-poly_ldy   .word 0
-poly_lerr  .word 0
-poly_le2   .word 0
-poly_lsx   .word 0
-poly_lsy   .word 0
-poly_lt    .word 0
 
-poly_ymin  .word 0
-poly_ymax  .word 0
-poly_y     .word 0
-poly_found .byte 0
-poly_xa    .word 0
-poly_ya    .word 0
-poly_xb    .word 0
-poly_yb    .word 0
-poly_xtop  .word 0
-poly_ytop  .word 0
-poly_xbot  .word 0
-poly_ybot  .word 0
-poly_x     .word 0
-poly_xl    .word 0
-poly_xr    .word 0
-poly_dxs   .byte 0
-poly_md1   .word 0
-poly_md2   .word 0
-poly_md3   .word 0
-poly_mdq   .word 0
-poly_prod  .res 4, 0
 
 
 ; ---------------------------------------------------------------------
@@ -1940,7 +918,7 @@ poly_prod  .res 4, 0
 ;       draws through shp_do_pset, so it clips wherever pset clips.
 ; ---------------------------------------------------------------------
 
-shp_line
+shp_line:
 	sec                         ; dx = |x1 - x0|, sx = direction
 	lda shl_x1
 	sbc shl_x0
@@ -1960,11 +938,11 @@ shp_line
 	sta shl_sx
 	sta shl_sx+1
 	bra shp_sl_dxd
-shp_sl_dxp
+shp_sl_dxp:
 	lda #1
 	sta shl_sx
 	stz shl_sx+1
-shp_sl_dxd
+shp_sl_dxd:
 	sec                         ; dy = -|y1 - y0|, sy = direction
 	lda shl_y1
 	sbc shl_y0
@@ -1984,11 +962,11 @@ shp_sl_dxd
 	sta shl_sy
 	sta shl_sy+1
 	bra shp_sl_dyd
-shp_sl_dyp
+shp_sl_dyp:
 	lda #1
 	sta shl_sy
 	stz shl_sy+1
-shp_sl_dyd
+shp_sl_dyd:
 	sec                         ; dy stored negative
 	lda #0
 	sbc shl_t
@@ -2003,7 +981,7 @@ shp_sl_dyd
 	lda shl_dx+1
 	adc shl_dy+1
 	sta shl_err+1
-shp_sl_loop
+shp_sl_loop:
 	lda shl_x0
 	sta X16_P0
 	lda shl_x0+1
@@ -2027,7 +1005,7 @@ shp_sl_loop
 	cmp shl_y1+1
 	bne shp_sl_step
 	rts
-shp_sl_step
+shp_sl_step:
 	lda shl_err                 ; e2 = 2 * err
 	asl
 	sta shl_e2
@@ -2041,7 +1019,7 @@ shp_sl_step
 	sbc shl_dy+1
 	bvc shp_sl_nv1
 	eor #$80
-shp_sl_nv1
+shp_sl_nv1:
 	bmi shp_sl_skx
 	clc
 	lda shl_err
@@ -2057,7 +1035,7 @@ shp_sl_nv1
 	lda shl_x0+1
 	adc shl_sx+1
 	sta shl_x0+1
-shp_sl_skx
+shp_sl_skx:
 	sec                         ; e2 <= dx ?  err += dx, y0 += sy
 	lda shl_dx
 	sbc shl_e2
@@ -2065,7 +1043,7 @@ shp_sl_skx
 	sbc shl_e2+1
 	bvc shp_sl_nv2
 	eor #$80
-shp_sl_nv2
+shp_sl_nv2:
 	bmi shp_sl_sky
 	clc
 	lda shl_err
@@ -2081,21 +1059,9 @@ shp_sl_nv2
 	lda shl_y0+1
 	adc shl_sy+1
 	sta shl_y0+1
-shp_sl_sky
+shp_sl_sky:
 	jmp shp_sl_loop
 
-shl_x0  .word 0
-shl_y0  .word 0
-shl_x1  .word 0
-shl_y1  .word 0
-shl_col .byte 0
-shl_dx  .word 0
-shl_dy  .word 0
-shl_sx  .word 0
-shl_sy  .word 0
-shl_err .word 0
-shl_e2  .word 0
-shl_t   .word 0
 
 
 ; ---------------------------------------------------------------------
@@ -2121,15 +1087,15 @@ shl_t   .word 0
 ; top and bottom bands.
 ; ---------------------------------------------------------------------
 
-shape_rrect
+shape_rrect:
 	sta rr_col
 	stz rr_fl
 	jmp shp_rr_begin
-shape_frrect
+shape_frrect:
 	sta rr_col
 	lda #1
 	sta rr_fl
-shp_rr_begin
+shp_rr_begin:
 	lda rr_x                    ; corner reference points:
 	sta rr_x0                   ;   x0 = x, x1 = x + w - 1
 	lda rr_x+1
@@ -2142,9 +1108,9 @@ shp_rr_begin
 	adc rr_w+1
 	sta rr_x1+1
 	lda rr_x1                   ; x1 -= 1
-	bne :+
+	bne shpv_1
 	dec rr_x1+1
-:	dec rr_x1
+shpv_1:	dec rr_x1
 	lda rr_y                    ;   y0 = y, y1 = y + h - 1
 	sta rr_y0
 	lda rr_y+1
@@ -2157,9 +1123,9 @@ shp_rr_begin
 	adc rr_h+1
 	sta rr_y1+1
 	lda rr_y1                   ; y1 -= 1
-	bne :+
+	bne shpv_2
 	dec rr_y1+1
-:	dec rr_y1
+shpv_2:	dec rr_y1
 
 	jsr shp_rr_clampr              ; rr_r = min(rr_r, min(w,h)/2)
 	lda rr_x0                   ; corner centres:
@@ -2194,11 +1160,11 @@ shp_rr_begin
 	lda rr_fl
 	beq shp_rr_out
 	jmp shp_rr_fill
-shp_rr_out
+shp_rr_out:
 	jmp shp_rr_outline
 
 ; rr_r = min(rr_r, min(rr_w, rr_h) / 2)
-shp_rr_clampr
+shp_rr_clampr:
 	lda rr_w                    ; m = min(w, h)  (16-bit unsigned)
 	sta rr_m
 	lda rr_w+1
@@ -2210,12 +1176,12 @@ shp_rr_clampr
 	lda rr_h
 	cmp rr_m
 	bcs shp_rr_cmok
-shp_rr_cmh
+shp_rr_cmh:
 	lda rr_h
 	sta rr_m
 	lda rr_h+1
 	sta rr_m+1
-shp_rr_cmok
+shp_rr_cmok:
 	lsr rr_m+1                  ; m /= 2
 	ror rr_m
 	lda rr_m+1                  ; m >= 256 ? radius already fits any byte
@@ -2225,11 +1191,11 @@ shp_rr_cmok
 	bcc shp_rr_crok
 	lda rr_m
 	sta rr_r
-shp_rr_crok
+shp_rr_crok:
 	rts
 
 ; --- outline ---------------------------------------------------------
-shp_rr_outline
+shp_rr_outline:
 	jsr shp_rr_corners             ; the four quarter-circle corners
 	; top edge: (cxl, y0) .. (cxr, y0)
 	lda rr_cxl
@@ -2266,20 +1232,20 @@ shp_rr_outline
 	rts
 
 ; pset a horizontal run from (P0/P1) to x=rr_cxr on the row in P2/P3
-shp_rr_hspan
+shp_rr_hspan:
 	sec                         ; empty run when cxr < cxl (r reaches w/2):
 	lda rr_cxr                  ; the rounded ends meet, no straight top/bottom
 	sbc rr_cxl
 	lda rr_cxr+1
 	sbc rr_cxl+1
-	bvc :+
+	bvc shpv_3
 	eor #$80
-:	bmi shp_rr_hsd
+shpv_3:	bmi shp_rr_hsd
 	lda X16_P2                  ; hold the row (pset reloads P0..P3)
 	sta rr_ry
 	lda X16_P3
 	sta rr_ry+1
-shp_rr_hsl
+shp_rr_hsl:
 	lda rr_ry
 	sta X16_P2
 	lda rr_ry+1
@@ -2292,24 +1258,24 @@ shp_rr_hsl
 	lda X16_P1
 	cmp rr_cxr+1
 	beq shp_rr_hsd
-shp_rr_hsn
+shp_rr_hsn:
 	inc X16_P0
 	bne shp_rr_hsl
 	inc X16_P1
 	bra shp_rr_hsl
-shp_rr_hsd
+shp_rr_hsd:
 	rts
 
 ; pset a vertical run on column (P0/P1) from y=rr_cyt to y=rr_cyb
-shp_rr_vspan
+shp_rr_vspan:
 	sec                         ; empty run when cyb < cyt (r reaches h/2):
 	lda rr_cyb                  ; the rounded ends meet, no straight sides
 	sbc rr_cyt
 	lda rr_cyb+1
 	sbc rr_cyt+1
-	bvc :+
+	bvc shpv_4
 	eor #$80
-:	bmi shp_rr_vsd
+shpv_4:	bmi shp_rr_vsd
 	lda X16_P0
 	sta rr_rx
 	lda X16_P1
@@ -2318,7 +1284,7 @@ shp_rr_vspan
 	sta X16_P2
 	lda rr_cyt+1
 	sta X16_P3
-shp_rr_vsl
+shp_rr_vsl:
 	lda rr_rx
 	sta X16_P0
 	lda rr_rx+1
@@ -2331,16 +1297,16 @@ shp_rr_vsl
 	lda X16_P3
 	cmp rr_cyb+1
 	beq shp_rr_vsd
-shp_rr_vsn
+shp_rr_vsn:
 	inc X16_P2
 	bne shp_rr_vsl
 	inc X16_P3
 	bra shp_rr_vsl
-shp_rr_vsd
+shp_rr_vsd:
 	rts
 
 ; walk the quarter circle once; each octant point plots at all 4 corners
-shp_rr_corners
+shp_rr_corners:
 	lda rr_r                    ; x = r, y = 0, err = 1 - r
 	sta rr_wx
 	stz rr_wy
@@ -2351,12 +1317,12 @@ shp_rr_corners
 	lda #0
 	sbc #0
 	sta rr_werr+1
-shp_rr_cwl
+shp_rr_cwl:
 	lda rr_wy                   ; while y <= x
 	cmp rr_wx
 	beq shp_rr_cwp
 	bcs shp_rr_cwd
-shp_rr_cwp
+shp_rr_cwp:
 	lda rr_wx                   ; plot (a,b) = (x,y) and (y,x) at 4 corners
 	sta rr_ca
 	lda rr_wy
@@ -2369,11 +1335,11 @@ shp_rr_cwp
 	jsr shp_rr_c4
 	jsr shp_rr_wstep
 	bra shp_rr_cwl
-shp_rr_cwd
+shp_rr_cwd:
 	rts
 
 ; plot (a,b) offsets at the four corner centres
-shp_rr_c4
+shp_rr_c4:
 	sec                         ; TL: (cxl - a, cyt - b)
 	lda rr_cxl
 	sbc rr_ca
@@ -2440,7 +1406,7 @@ shp_rr_c4
 	jmp shp_do_pset
 
 ; midpoint error walk shared by shp_rr_corners and the fill's table build
-shp_rr_wstep
+shp_rr_wstep:
 	inc rr_wy
 	bit rr_werr+1
 	bmi shp_rr_wgrow
@@ -2453,18 +1419,18 @@ shp_rr_wstep
 	sbc #0
 	sta rr_wt+1
 	bra shp_rr_wap
-shp_rr_wgrow
+shp_rr_wgrow:
 	lda rr_wy                   ; t = y
 	sta rr_wt
 	lda #0
 	sta rr_wt+1
-shp_rr_wap
+shp_rr_wap:
 	asl rr_wt                   ; err += 2t + 1
 	rol rr_wt+1
 	inc rr_wt
-	bne :+
+	bne shpv_5
 	inc rr_wt+1
-:	clc
+shpv_5:	clc
 	lda rr_werr
 	adc rr_wt
 	sta rr_werr
@@ -2474,59 +1440,59 @@ shp_rr_wap
 	rts
 
 ; --- fill ------------------------------------------------------------
-shp_rr_fill
+shp_rr_fill:
 	jsr shp_rr_build               ; rr_ext[0..r] = corner half-extents
 	lda rr_y0                   ; row = y0
 	sta rr_ry
 	lda rr_y0+1
 	sta rr_ry+1
-shp_rr_fl
+shp_rr_fl:
 	lda rr_y1                   ; row > y1 ? done
 	cmp rr_ry
 	lda rr_y1+1
 	sbc rr_ry+1
-	bvc :+
+	bvc shpv_6
 	eor #$80
-:	bmi shp_rr_fld
+shpv_6:	bmi shp_rr_fld
 	jsr shp_rr_row
 	inc rr_ry
 	bne shp_rr_fl
 	inc rr_ry+1
 	bra shp_rr_fl
-shp_rr_fld
+shp_rr_fld:
 	rts
 
 ; draw the one span for row rr_ry: full width in the middle band, inset
 ; by rr_ext[d] in the rounded top/bottom bands
-shp_rr_row
+shp_rr_row:
 	lda rr_ry                   ; row < cyt ?  top rounded band, d = cyt-row
 	cmp rr_cyt
 	lda rr_ry+1
 	sbc rr_cyt+1
-	bvc :+
+	bvc shpv_7
 	eor #$80
-:	bmi shp_rr_rtop
+shpv_7:	bmi shp_rr_rtop
 	lda rr_cyb                  ; row > cyb ?  bottom band, d = row-cyb
 	cmp rr_ry
 	lda rr_cyb+1
 	sbc rr_ry+1
-	bvc :+
+	bvc shpv_8
 	eor #$80
-:	bmi shp_rr_rbot
+shpv_8:	bmi shp_rr_rbot
 	ldx #0                      ; middle band: d = 0, ext[0] = r -> full width
 	beq shp_rr_inset               ; (always: ldx #0 set Z)
-shp_rr_rtop
+shp_rr_rtop:
 	sec                         ; d = cyt - row (1..r)
 	lda rr_cyt
 	sbc rr_ry
 	tax
 	bra shp_rr_inset
-shp_rr_rbot
+shp_rr_rbot:
 	sec                         ; d = row - cyb (1..r)
 	lda rr_ry
 	sbc rr_cyb
 	tax
-shp_rr_inset
+shp_rr_inset:
 	lda rr_ext,x                ; ins = rr_ext[d]
 	sta rr_ins
 	stz rr_ins+1
@@ -2556,16 +1522,16 @@ shp_rr_inset
 	sbc X16_P1
 	sta X16_P5
 	inc X16_P4
-	bne :+
+	bne shpv_9
 	inc X16_P5
-:	lda rr_col
+shpv_9:	lda rr_col
 	jmp shp_do_hline
 
 ; rr_ext[d] = corner half-extent at vertical offset d, for d = 0..r
-shp_rr_build
+shp_rr_build:
 	ldx #0                      ; zero rr_ext[0..255]
 	lda #0
-shp_rr_bz
+shp_rr_bz:
 	sta rr_ext,x
 	inx
 	bne shp_rr_bz
@@ -2581,54 +1547,28 @@ shp_rr_bz
 	lda #0
 	sbc #0
 	sta rr_werr+1
-shp_rr_bwl
+shp_rr_bwl:
 	lda rr_wy                   ; while y <= x
 	cmp rr_wx
 	beq shp_rr_bwp
 	bcs shp_rr_bwd
-shp_rr_bwp
+shp_rr_bwp:
 	ldx rr_wy                   ; ext[y] = max(ext[y], x)
 	lda rr_wx
 	cmp rr_ext,x
-	bcc :+
+	bcc shpv_10
 	sta rr_ext,x
-:	ldx rr_wx                   ; ext[x] = max(ext[x], y)
+shpv_10:	ldx rr_wx                   ; ext[x] = max(ext[x], y)
 	lda rr_wy
 	cmp rr_ext,x
-	bcc :+
+	bcc shpv_11
 	sta rr_ext,x
-:	jsr shp_rr_wstep
+shpv_11:	jsr shp_rr_wstep
 	bra shp_rr_bwl
-shp_rr_bwd
+shp_rr_bwd:
 	rts
 
 ; --- rounded-rect state ----------------------------------------------
-rr_x    .word 0
-rr_y    .word 0
-rr_w    .word 0
-rr_h    .word 0
-rr_r    .byte 0
-rr_col  .byte 0
-rr_fl   .byte 0
-rr_x0   .word 0
-rr_y0   .word 0
-rr_x1   .word 0
-rr_y1   .word 0
-rr_cxl  .word 0
-rr_cxr  .word 0
-rr_cyt  .word 0
-rr_cyb  .word 0
-rr_m    .word 0
-rr_ry   .word 0
-rr_rx   .word 0
-rr_ins  .word 0
-rr_ca   .byte 0
-rr_cb   .byte 0
-rr_wx   .byte 0
-rr_wy   .byte 0
-rr_werr .word 0
-rr_wt   .word 0
-rr_ext  .res 256, 0
 
 
 ; ---------------------------------------------------------------------
@@ -2651,7 +1591,7 @@ rr_ext  .res 256, 0
 
 ARC_STEP = 4                    ; byte-angle units between samples
 
-shape_arc
+shape_arc:
 	sta shl_col                 ; shp_line draws in this colour
 	lda X16_P0
 	sta arc_cx
@@ -2673,7 +1613,7 @@ shape_arc
 	lda arc_span
 	bne shp_ar_have
 	inc arc_span+1
-shp_ar_have
+shp_ar_have:
 	lda arc_a0                  ; first sample -> shl_x0/y0 (prev point)
 	jsr shp_arc_point
 	lda arc_px
@@ -2686,20 +1626,20 @@ shp_ar_have
 	sta shl_y0+1
 	lda arc_a0
 	sta arc_ang
-shp_ar_loop
+shp_ar_loop:
 	lda arc_span+1              ; step = min(ARC_STEP, span)
 	bne shp_ar_full
 	lda arc_span
 	cmp #ARC_STEP
 	bcc shp_ar_last
-shp_ar_full
+shp_ar_full:
 	lda #ARC_STEP
 	sta arc_step
 	bra shp_ar_adv
-shp_ar_last
+shp_ar_last:
 	lda arc_span
 	sta arc_step
-shp_ar_adv
+shp_ar_adv:
 	clc                         ; ang = (ang + step) mod 256
 	lda arc_ang
 	adc arc_step
@@ -2736,7 +1676,7 @@ shp_ar_adv
 	rts
 
 ; sample at byte-angle A -> (arc_px, arc_py)
-shp_arc_point
+shp_arc_point:
 	pha
 	jsr cos8                    ; A = cos * 127 (signed)
 	jsr shp_arc_scale              ; arc_off = round(r * A / 128)
@@ -2760,7 +1700,7 @@ shp_arc_point
 	rts
 
 ; arc_off = round(arc_r * |A| / 128) with A's sign (A a signed byte)
-shp_arc_scale
+shp_arc_scale:
 	stz arc_sgn
 	pha
 	and #$80
@@ -2771,9 +1711,9 @@ shp_arc_scale
 	clc
 	adc #1
 	bra shp_as_mul
-shp_as_pos
+shp_as_pos:
 	pla
-shp_as_mul
+shp_as_mul:
 	jsr shp_arc_mul8               ; arc_p16 = arc_r * |A|
 	clc
 	lda arc_p16                 ; + 0.5 LSB so >>7 rounds
@@ -2797,20 +1737,20 @@ shp_as_mul
 	lda #0
 	sbc arc_off+1
 	sta arc_off+1
-shp_as_done
+shp_as_done:
 	rts
 
 ; arc_p16 = arc_r * A  (8x8 -> 16, unsigned)
-shp_arc_mul8
+shp_arc_mul8:
 	sta arc_t
 	lda #0
 	ldx #8
-shp_am_loop
+shp_am_loop:
 	lsr arc_t
 	bcc shp_am_skip
 	clc
 	adc arc_r
-shp_am_skip
+shp_am_skip:
 	ror
 	ror arc_p16
 	dex
@@ -2819,19 +1759,6 @@ shp_am_skip
 	rts
 
 ; --- arc state (shared with shape_pie) -------------------------------
-arc_cx   .word 0
-arc_cy   .word 0
-arc_r    .byte 0
-arc_a0   .byte 0
-arc_ang  .byte 0
-arc_step .byte 0
-arc_span .word 0
-arc_px   .word 0
-arc_py   .word 0
-arc_off  .word 0
-arc_sgn  .byte 0
-arc_p16  .word 0
-arc_t    .byte 0
 
 
 ; ---------------------------------------------------------------------
@@ -2849,7 +1776,7 @@ arc_t    .byte 0
 ;       P5 = start angle, P6 = end angle, A = colour
 ; ---------------------------------------------------------------------
 
-shape_pie
+shape_pie:
 	sta pie_col
 	lda X16_P0
 	sta arc_cx
@@ -2871,7 +1798,7 @@ shape_pie
 	lda arc_span
 	bne shp_pie_have
 	inc arc_span+1
-shp_pie_have
+shp_pie_have:
 	lda arc_a0                  ; prev = sample(start)
 	jsr shp_arc_point
 	lda arc_px
@@ -2884,20 +1811,20 @@ shp_pie_have
 	sta pie_prevy+1
 	lda arc_a0
 	sta arc_ang
-shp_pie_loop
+shp_pie_loop:
 	lda arc_span+1              ; step = min(ARC_STEP, span)
 	bne shp_pie_full
 	lda arc_span
 	cmp #ARC_STEP
 	bcc shp_pie_last
-shp_pie_full
+shp_pie_full:
 	lda #ARC_STEP
 	sta arc_step
 	bra shp_pie_adv
-shp_pie_last
+shp_pie_last:
 	lda arc_span
 	sta arc_step
-shp_pie_adv
+shp_pie_adv:
 	clc
 	lda arc_ang
 	adc arc_step
@@ -2948,7 +1875,7 @@ shp_pie_adv
 	ora arc_span+1
 	beq shp_pie_done
 	jmp shp_pie_loop
-shp_pie_done
+shp_pie_done:
 	rts
 
 ; --- triangle scanline fill (fan primitive) --------------------------
@@ -2957,7 +1884,7 @@ shp_pie_done
 ; short edges by scanline with a division-free DDA (err += |dx|; while
 ; err >= dy: x += sign, err -= dy). A zero-height triangle has no area
 ; and is skipped. Edge state is two-wide: index 0 = long, 2 = short.
-shp_tf_fill
+shp_tf_fill:
 	jsr shp_tf_sort                ; ay <= by <= cy
 	lda tf_ay                   ; ay == cy ? zero height, nothing to fill
 	cmp tf_cy
@@ -2966,7 +1893,7 @@ shp_tf_fill
 	cmp tf_cy+1
 	bne shp_tf_go
 	rts
-shp_tf_go
+shp_tf_go:
 	lda tf_ax                   ; long edge a -> c  (index 0)
 	sta tf_isx
 	lda tf_ax+1
@@ -2994,9 +1921,9 @@ shp_tf_go
 	sbc tf_by
 	lda tf_ay+1
 	sbc tf_by+1
-	bvc :+
+	bvc shpv_12
 	eor #$80
-:	bpl shp_tf_p2init              ; ay >= by (flat top): skip to phase 2
+shpv_12:	bpl shp_tf_p2init              ; ay >= by (flat top): skip to phase 2
 	lda tf_ax                   ; short edge a -> b  (index 2)
 	sta tf_isx
 	lda tf_ax+1
@@ -3015,27 +1942,27 @@ shp_tf_go
 	sta tf_iey+1
 	ldx #2
 	jsr shp_tf_init
-shp_tf_p1loop
+shp_tf_p1loop:
 	sec                         ; y >= by ? phase 1 done
 	lda tf_y
 	sbc tf_by
 	lda tf_y+1
 	sbc tf_by+1
-	bvc :+
+	bvc shpv_13
 	eor #$80
-:	bmi shp_tf_p1do
+shpv_13:	bmi shp_tf_p1do
 	jmp shp_tf_p2init
-shp_tf_p1do
+shp_tf_p1do:
 	jsr shp_tf_emitrow
 	ldx #0
 	jsr shp_tf_adv
 	ldx #2
 	jsr shp_tf_adv
 	inc tf_y
-	bne :+
+	bne shpv_14
 	inc tf_y+1
-:	jmp shp_tf_p1loop
-shp_tf_p2init
+shpv_14:	jmp shp_tf_p1loop
+shp_tf_p2init:
 	lda tf_bx                   ; short edge b -> c  (index 2)
 	sta tf_isx
 	lda tf_bx+1
@@ -3054,7 +1981,7 @@ shp_tf_p2init
 	sta tf_iey+1
 	ldx #2
 	jsr shp_tf_init
-shp_tf_p2loop
+shp_tf_p2loop:
 	jsr shp_tf_emitrow
 	lda tf_y                    ; y == cy ? done (last row)
 	cmp tf_cy
@@ -3063,49 +1990,49 @@ shp_tf_p2loop
 	cmp tf_cy+1
 	bne shp_tf_p2do
 	rts
-shp_tf_p2do
+shp_tf_p2do:
 	ldx #0
 	jsr shp_tf_adv
 	ldx #2
 	jsr shp_tf_adv
 	inc tf_y
-	bne :+
+	bne shpv_15
 	inc tf_y+1
-:	jmp shp_tf_p2loop
+shpv_15:	jmp shp_tf_p2loop
 
 ; sort tf_a/tf_b/tf_c by y ascending (each slot is x.w then y.w)
-shp_tf_sort
+shp_tf_sort:
 	jsr shp_tf_cmp_ab
-	bpl :+
+	bpl shpv_16
 	jsr shp_tf_swap_ab
-:	jsr shp_tf_cmp_bc
-	bpl :+
+shpv_16:	jsr shp_tf_cmp_bc
+	bpl shpv_17
 	jsr shp_tf_swap_bc
-:	jsr shp_tf_cmp_ab
-	bpl :+
+shpv_17:	jsr shp_tf_cmp_ab
+	bpl shpv_18
 	jsr shp_tf_swap_ab
-:	rts
-shp_tf_cmp_ab
+shpv_18:	rts
+shp_tf_cmp_ab:
 	sec
 	lda tf_by
 	sbc tf_ay
 	lda tf_by+1
 	sbc tf_ay+1
-	bvc :+
+	bvc shpv_19
 	eor #$80
-:	rts
-shp_tf_cmp_bc
+shpv_19:	rts
+shp_tf_cmp_bc:
 	sec
 	lda tf_cy
 	sbc tf_by
 	lda tf_cy+1
 	sbc tf_by+1
-	bvc :+
+	bvc shpv_20
 	eor #$80
-:	rts
-shp_tf_swap_ab
+shpv_20:	rts
+shp_tf_swap_ab:
 	ldx #3
-shp_tsab
+shp_tsab:
 	lda tf_ax,x
 	ldy tf_bx,x
 	sta tf_bx,x
@@ -3114,9 +2041,9 @@ shp_tsab
 	dex
 	bpl shp_tsab
 	rts
-shp_tf_swap_bc
+shp_tf_swap_bc:
 	ldx #3
-shp_tsbc
+shp_tsbc:
 	lda tf_bx,x
 	ldy tf_cx,x
 	sta tf_cx,x
@@ -3127,7 +2054,7 @@ shp_tsbc
 	rts
 
 ; init edge X (0 long / 2 short) from (tf_isx,tf_isy) to (tf_iex,tf_iey)
-shp_tf_init
+shp_tf_init:
 	lda tf_isx
 	sta e_curx,x
 	lda tf_isx+1
@@ -3158,7 +2085,7 @@ shp_tf_init
 	sta e_sx,x
 	sta e_sx+1,x
 	bra shp_ti_err
-shp_ti_pos
+shp_ti_pos:
 	lda tf_edx                  ; adx = dx, sx = +1
 	sta e_adx,x
 	lda tf_edx+1
@@ -3166,13 +2093,13 @@ shp_ti_pos
 	lda #1
 	sta e_sx,x
 	stz e_sx+1,x
-shp_ti_err
+shp_ti_err:
 	stz e_err,x
 	stz e_err+1,x
 	rts
 
 ; advance edge X by one scanline (dy for this edge must be > 0)
-shp_tf_adv
+shp_tf_adv:
 	clc                         ; err += adx
 	lda e_err,x
 	adc e_adx,x
@@ -3180,7 +2107,7 @@ shp_tf_adv
 	lda e_err+1,x
 	adc e_adx+1,x
 	sta e_err+1,x
-shp_ta_w
+shp_ta_w:
 	sec                         ; err >= dy ?
 	lda e_err,x
 	sbc e_dy,x
@@ -3199,11 +2126,11 @@ shp_ta_w
 	adc e_sx+1,x
 	sta e_curx+1,x
 	bra shp_ta_w
-shp_ta_done
+shp_ta_done:
 	rts
 
 ; HLINE on row tf_y between the long (index 0) and short (index 2) x's
-shp_tf_emitrow
+shp_tf_emitrow:
 	sec                         ; diff = short_x - long_x
 	lda e_curx+2
 	sbc e_curx
@@ -3224,7 +2151,7 @@ shp_tf_emitrow
 	sbc tf_tmp+1
 	sta X16_P5
 	bra shp_te_len
-shp_te_pos
+shp_te_pos:
 	lda e_curx
 	sta X16_P0
 	lda e_curx+1
@@ -3233,11 +2160,11 @@ shp_te_pos
 	sta X16_P4
 	lda tf_tmp+1
 	sta X16_P5
-shp_te_len
+shp_te_len:
 	inc X16_P4                  ; len = |diff| + 1
-	bne :+
+	bne shpv_21
 	inc X16_P5
-:	lda tf_y
+shpv_21:	lda tf_y
 	sta X16_P2
 	lda tf_y+1
 	sta X16_P3
@@ -3246,27 +2173,6 @@ shp_te_len
 	rts
 
 ; --- pie / triangle-fill state ---------------------------------------
-pie_col   .byte 0
-pie_prevx .word 0
-pie_prevy .word 0
-tf_ax  .word 0
-tf_ay  .word 0
-tf_bx  .word 0
-tf_by  .word 0
-tf_cx  .word 0
-tf_cy  .word 0
-tf_y   .word 0
-tf_isx .word 0
-tf_isy .word 0
-tf_iex .word 0
-tf_iey .word 0
-tf_edx .word 0
-tf_tmp .word 0
-e_curx .res 4, 0
-e_err  .res 4, 0
-e_adx  .res 4, 0
-e_dy   .res 4, 0
-e_sx   .res 4, 0
 
 
 ; ---------------------------------------------------------------------
@@ -3286,7 +2192,7 @@ e_sx   .res 4, 0
 ; exactly rather than evaluated, so the curve meets its anchors.
 ; ---------------------------------------------------------------------
 
-shape_bezier
+shape_bezier:
 	sta shl_col
 	jsr shp_bz_nseg                ; bez_n = clamp(perimeter/8, 4, 64)
 	lda bez_x0                  ; prev = P0 (emitted exactly)
@@ -3302,18 +2208,18 @@ shape_bezier
 	stz bez_tb
 	stz bez_rem
 	stz bez_rem+1
-shp_bz_loop
+shp_bz_loop:
 	lda bez_i                   ; i == n ? last segment goes to P3
 	cmp bez_n
 	beq shp_bz_last
 	inc bez_rem+1               ; rem += 256; while rem >= n: tb++, rem -= n
-shp_bz_tw
+shp_bz_tw:
 	lda bez_rem+1
 	bne shp_bz_tsub
 	lda bez_rem
 	cmp bez_n
 	bcc shp_bz_tdone
-shp_bz_tsub
+shp_bz_tsub:
 	sec
 	lda bez_rem
 	sbc bez_n
@@ -3323,7 +2229,7 @@ shp_bz_tsub
 	sta bez_rem+1
 	inc bez_tb
 	bra shp_bz_tw
-shp_bz_tdone
+shp_bz_tdone:
 	jsr shp_bz_eval                ; (bez_rx, bez_ry) = B(tb)
 	lda bez_rx
 	sta shl_x1
@@ -3344,7 +2250,7 @@ shp_bz_tdone
 	sta shl_y0+1
 	inc bez_i
 	jmp shp_bz_loop
-shp_bz_last
+shp_bz_last:
 	lda bez_x3                  ; final sample = P3, exact
 	sta shl_x1
 	lda bez_x3+1
@@ -3356,11 +2262,11 @@ shp_bz_last
 	jmp shp_line
 
 ; bez_n = clamp(Manhattan perimeter of the control polygon / 8, 4, 64)
-shp_bz_nseg
+shp_bz_nseg:
 	stz bez_per
 	stz bez_per+1
 	ldx #0                      ; X = 4*k over the three control segments
-shp_bn_loop
+shp_bn_loop:
 	sec                         ; dx = pts[k+1]shp_x - pts[k]shp_x
 	lda bez_x0+4,x
 	sbc bez_x0,x
@@ -3384,7 +2290,7 @@ shp_bn_loop
 	cpx #12
 	bne shp_bn_loop
 	ldx #3                      ; per >>= 3
-shp_bn_sh
+shp_bn_sh:
 	lsr bez_per+1
 	ror bez_per
 	dex
@@ -3397,16 +2303,16 @@ shp_bn_sh
 	cmp #4
 	bcs shp_bn_ok                  ; 4..63
 	lda #4
-shp_bn_ok
+shp_bn_ok:
 	sta bez_n
 	rts
-shp_bn_hi
+shp_bn_hi:
 	lda #64
 	sta bez_n
 	rts
 
 ; bez_per += |bez_tmp|  (signed word magnitude)
-shp_bz_absacc
+shp_bz_absacc:
 	lda bez_tmp+1
 	bpl shp_ba_pos
 	sec
@@ -3416,7 +2322,7 @@ shp_bz_absacc
 	lda #0
 	sbc bez_tmp+1
 	sta bez_tmp+1
-shp_ba_pos
+shp_ba_pos:
 	clc
 	lda bez_per
 	adc bez_tmp
@@ -3427,10 +2333,10 @@ shp_ba_pos
 	rts
 
 ; (bez_rx, bez_ry) = cubic B(bez_tb) by de Casteljau
-shp_bz_eval
+shp_bz_eval:
 	ldx #0                      ; copy control points into the work arrays
 	ldy #0
-shp_be_cp
+shp_be_cp:
 	lda bez_x0,y
 	sta bez_wx,x
 	lda bez_x0+1,y
@@ -3449,12 +2355,12 @@ shp_be_cp
 	bne shp_be_cp
 	lda #3
 	sta bez_cnt
-shp_be_lvl
+shp_be_lvl:
 	lda bez_cnt                 ; inner loop j = 0 .. cnt-1  (index j*2)
 	asl
 	sta bez_lim
 	stz bez_jx
-shp_be_jx
+shp_be_jx:
 	ldx bez_jx                  ; wx[j] = lerp(wx[j], wx[j+1], t)
 	lda bez_wx,x
 	sta bez_p
@@ -3503,7 +2409,7 @@ shp_be_jx
 	rts
 
 ; bez_r = bez_p + round((bez_q - bez_p) * bez_tb / 256)   (signed)
-shp_bz_lerp
+shp_bz_lerp:
 	sec                         ; d = q - p
 	lda bez_q
 	sbc bez_p
@@ -3522,7 +2428,7 @@ shp_bz_lerp
 	lda #0
 	sbc bez_d+1
 	sta bez_d+1
-shp_bl_pos
+shp_bl_pos:
 	jsr shp_bz_mul                 ; bez_prod = |d| * t (24-bit)
 	clc                         ; + 128 (round), then take bytes 1..2 (>>8)
 	lda bez_prod
@@ -3542,7 +2448,7 @@ shp_bl_pos
 	lda #0
 	sbc bez_m+1
 	sta bez_m+1
-shp_bl_add
+shp_bl_add:
 	clc                         ; r = p + m
 	lda bez_p
 	adc bez_m
@@ -3553,14 +2459,14 @@ shp_bl_add
 	rts
 
 ; bez_prod (24-bit) = bez_d (16-bit) * bez_tb (8-bit), unsigned
-shp_bz_mul
+shp_bz_mul:
 	stz bez_prod
 	stz bez_prod+1
 	stz bez_prod+2
 	lda bez_tb
 	sta bez_mt
 	ldx #8
-shp_bm_loop
+shp_bm_loop:
 	asl bez_prod
 	rol bez_prod+1
 	rol bez_prod+2
@@ -3576,39 +2482,163 @@ shp_bm_loop
 	lda bez_prod+2
 	adc #0
 	sta bez_prod+2
-shp_bm_skip
+shp_bm_skip:
 	dex
 	bne shp_bm_loop
 	rts
 
 ; --- bezier state ----------------------------------------------------
-bez_x0 .word 0
-bez_y0 .word 0
-bez_x1 .word 0
-bez_y1 .word 0
-bez_x2 .word 0
-bez_y2 .word 0
-bez_x3 .word 0
-bez_y3 .word 0
-bez_n    .byte 0
-bez_i    .byte 0
-bez_tb   .byte 0
-bez_rem  .word 0
-bez_per  .word 0
-bez_tmp  .word 0
-bez_rx   .word 0
-bez_ry   .word 0
-bez_wx   .res 8, 0
-bez_wy   .res 8, 0
-bez_cnt  .byte 0
-bez_lim  .byte 0
-bez_jx   .byte 0
-bez_p    .word 0
-bez_q    .word 0
-bez_d    .word 0
-bez_dsgn .byte 0
-bez_prod .res 3, 0
-bez_mt   .byte 0
-bez_m    .word 0
-bez_r    .word 0
 
+
+
+        section bss
+poly_col: reserve 1
+poly_efl: reserve 1
+poly_cx: reserve 2
+poly_cy: reserve 2
+poly_r: reserve 1
+poly_n: reserve 1
+poly_i: reserve 1
+poly_acc: reserve 2
+poly_step: reserve 2
+poly_off: reserve 2
+poly_sgn: reserve 1
+poly_p16: reserve 2
+poly_t: reserve 1
+poly_dvd: reserve 3
+poly_rem: reserve 2
+poly_vx: reserve POLY_MAX * 2
+poly_vy: reserve POLY_MAX * 2
+poly_lx0: reserve 2
+poly_ly0: reserve 2
+poly_lx1: reserve 2
+poly_ly1: reserve 2
+poly_ldx: reserve 2
+poly_ldy: reserve 2
+poly_lerr: reserve 2
+poly_le2: reserve 2
+poly_lsx: reserve 2
+poly_lsy: reserve 2
+poly_lt: reserve 2
+poly_ymin: reserve 2
+poly_ymax: reserve 2
+poly_y: reserve 2
+poly_found: reserve 1
+poly_xa: reserve 2
+poly_ya: reserve 2
+poly_xb: reserve 2
+poly_yb: reserve 2
+poly_xtop: reserve 2
+poly_ytop: reserve 2
+poly_xbot: reserve 2
+poly_ybot: reserve 2
+poly_x: reserve 2
+poly_xl: reserve 2
+poly_xr: reserve 2
+poly_dxs: reserve 1
+poly_md1: reserve 2
+poly_md2: reserve 2
+poly_md3: reserve 2
+poly_mdq: reserve 2
+poly_prod: reserve 4
+shl_x0: reserve 2
+shl_y0: reserve 2
+shl_x1: reserve 2
+shl_y1: reserve 2
+shl_col: reserve 1
+shl_dx: reserve 2
+shl_dy: reserve 2
+shl_sx: reserve 2
+shl_sy: reserve 2
+shl_err: reserve 2
+shl_e2: reserve 2
+shl_t: reserve 2
+rr_x: reserve 2
+rr_y: reserve 2
+rr_w: reserve 2
+rr_h: reserve 2
+rr_r: reserve 1
+rr_col: reserve 1
+rr_fl: reserve 1
+rr_x0: reserve 2
+rr_y0: reserve 2
+rr_x1: reserve 2
+rr_y1: reserve 2
+rr_cxl: reserve 2
+rr_cxr: reserve 2
+rr_cyt: reserve 2
+rr_cyb: reserve 2
+rr_m: reserve 2
+rr_ry: reserve 2
+rr_rx: reserve 2
+rr_ins: reserve 2
+rr_ca: reserve 1
+rr_cb: reserve 1
+rr_wx: reserve 1
+rr_wy: reserve 1
+rr_werr: reserve 2
+rr_wt: reserve 2
+rr_ext: reserve 256
+arc_cx: reserve 2
+arc_cy: reserve 2
+arc_r: reserve 1
+arc_a0: reserve 1
+arc_ang: reserve 1
+arc_step: reserve 1
+arc_span: reserve 2
+arc_px: reserve 2
+arc_py: reserve 2
+arc_off: reserve 2
+arc_sgn: reserve 1
+arc_p16: reserve 2
+arc_t: reserve 1
+pie_col: reserve 1
+pie_prevx: reserve 2
+pie_prevy: reserve 2
+tf_ax: reserve 2
+tf_ay: reserve 2
+tf_bx: reserve 2
+tf_by: reserve 2
+tf_cx: reserve 2
+tf_cy: reserve 2
+tf_y: reserve 2
+tf_isx: reserve 2
+tf_isy: reserve 2
+tf_iex: reserve 2
+tf_iey: reserve 2
+tf_edx: reserve 2
+tf_tmp: reserve 2
+e_curx: reserve 4
+e_err: reserve 4
+e_adx: reserve 4
+e_dy: reserve 4
+e_sx: reserve 4
+bez_x0: reserve 2
+bez_y0: reserve 2
+bez_x1: reserve 2
+bez_y1: reserve 2
+bez_x2: reserve 2
+bez_y2: reserve 2
+bez_x3: reserve 2
+bez_y3: reserve 2
+bez_n: reserve 1
+bez_i: reserve 1
+bez_tb: reserve 1
+bez_rem: reserve 2
+bez_per: reserve 2
+bez_tmp: reserve 2
+bez_rx: reserve 2
+bez_ry: reserve 2
+bez_wx: reserve 8
+bez_wy: reserve 8
+bez_cnt: reserve 1
+bez_lim: reserve 1
+bez_jx: reserve 1
+bez_p: reserve 2
+bez_q: reserve 2
+bez_d: reserve 2
+bez_dsgn: reserve 1
+bez_prod: reserve 3
+bez_mt: reserve 1
+bez_m: reserve 2
+bez_r: reserve 2

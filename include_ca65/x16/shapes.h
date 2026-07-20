@@ -51,6 +51,42 @@ void __fastcall__ x16_gfx_fellipse (unsigned int cx, unsigned char cy,
 unsigned char __fastcall__ x16_gfx_flood (unsigned int x, unsigned char y,
                                           unsigned char color);
 
+/* Regular convex N-gon (sides 3-24), outline / filled. rotation is a byte
+** angle (0=east, 64=south, matching sin8/cos8); the first vertex points
+** that way. Radius 0-255. */
+void __fastcall__ x16_gfx_polygon (unsigned int cx, unsigned char cy,
+                                   unsigned char r, unsigned char sides,
+                                   unsigned char rotation,
+                                   unsigned char color);
+void __fastcall__ x16_gfx_fpolygon (unsigned int cx, unsigned char cy,
+                                    unsigned char r, unsigned char sides,
+                                    unsigned char rotation,
+                                    unsigned char color);
+
+/* Rounded rectangle, outline / filled. (x,y) = top-left, w/h = size, r =
+** corner radius (clamped to min(w,h)/2). Coordinates are 16-bit here. */
+void __fastcall__ x16_gfx_rrect (unsigned int x, unsigned int y,
+                                 unsigned int w, unsigned int h,
+                                 unsigned char r, unsigned char color);
+void __fastcall__ x16_gfx_frrect (unsigned int x, unsigned int y,
+                                  unsigned int w, unsigned int h,
+                                  unsigned char r, unsigned char color);
+
+/* Arc: a circle-outline slice from byte-angle a0 to a1 (a0==a1 = full
+** circle). x16_gfx_pie fills the matching wedge. */
+void __fastcall__ x16_gfx_arc (unsigned int cx, unsigned char cy,
+                               unsigned char r, unsigned char a0,
+                               unsigned char a1, unsigned char color);
+void __fastcall__ x16_gfx_pie (unsigned int cx, unsigned char cy,
+                               unsigned char r, unsigned char a0,
+                               unsigned char a1, unsigned char color);
+
+/* Cubic Bezier through four control points, passed as an 8-element array
+** pts[] = { x0,y0, x1,y1, x2,y2, x3,y3 } (16-bit each) -- too many scalars
+** to travel through the register-ABI toolchains, so a pointer is used. */
+void __fastcall__ x16_gfx_bezier (const unsigned int *pts,
+                                  unsigned char color);
+
 /* --- 2bpp (640x480) -------------------------------------------------- */
 
 void __fastcall__ x16_gfx2_circle (unsigned int cx, unsigned int cy,
@@ -67,5 +103,31 @@ void __fastcall__ x16_gfx2_fellipse (unsigned int cx, unsigned int cy,
 
 unsigned char __fastcall__ x16_gfx2_flood (unsigned int x, unsigned int y,
                                            unsigned char color);
+
+void __fastcall__ x16_gfx2_polygon (unsigned int cx, unsigned int cy,
+                                    unsigned char r, unsigned char sides,
+                                    unsigned char rotation,
+                                    unsigned char color);
+void __fastcall__ x16_gfx2_fpolygon (unsigned int cx, unsigned int cy,
+                                     unsigned char r, unsigned char sides,
+                                     unsigned char rotation,
+                                     unsigned char color);
+
+void __fastcall__ x16_gfx2_rrect (unsigned int x, unsigned int y,
+                                  unsigned int w, unsigned int h,
+                                  unsigned char r, unsigned char color);
+void __fastcall__ x16_gfx2_frrect (unsigned int x, unsigned int y,
+                                   unsigned int w, unsigned int h,
+                                   unsigned char r, unsigned char color);
+
+void __fastcall__ x16_gfx2_arc (unsigned int cx, unsigned int cy,
+                                unsigned char r, unsigned char a0,
+                                unsigned char a1, unsigned char color);
+void __fastcall__ x16_gfx2_pie (unsigned int cx, unsigned int cy,
+                                unsigned char r, unsigned char a0,
+                                unsigned char a1, unsigned char color);
+
+void __fastcall__ x16_gfx2_bezier (const unsigned int *pts,
+                                   unsigned char color);
 
 #endif /* X16_SHAPES_H */

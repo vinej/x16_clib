@@ -33,6 +33,7 @@
         .export         _x16_cos8u
         .export         _x16_atan2
         .export         _x16_lerp8
+        .export         sin8, cos8      ; raw A->A, used by gfx/shapes.s
 
         .segment        "CODE"
 

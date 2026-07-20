@@ -36,6 +36,8 @@
         .globl  x16_cos8
         .globl  x16_sin8u
         .globl  x16_cos8u
+        .globl  sin8
+        .globl  cos8
         .globl  x16_atan2
         .globl  x16_lerp8
 

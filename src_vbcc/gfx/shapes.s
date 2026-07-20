@@ -26,6 +26,14 @@
         global  _x16_gfx_fellipse
         global  _x16_gfx2_ellipse
         global  _x16_gfx2_fellipse
+        global  shp_do_pset
+        global  shp_do_hline
+        global  shp_do_read
+        global  shp_bind8
+        global  shp_bind2
+        global  shp_w
+        global  shp_h
+        global  shp_mcol
 
         section text
 
@@ -236,7 +244,6 @@ shp_emarshal2:                          ; cx->r0/r1, cy->r2/r3, rx->r4, ry->r6
         lda     (sp),y
         sta     shp_mcol                ; color (stacked 5th arg)
         rts
-
 
 shape_circle:
 	sta shp_col

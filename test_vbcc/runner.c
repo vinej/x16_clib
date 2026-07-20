@@ -936,6 +936,7 @@ static void test_shapes_flood2(void)
             "SHAPES_FLOOD2");
 }
 
+
 /* ellipse: 5 arguments, so both calls prove the colour's ride on the C
 ** soft stack behind the pinned r0..r6. */
 static void test_shapes_ellipse8(void)

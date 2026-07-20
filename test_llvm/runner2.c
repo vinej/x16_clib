@@ -854,6 +854,30 @@ static void test_shapes_flood2(void)
             "SHAPES_FLOOD2");
 }
 
+/* v0.8.0 curve shapes (2bpp): polygon, rounded rect, arc, pie, cubic
+** bezier. Each is cleared, drawn, and probed through the independent
+** gfx2_read; one combined check also proves the deep arg slots (bezier
+** passes nine). */
+static void test_shapes_curves2(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
+    x16_gfx2_fpolygon(40, 20, 12, 4, 0, 2);
+    t_check(x16_gfx2_read(40, 20) == 2 && x16_gfx2_read(40, 7) == 0, "CURVE_POLYGON");
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
+    x16_gfx2_frrect(20, 4, 40, 30, 8, 2);
+    t_check(x16_gfx2_read(40, 19) == 2 && x16_gfx2_read(20, 4) == 0, "CURVE_RRECT");
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
+    x16_gfx2_arc(40, 20, 15, 0, 64, 3);
+    t_check(x16_gfx2_read(55, 20) == 3 && x16_gfx2_read(40, 35) == 3 && x16_gfx2_read(25, 20) == 0, "CURVE_ARC");
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
+    x16_gfx2_pie(40, 20, 15, 0, 64, 3);
+    t_check(x16_gfx2_read(40, 20) == 3 && x16_gfx2_read(45, 25) == 3 && x16_gfx2_read(35, 15) == 0, "CURVE_PIE");
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
+    { static const unsigned int bpts[8] = {20,20,30,20,40,20,50,20};
+      x16_gfx2_bezier(bpts, 3); }
+    t_check(x16_gfx2_read(20, 20) == 3 && x16_gfx2_read(50, 20) == 3 && x16_gfx2_read(35, 20) == 3, "CURVE_BEZIER");
+}
+
 /* ellipse: 5 arguments, so the 8bpp call proves the deepest char slot
 ** (__rc5) and the 2bpp call the deepest of all (__rc6). */
 static void test_shapes_ellipse8(void)
@@ -942,6 +966,7 @@ int main(void)
     test_shapes_flood8();
     test_shapes_disc2();
     test_shapes_flood2();
+    test_shapes_curves2();
     test_shapes_ellipse8();
     test_shapes_fellipse2();
 

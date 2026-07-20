@@ -3674,6 +3674,85 @@ static void test_g2_flood(void)
             "G2_FLOOD");
 }
 
+/* --- v0.8.0 curve shapes (2bpp) -------------------------------------- */
+
+/* Regular N-gon: a filled square inks its interior; above the top vertex
+** is clear. */
+static void test_g2_polygon(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+
+    x16_gfx2_fpolygon(40, 20, 12, 4, 0, 2);     /* square, filled */
+
+    t_check(x16_gfx2_read(40, 20) == 2 &&       /* centre filled */
+            x16_gfx2_read(40, 16) == 2 &&       /* interior */
+            x16_gfx2_read(40, 7) == 0,          /* above the north vertex */
+            "G2_POLYGON");
+}
+
+/* Rounded rectangle: filled interior, and the sharp corner cut away by
+** the round. */
+static void test_g2_rrect(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+
+    x16_gfx2_frrect(20, 4, 40, 30, 8, 2);
+
+    t_check(x16_gfx2_read(40, 19) == 2 &&       /* interior filled */
+            x16_gfx2_read(20, 4) == 0,          /* sharp corner cut away */
+            "G2_RRECT");
+}
+
+/* Arc: a quarter from east to south. The endpoints plot; west and the
+** centre stay clear. */
+static void test_g2_arc(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+
+    x16_gfx2_arc(40, 20, 15, 0, 64, 3);         /* east -> south */
+
+    t_check(x16_gfx2_read(55, 20) == 3 &&       /* east endpoint */
+            x16_gfx2_read(40, 35) == 3 &&       /* south endpoint */
+            x16_gfx2_read(25, 20) == 0 &&       /* west: not in the arc */
+            x16_gfx2_read(40, 20) == 0,         /* centre: outline */
+            "G2_ARC");
+}
+
+/* Pie: the same wedge, filled. Centre and SE interior inked; NW clear. */
+static void test_g2_pie(void)
+{
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+
+    x16_gfx2_pie(40, 20, 15, 0, 64, 3);
+
+    t_check(x16_gfx2_read(40, 20) == 3 &&       /* centre (fan apex) */
+            x16_gfx2_read(45, 25) == 3 &&       /* SE interior */
+            x16_gfx2_read(35, 15) == 0,         /* NW: outside the wedge */
+            "G2_PIE");
+}
+
+/* Cubic Bezier: collinear control points make a straight horizontal line
+** whose pixels are predictable. */
+static void test_g2_bezier(void)
+{
+    static const unsigned int bpts[8] = { 20, 20, 30, 20, 40, 20, 50, 20 };
+
+    x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
+    x16_vera_fill(0x00, 160UL * 41);
+
+    x16_gfx2_bezier(bpts, 3);
+
+    t_check(x16_gfx2_read(20, 20) == 3 &&       /* P0 anchor */
+            x16_gfx2_read(50, 20) == 3 &&       /* P3 anchor */
+            x16_gfx2_read(35, 20) == 3 &&       /* on the line */
+            x16_gfx2_read(35, 22) == 0,         /* a 1px line: below is clear */
+            "G2_BEZIER");
+}
+
 #endif /* SUITE == 2 */
 
 int main(void)
@@ -3939,6 +4018,11 @@ int main(void)
     test_g2_ellipse();
     test_g2_fellipse();
     test_g2_flood();
+    test_g2_polygon();
+    test_g2_rrect();
+    test_g2_arc();
+    test_g2_pie();
+    test_g2_bezier();
 
 #endif
 
