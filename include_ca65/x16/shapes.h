@@ -1,5 +1,6 @@
 /* =====================================================================
- * x16clib :: x16/shapes.h -- circle / disc / flood for both bitmap modes
+ * x16clib :: x16/shapes.h -- circle / disc / ellipse / flood / polygon /
+ *                            rounded rect / arc / pie / bezier, both modes
  * =====================================================================
  * One shape implementation, bound at call time to the engine each entry
  * point names:
@@ -18,6 +19,9 @@
  *     screen, exactly as for the line/rect primitives.
  *   - flood: bounds-checked against the canvas, so it never reads or
  *     writes off screen.
+ *   - polygon / arc / pie / bezier outlines plot through the clipping
+ *     pset(); the filled variants (fpolygon, frrect, pie) use hline and
+ *     should be kept on screen, as for disc.
  * =====================================================================
  */
 

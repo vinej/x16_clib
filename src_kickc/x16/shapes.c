@@ -20,6 +20,8 @@
 #include <x16/bitmap.h>
 #include <x16/bitmap2.h>
 #include <x16/shapes.h>
+#include <x16/math.h>
+#include <x16/fixed.h>
 
 #define SHP_FMAX 96                     // flood seed stack depth
 
@@ -494,6 +496,288 @@ unsigned char x16__shp_flood(unsigned int sx, unsigned int sy,
     return 1;
 }
 
+// =====================================================================
+// v0.8.0 curve shapes: polygon, rounded rect, arc, pie, cubic bezier.
+// Re-derived in C from x16_library's gfx/shapes.asm, plotting through the
+// same runtime-bound x16__shp_pset / _hline.
+// =====================================================================
+#define X16__POLYMAX 24
+__mem int x16__vx[X16__POLYMAX];
+__mem int x16__vy[X16__POLYMAX];
+__mem unsigned char x16__ext[256];
+__mem int x16__ax;
+__mem int x16__ay;
+__mem int x16__bx[4];
+__mem int x16__by[4];
+__mem int x16__wx[4];
+__mem int x16__wy[4];
+
+// 65536/n for n=3..24; the 6502 has no divide and kickc no runtime one, so
+// the polygon's angular step is a table rather than a division.
+const unsigned int x16__pstep[25] = {
+    0, 0, 0, 21845, 16384, 13107, 10922, 9362, 8192, 7281, 6553, 5957,
+    5461, 5041, 4681, 4369, 4096, 3855, 3640, 3449, 3276, 3120, 2978,
+    2849, 2730
+};
+
+// signed Bresenham line through the bound pset. dx is kept as |dx| and dy
+// as -|dy|, both formed by SUBTRACTION not `0 - d`: kickc folds `0 - d`
+// away, which would leave err = dx+|dy| and the walk would never end (the
+// same trap x16_gfx2_line documents).
+void x16__shp_line(int x0, int y0, int x1, int y1) {
+    int dx, dy, sx, sy, err, e2;
+    dx = x1 - x0;
+    if (dx < 0) { dx = x0 - x1; sx = -1; } else { sx = 1; }
+    dy = y1 - y0;
+    if (dy < 0) { sy = -1; } else { dy = y0 - y1; sy = 1; }
+    err = dx + dy;
+    for (;;) {
+        x16__shp_pset((unsigned int)x0, (unsigned int)y0, x16__sc_col);
+        if (x0 == x1 && y0 == y1) { break; }
+        e2 = err << 1;
+        if (e2 >= dy) { err = err + dy; x0 = x0 + sx; }
+        if (e2 <= dx) { err = err + dx; y0 = y0 + sy; }
+    }
+}
+
+// base + round(r * t / 128). t is the RAW byte returned by cos8/sin8:
+// kickc does not sign-extend signed char, so `(int)t < 0` never fires and
+// every negative offset silently became positive. The sign is read from
+// the byte itself (>= 128 => negative), the magnitude from the unsigned
+// multiply fragment (rounded via the free >>8), and the sign applied with
+// base - mag (a two-variable subtract, which kickc does compile; it only
+// mangles `0 - var`).
+int x16__coord(int base, unsigned char r, unsigned char t) {
+    int tv, r2, off;
+    // t is the RAW byte from cos8/sin8. kickc does not reliably sign-extend
+    // signed char, so sign-extend by hand (byte-256 is a plain subtract, not
+    // the `0 - var`/`const - var` forms kickc mangles).
+    if (t >= 128) { tv = (int)t - 256; } else { tv = (int)t; }
+    // off = r*t/128 (floored) via the SIGNED multiply fragment:
+    // x16_mul88(2r, t) == (2r*t)>>8. No rounding step -- kickc's `>>1` on a
+    // negative int shifts logically, which corrupts the sign; the 1px inset
+    // that flooring costs is invisible in a filled shape. 2r by addition.
+    r2 = (int)r; r2 = r2 + r2;
+    off = x16_mul88(r2, tv);
+    return base + off;
+}
+
+// the N vertices of a regular N-gon into vx[]/vy[]
+void x16__poly_verts(unsigned char r, unsigned char n, unsigned char rot) {
+    unsigned int acc, step;
+    unsigned char i, ang;
+    step = x16__pstep[n];
+    acc = ((unsigned int)rot) << 8;
+    for (i = 0; i < n; i++) {
+        ang = (unsigned char)(acc >> 8);
+        x16__vx[i] = x16__coord((int)x16__sc_cx, r, (unsigned char)x16_cos8(ang));
+        x16__vy[i] = x16__coord((int)x16__sc_cy, r, (unsigned char)x16_sin8(ang));
+        acc = acc + step;
+    }
+}
+
+void x16__poly_outline(unsigned char n) {
+    unsigned char i, j;
+    for (i = 0; i < n; i++) {
+        j = i + 1;
+        if (j == n) { j = 0; }
+        x16__shp_line(x16__vx[i], x16__vy[i], x16__vx[j], x16__vy[j]);
+    }
+}
+
+// The convex-polygon fill is done by OUTLINE + FLOOD, not a scanline span
+// buffer: kickc cannot reliably compile `int_array[variable_index] = value`
+// (the store silently mis-selects a fragment), and a per-row min/max span
+// buffer is built entirely on that. Flooding from the centre -- always
+// interior to a convex polygon -- reuses only primitives that do work here
+// (shp_line for the outline, shp_flood for the interior).
+void x16__polygon(unsigned char r, unsigned char sides, unsigned char rot,
+                  unsigned char fill) {
+    if (sides < 3) { return; }
+    if (sides > X16__POLYMAX) { sides = X16__POLYMAX; }
+    x16__poly_verts(r, sides, rot);
+    x16__poly_outline(sides);
+    if (fill != 0) {
+        x16__shp_flood(x16__sc_cx, x16__sc_cy, x16__sc_col);
+    }
+}
+
+// --- rounded rectangle ----------------------------------------------
+void x16__rr_plot4(int cxl, int cxr, int cyt, int cyb, int a, int b) {
+    x16__shp_pset((unsigned int)(cxl - a), (unsigned int)(cyt - b), x16__sc_col);
+    x16__shp_pset((unsigned int)(cxr + a), (unsigned int)(cyt - b), x16__sc_col);
+    x16__shp_pset((unsigned int)(cxl - a), (unsigned int)(cyb + b), x16__sc_col);
+    x16__shp_pset((unsigned int)(cxr + a), (unsigned int)(cyb + b), x16__sc_col);
+}
+
+void x16__rr_corners(int cxl, int cxr, int cyt, int cyb, unsigned char r) {
+    int wx, wy, werr, wt;
+    wx = (int)r; wy = 0; werr = 1 - (int)r;
+    while (wy <= wx) {
+        x16__rr_plot4(cxl, cxr, cyt, cyb, wx, wy);
+        x16__rr_plot4(cxl, cxr, cyt, cyb, wy, wx);
+        wy++;
+        if (werr < 0) { wt = wy; }
+        else { wx--; wt = wy - wx; }
+        werr = werr + (wt << 1) + 1;
+    }
+}
+
+void x16__rr_build(unsigned char r) {
+    unsigned char wx, wy;
+    int werr, wt;
+    unsigned int i;
+    for (i = 0; i <= (unsigned int)r; i++) { x16__ext[i] = 0; }
+    x16__ext[0] = r;
+    wx = r; wy = 0; werr = 1 - (int)r;
+    while (wy <= wx) {
+        if (wx > x16__ext[wy]) { x16__ext[wy] = wx; }
+        if (wy > x16__ext[wx]) { x16__ext[wx] = wy; }
+        wy++;
+        if (werr < 0) { wt = (int)wy; }
+        else { wx--; wt = (int)wy - (int)wx; }
+        werr = werr + (wt << 1) + 1;
+    }
+}
+
+void x16__rrect(int x, int y, int w, int h, unsigned char r,
+                unsigned char fill) {
+    int x0, y0, x1, y1, cxl, cxr, cyt, cyb, m, row, d, ins, left, right;
+    m = w;
+    if (h < m) { m = h; }
+    m = m >> 1;
+    if ((int)r > m) { r = (unsigned char)m; }
+    x0 = x; x1 = x + w - 1; y0 = y; y1 = y + h - 1;
+    cxl = x0 + (int)r; cxr = x1 - (int)r;
+    cyt = y0 + (int)r; cyb = y1 - (int)r;
+    if (fill == 0) {
+        x16__rr_corners(cxl, cxr, cyt, cyb, r);
+        if (cxl <= cxr) {
+            x16__shp_line(cxl, y0, cxr, y0);
+            x16__shp_line(cxl, y1, cxr, y1);
+        }
+        if (cyt <= cyb) {
+            x16__shp_line(x0, cyt, x0, cyb);
+            x16__shp_line(x1, cyt, x1, cyb);
+        }
+        return;
+    }
+    x16__rr_build(r);
+    for (row = y0; row <= y1; row++) {
+        if (row < cyt) { d = cyt - row; }
+        else if (row > cyb) { d = row - cyb; }
+        else { d = 0; }
+        ins = (int)x16__ext[d];
+        left = cxl - ins;
+        right = cxr + ins;
+        x16__shp_hline((unsigned int)left, (unsigned int)row,
+                       (unsigned int)(right - left + 1), x16__sc_col);
+    }
+}
+
+// --- arc / pie -------------------------------------------------------
+void x16__arc_point(unsigned char r, unsigned char ang) {
+    x16__ax = x16__coord((int)x16__sc_cx, r, (unsigned char)x16_cos8(ang));
+    x16__ay = x16__coord((int)x16__sc_cy, r, (unsigned char)x16_sin8(ang));
+}
+
+void x16__arc(unsigned char r, unsigned char a0, unsigned char a1,
+              unsigned char pie) {
+    unsigned int span;
+    unsigned char ang, step, mid, hr;
+    int px, py, cx, cy, fx, fy;
+    span = (unsigned int)((unsigned char)(a1 - a0));
+    if (span == 0) { span = 256; }
+    cx = (int)x16__sc_cx; cy = (int)x16__sc_cy;
+    // the arc itself, as a polyline of short chords
+    x16__arc_point(r, a0);
+    px = x16__ax; py = x16__ay;
+    ang = a0;
+    while (span != 0) {
+        if (span < 4) { step = (unsigned char)span; } else { step = 4; }
+        ang = (unsigned char)(ang + step);
+        span = span - step;
+        x16__arc_point(r, ang);
+        x16__shp_line(px, py, x16__ax, x16__ay);
+        px = x16__ax; py = x16__ay;
+    }
+    // the pie wedge: close it with the two bounding radii, then flood the
+    // inside from a seed at half-radius on the mid angle (same reason the
+    // polygon fill floods -- kickc cannot do the span-buffer fill).
+    if (pie != 0) {
+        x16__arc_point(r, a0);
+        x16__shp_line(cx, cy, x16__ax, x16__ay);
+        x16__arc_point(r, a1);
+        x16__shp_line(cx, cy, x16__ax, x16__ay);
+        span = (unsigned int)((unsigned char)(a1 - a0));
+        if (span == 0) { span = 256; }
+        mid = (unsigned char)(a0 + (unsigned char)(span >> 1));
+        hr = r >> 1;
+        fx = x16__coord(cx, hr, (unsigned char)x16_cos8(mid));
+        fy = x16__coord(cy, hr, (unsigned char)x16_sin8(mid));
+        x16__shp_flood((unsigned int)fx, (unsigned int)fy, x16__sc_col);
+    }
+}
+
+// --- cubic bezier ----------------------------------------------------
+// p + (q-p)*t/256, with t in 0..255. x16_mul88(a,b) == (a*b)>>8 signed, so
+// mul88(q-p, t) is exactly the lerp fraction -- and routes the multiply
+// through the library fragment.
+int x16__lerp(int p, int q, unsigned char t) {
+    return p + x16_mul88(q - p, (int)t);
+}
+
+void x16__bez_eval(unsigned char t) {
+    unsigned char cnt, j, k;
+    int a, b;
+    for (j = 0; j < 4; j++) {
+        a = x16__bx[j]; x16__wx[j] = a;
+        b = x16__by[j]; x16__wy[j] = b;
+    }
+    cnt = 3;
+    while (cnt > 0) {
+        for (j = 0; j < cnt; j++) {
+            k = j + 1;
+            a = x16__wx[j]; b = x16__wx[k];
+            x16__wx[j] = x16__lerp(a, b, t);
+            a = x16__wy[j]; b = x16__wy[k];
+            x16__wy[j] = x16__lerp(a, b, t);
+        }
+        cnt--;
+    }
+}
+
+void x16__bezier(void) {
+    int per, nn, dx, dy, px, py, a, b;
+    unsigned char i, k, nb, tb;
+    unsigned int rem;
+    per = 0;
+    for (i = 0; i < 3; i++) {
+        k = i + 1;
+        a = x16__bx[k]; b = x16__bx[i];
+        dx = a - b;
+        if (dx < 0) { dx = 0 - dx; }
+        a = x16__by[k]; b = x16__by[i];
+        dy = a - b;
+        if (dy < 0) { dy = 0 - dy; }
+        per = per + dx + dy;
+    }
+    nn = per >> 3;
+    if (nn < 4) { nn = 4; }
+    if (nn > 64) { nn = 64; }
+    nb = (unsigned char)nn;
+    px = x16__bx[0]; py = x16__by[0];
+    tb = 0; rem = 0;
+    for (i = 1; i < nb; i++) {
+        rem = rem + 256;
+        while (rem >= (unsigned int)nb) { tb++; rem = rem - (unsigned int)nb; }
+        x16__bez_eval(tb);
+        x16__shp_line(px, py, x16__wx[0], x16__wy[0]);
+        px = x16__wx[0]; py = x16__wy[0];
+    }
+    x16__shp_line(px, py, x16__bx[3], x16__by[3]);
+}
+
 // --- public entry points ---------------------------------------------
 void x16_gfx_circle(unsigned int cx, unsigned char cy, unsigned char r,
                     unsigned char color) {
@@ -597,4 +881,108 @@ unsigned char x16_gfx2_flood(unsigned int x, unsigned int y,
     x16__shp_w = 640;
     x16__shp_h = 480;
     return x16__shp_flood(x, y, color);
+}
+
+// --- curve shapes: 8bpp (320x240) ------------------------------------
+void x16_gfx_polygon(unsigned int cx, unsigned char cy, unsigned char r,
+                     unsigned char sides, unsigned char rotation,
+                     unsigned char color) {
+    x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
+    x16__sc_cx = cx; x16__sc_cy = (unsigned int)cy; x16__sc_col = color;
+    x16__polygon(r, sides, rotation, 0);
+}
+
+void x16_gfx_fpolygon(unsigned int cx, unsigned char cy, unsigned char r,
+                      unsigned char sides, unsigned char rotation,
+                      unsigned char color) {
+    x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
+    x16__sc_cx = cx; x16__sc_cy = (unsigned int)cy; x16__sc_col = color;
+    x16__polygon(r, sides, rotation, 1);
+}
+
+void x16_gfx_rrect(unsigned int x, unsigned int y, unsigned int w,
+                   unsigned int h, unsigned char r, unsigned char color) {
+    x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240; x16__sc_col = color;
+    x16__rrect((int)x, (int)y, (int)w, (int)h, r, 0);
+}
+
+void x16_gfx_frrect(unsigned int x, unsigned int y, unsigned int w,
+                    unsigned int h, unsigned char r, unsigned char color) {
+    x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240; x16__sc_col = color;
+    x16__rrect((int)x, (int)y, (int)w, (int)h, r, 1);
+}
+
+void x16_gfx_arc(unsigned int cx, unsigned char cy, unsigned char r,
+                 unsigned char a0, unsigned char a1, unsigned char color) {
+    x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
+    x16__sc_cx = cx; x16__sc_cy = (unsigned int)cy; x16__sc_col = color;
+    x16__arc(r, a0, a1, 0);
+}
+
+void x16_gfx_pie(unsigned int cx, unsigned char cy, unsigned char r,
+                 unsigned char a0, unsigned char a1, unsigned char color) {
+    x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
+    x16__sc_cx = cx; x16__sc_cy = (unsigned int)cy; x16__sc_col = color;
+    x16__arc(r, a0, a1, 1);
+}
+
+void x16_gfx_bezier(const unsigned int *pts, unsigned char color) {
+    x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240; x16__sc_col = color;
+    x16__bx[0] = (int)pts[0]; x16__by[0] = (int)pts[1];
+    x16__bx[1] = (int)pts[2]; x16__by[1] = (int)pts[3];
+    x16__bx[2] = (int)pts[4]; x16__by[2] = (int)pts[5];
+    x16__bx[3] = (int)pts[6]; x16__by[3] = (int)pts[7];
+    x16__bezier();
+}
+
+// --- curve shapes: 2bpp (640x480) ------------------------------------
+void x16_gfx2_polygon(unsigned int cx, unsigned int cy, unsigned char r,
+                      unsigned char sides, unsigned char rotation,
+                      unsigned char color) {
+    x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
+    x16__sc_cx = cx; x16__sc_cy = cy; x16__sc_col = color;
+    x16__polygon(r, sides, rotation, 0);
+}
+
+void x16_gfx2_fpolygon(unsigned int cx, unsigned int cy, unsigned char r,
+                       unsigned char sides, unsigned char rotation,
+                       unsigned char color) {
+    x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
+    x16__sc_cx = cx; x16__sc_cy = cy; x16__sc_col = color;
+    x16__polygon(r, sides, rotation, 1);
+}
+
+void x16_gfx2_rrect(unsigned int x, unsigned int y, unsigned int w,
+                    unsigned int h, unsigned char r, unsigned char color) {
+    x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480; x16__sc_col = color;
+    x16__rrect((int)x, (int)y, (int)w, (int)h, r, 0);
+}
+
+void x16_gfx2_frrect(unsigned int x, unsigned int y, unsigned int w,
+                     unsigned int h, unsigned char r, unsigned char color) {
+    x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480; x16__sc_col = color;
+    x16__rrect((int)x, (int)y, (int)w, (int)h, r, 1);
+}
+
+void x16_gfx2_arc(unsigned int cx, unsigned int cy, unsigned char r,
+                  unsigned char a0, unsigned char a1, unsigned char color) {
+    x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
+    x16__sc_cx = cx; x16__sc_cy = cy; x16__sc_col = color;
+    x16__arc(r, a0, a1, 0);
+}
+
+void x16_gfx2_pie(unsigned int cx, unsigned int cy, unsigned char r,
+                  unsigned char a0, unsigned char a1, unsigned char color) {
+    x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
+    x16__sc_cx = cx; x16__sc_cy = cy; x16__sc_col = color;
+    x16__arc(r, a0, a1, 1);
+}
+
+void x16_gfx2_bezier(const unsigned int *pts, unsigned char color) {
+    x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480; x16__sc_col = color;
+    x16__bx[0] = (int)pts[0]; x16__by[0] = (int)pts[1];
+    x16__bx[1] = (int)pts[2]; x16__by[1] = (int)pts[3];
+    x16__bx[2] = (int)pts[4]; x16__by[2] = (int)pts[5];
+    x16__bx[3] = (int)pts[6]; x16__by[3] = (int)pts[7];
+    x16__bezier();
 }

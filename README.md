@@ -116,7 +116,7 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/sprite.h` | all 128 hardware sprites |
 | `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham, glyphs and text |
 | `x16/bitmap2.h` | **640x480x4 (2bpp)**: pset, read, spans, rects, Bresenham, screen-anchored patterns, raster-op blits, masked pre-shifted blits |
-| `x16/shapes.h` | **circles, discs, ellipses and flood fill for BOTH bitmap modes** from one implementation: `x16_gfx_*` on the 8bpp plane, `x16_gfx2_*` on the 2bpp plane |
+| `x16/shapes.h` | **circles, discs, ellipses, flood fill, regular polygons, rounded rectangles, arcs, pie wedges and cubic Beziers for BOTH bitmap modes** from one implementation: `x16_gfx_*` on the 8bpp plane, `x16_gfx2_*` on the 2bpp plane |
 | `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines, filled triangles, blits, transparency** |
 | `x16/psg.h` | the 16-voice PSG, and **ASR envelopes** |
 | `x16/ym.h` | the YM2151 FM chip |

@@ -296,6 +296,57 @@ void test_shapes_fellipse2(void) {
             "SHAPES_FELLIPSE2");
 }
 
+/* v0.8.0 curve shapes on the 2bpp engine, verified through gfx2_read. */
+void test_curve_polygon2(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 41);
+    x16_gfx2_fpolygon(40, 20, 12, 4, 0, 2);         /* filled diamond */
+    t_check((x16_gfx2_read(40, 20) == 2 &&          /* centre */
+            x16_gfx2_read(45, 20) == 2 &&           /* east interior */
+            x16_gfx2_read(35, 20) == 2 &&           /* west interior (neg off) */
+            x16_gfx2_read(40, 15) == 2 &&           /* north interior */
+            x16_gfx2_read(40, 7) == 0) ? 1 : 0, "CURVE_POLYGON2");
+}
+
+void test_curve_rrect2(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 41);
+    x16_gfx2_frrect(20, 4, 40, 30, 8, 2);
+    t_check((x16_gfx2_read(40, 19) == 2 &&
+            x16_gfx2_read(20, 4) == 0) ? 1 : 0, "CURVE_RRECT2");
+}
+
+void test_curve_arc2(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 41);
+    x16_gfx2_arc(40, 20, 15, 0, 64, 3);             /* east -> south */
+    /* the rim is at radius 14 or 15 (kickc floors the r*sin/cos scale by up
+    ** to 1px), so accept either -- what matters is the arc is drawn east and
+    ** south and NOT west. */
+    t_check(((x16_gfx2_read(55, 20) == 3 || x16_gfx2_read(54, 20) == 3) &&
+            (x16_gfx2_read(40, 35) == 3 || x16_gfx2_read(40, 34) == 3) &&
+            x16_gfx2_read(25, 20) == 0) ? 1 : 0, "CURVE_ARC2");
+}
+
+void test_curve_pie2(void) {
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 41);
+    x16_gfx2_pie(40, 20, 15, 0, 64, 3);
+    t_check((x16_gfx2_read(40, 20) == 3 &&
+            x16_gfx2_read(45, 25) == 3 &&
+            x16_gfx2_read(35, 15) == 0) ? 1 : 0, "CURVE_PIE2");
+}
+
+void test_curve_bezier2(void) {
+    static const unsigned int bpts[8] = { 20, 20, 30, 20, 40, 20, 50, 20 };
+    x16_vera_addr0(X16_INC_1, 0x00000);
+    x16_vera_fill(0x00, 160 * 41);
+    x16_gfx2_bezier(bpts, 3);                        /* collinear -> line */
+    t_check((x16_gfx2_read(20, 20) == 3 &&
+            x16_gfx2_read(50, 20) == 3 &&
+            x16_gfx2_read(35, 20) == 3) ? 1 : 0, "CURVE_BEZIER2");
+}
+
 int main(void) {
     t_init();
 
@@ -320,6 +371,11 @@ int main(void) {
     test_shapes_disc2();
     test_shapes_flood2();
     test_shapes_fellipse2();
+    test_curve_polygon2();
+    test_curve_rrect2();
+    test_curve_arc2();
+    test_curve_pie2();
+    test_curve_bezier2();
 
     t_done();
     return 0;
