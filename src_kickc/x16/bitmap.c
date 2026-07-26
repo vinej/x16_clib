@@ -376,3 +376,160 @@ void x16_gfx_text(unsigned int x, unsigned char y, unsigned char color,
         s++;
     }
 }
+
+// =====================================================================
+// Patterns and blits -- the same surface x16/bitmap2.h has
+// =====================================================================
+// Two-way parity between the engines: a program can move between
+// 320x240x256 and 640x480x4 without losing a primitive. Two of these
+// differ from their 2bpp counterparts, and both differences come from
+// one byte being one pixel here rather than four -- pattern_set takes
+// whole colour bytes, and blitm needs no mask plane because colour 0
+// IS the mask.
+//
+// Plain C over x16__gfx_setptr(), which already owns the 17-bit address
+// arithmetic; only the byte writes drop into assembly, exactly as
+// x16__gfx_pset_i() does.
+//
+// Neither blit clips; keep them on screen.
+// =====================================================================
+
+__mem char x16__gp_pat[8];              // the cached 8x8 1bpp pattern
+__mem volatile char x16__gp_bg;
+__mem volatile char x16__gp_fg;
+__mem volatile char x16__gp_cur;        // the row, rotated to the phase
+__mem volatile char x16__gp_byte;       // one byte on its way to VERA
+
+// Write x16__gp_byte to the current port-0 address.
+void x16__gfx_put(void) {
+    asm {
+        lda x16__gp_byte
+        sta $9f23 /*VERA_DATA0*/
+    }
+}
+
+// Read one byte from the current port-0 address, advancing it. The
+// masked blit uses this to step over a transparent pixel -- the READ is
+// what advances the port, which is the whole trick.
+unsigned char x16__gfx_get(void) {
+    __mem char r;
+    asm {
+        lda $9f23 /*VERA_DATA0*/
+        sta r
+    }
+    return r;
+}
+
+void x16_gfx_pattern_set(const char *pattern, unsigned char bg,
+                         unsigned char fg) {
+    unsigned char i;
+    for (i = 0; i < 8; i++) {
+        x16__gp_pat[i] = pattern[i];
+    }
+    x16__gp_bg = bg;
+    x16__gp_fg = fg;
+}
+
+// Tiles from the SCREEN origin, like the 2bpp module: the pattern cell
+// under a pixel depends only on the pixel, not on the rectangle. That is
+// why the row is pre-rotated by x & 7 rather than started at phase 0.
+void x16_gfx_pattern_rect(unsigned int x, unsigned int y, unsigned int w,
+                          unsigned int h) {
+    unsigned int i;
+    unsigned char n;
+    unsigned char rot;
+    unsigned char cur;
+
+    if (w == 0) { return; }
+    if (h == 0) { return; }
+
+    rot = (unsigned char)x & 7;
+    while (h != 0) {
+        x16__gp_x = x;
+        x16__gp_y = (unsigned char)y;
+        x16__gfx_setptr(1);             // X16_INC_1
+
+        cur = x16__gp_pat[(unsigned char)y & 7];
+        for (n = 0; n < rot; n++) {
+            cur = (cur << 1) | (cur >> 7);      // circular left
+        }
+        for (i = 0; i < w; i++) {
+            if ((cur & 0x80) != 0) {
+                x16__gp_byte = x16__gp_fg;
+            } else {
+                x16__gp_byte = x16__gp_bg;
+            }
+            x16__gfx_put();
+            cur = (cur << 1) | (cur >> 7);
+        }
+        y++;
+        h--;
+    }
+}
+
+// Rows of pixel bytes from RAM. op: 0 copy, 1 OR, 2 AND, 3 XOR. The
+// read-modify-write ops read the screen back through the same port,
+// which costs a re-point per pixel here -- the assembly builds use a
+// second VERA port for it, but KickC has no way to say that in C.
+void x16_gfx_blit(unsigned int x, unsigned int y, unsigned char w,
+                  unsigned char h, const char *src, unsigned char op) {
+    unsigned char i;
+    unsigned char v;
+
+    while (h != 0) {
+        x16__gp_x = x;
+        x16__gp_y = (unsigned char)y;
+        x16__gfx_setptr(1);             // X16_INC_1
+
+        for (i = 0; i < w; i++) {
+            v = src[i];
+            if (op != 0) {
+                x16__gp_x = x + i;      // re-point: the read consumed one
+                x16__gp_y = (unsigned char)y;
+                x16__gfx_setptr(0);     // X16_INC_0: read and write in place
+                if (op == 1) { v = v | x16__gfx_get(); }
+                else if (op == 2) { v = v & x16__gfx_get(); }
+                else { v = v ^ x16__gfx_get(); }
+            }
+            x16__gp_byte = v;
+            x16__gfx_put();
+            if (op != 0) {
+                x16__gp_x = x + i + 1;  // step past it by hand
+                x16__gp_y = (unsigned char)y;
+                x16__gfx_setptr(1);
+            }
+        }
+        src = src + w;
+        y++;
+        h--;
+    }
+}
+
+// Masked: a source byte of 0 leaves the screen alone. At 8bpp the mask
+// IS the data, so the source is plain row-major pixels -- but a skipped
+// pixel must still ADVANCE the port, or everything after the first hole
+// shifts one place left.
+void x16_gfx_blitm(unsigned int x, unsigned int y, unsigned char w,
+                   unsigned char h, const char *src) {
+    unsigned char i;
+    unsigned char v;
+
+    while (h != 0) {
+        x16__gp_x = x;
+        x16__gp_y = (unsigned char)y;
+        x16__gfx_setptr(1);             // X16_INC_1
+
+        for (i = 0; i < w; i++) {
+            v = src[i];
+            if (v == 0) {
+                x16__gfx_get();         // advance without writing
+            } else {
+                x16__gp_byte = v;
+                x16__gfx_put();
+            }
+        }
+        src = src + w;
+        y++;
+        h--;
+    }
+}

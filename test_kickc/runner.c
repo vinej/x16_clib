@@ -619,6 +619,97 @@ void test_gfx_pset(void) {
     t_check((t_vpeek(0, PX(10, 5)) == 0x42) ? 1 : 0, "GFX_PSET");
 }
 
+/* ------------------------------------------------------------------ */
+/* 8bpp patterns and blits -- parity with the 2bpp engine              */
+/* ------------------------------------------------------------------ */
+
+/* The 8bpp plane is at VRAM 0, one byte per pixel, 320 to a row -- PX()
+** above. Every check reads back through t_vpeek(), the independent path.
+*/
+
+/* Pattern $F0: the left four pixels of every 8-pixel cell are ink. The
+** second fill starts at x=2, which is the point -- patterns anchor to
+** the SCREEN, so the cell is pre-rotated by x & 7 and the run reads two
+** ink, four background, then ink again. A version that started every
+** rectangle at phase 0 passes an x=0-only test.
+*/
+const char g8_pat_half[8] = {
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0
+};
+
+void test_g8_pattern(void) {
+    unsigned char i;
+
+    for (i = 0; i < 9; i++) {
+        t_vpoke(0, PX(i, 70), 0x55);
+        t_vpoke(0, PX(i + 2, 74), 0x55);
+    }
+
+    x16_gfx_pattern_set(g8_pat_half, 0, 5);     /* bg 0, fg 5 */
+    x16_gfx_pattern_rect(0, 70, 8, 1);
+    x16_gfx_pattern_rect(2, 74, 8, 1);
+
+    t_check((t_vpeek(0, PX(0, 70)) == 5 &&
+             t_vpeek(0, PX(3, 70)) == 5 &&
+             t_vpeek(0, PX(4, 70)) == 0 &&
+             t_vpeek(0, PX(7, 70)) == 0 &&
+             t_vpeek(0, PX(8, 70)) == 0x55 &&     /* stopped at the width */
+             t_vpeek(0, PX(2, 74)) == 5 &&        /* phase 2 */
+             t_vpeek(0, PX(4, 74)) == 0 &&
+             t_vpeek(0, PX(8, 74)) == 5) ? 1 : 0,
+            "GFX_PATTERN");
+}
+
+/* A 2x2 image copied in, then XORed with itself to leave zeros. The XOR
+** pass is what proves the read-modify-write path reads the screen back
+** rather than just writing again.
+*/
+const char g8_img[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+
+void test_g8_blit(void) {
+    t_vpoke(0, PX(8, 80), 0x00);
+    t_vpoke(0, PX(9, 80), 0x00);
+    t_vpoke(0, PX(8, 81), 0x00);
+    t_vpoke(0, PX(9, 81), 0x00);
+
+    x16_gfx_blit(8, 80, 2, 2, g8_img, 0);       /* copy */
+    if (t_vpeek(0, PX(8, 80)) != 0xDE || t_vpeek(0, PX(9, 80)) != 0xAD ||
+        t_vpeek(0, PX(8, 81)) != 0xBE || t_vpeek(0, PX(9, 81)) != 0xEF) {
+        t_check(0, "GFX_BLIT");
+        return;
+    }
+
+    x16_gfx_blit(8, 80, 2, 2, g8_img, 3);       /* XOR it away again */
+    t_check((t_vpeek(0, PX(8, 80)) == 0x00 &&
+             t_vpeek(0, PX(9, 81)) == 0x00) ? 1 : 0,
+            "GFX_BLIT");
+}
+
+/* Masked: a source byte of 0 leaves the screen alone. The transparent
+** pixels are INTERLEAVED with opaque ones, which is what makes this able
+** to fail -- skipping a pixel must still advance the VERA port, and a
+** version that simply skipped the store would shift everything after the
+** first hole one place left. The last byte catches exactly that.
+*/
+const char g8_mask[4] = { 0x00, 0x07, 0x00, 0x09 };
+
+void test_g8_blitm(void) {
+    unsigned char i;
+
+    for (i = 0; i < 5; i++) {
+        t_vpoke(0, PX(12 + i, 90), 0xFF);
+    }
+
+    x16_gfx_blitm(12, 90, 4, 1, g8_mask);
+
+    t_check((t_vpeek(0, PX(12, 90)) == 0xFF &&    /* transparent */
+             t_vpeek(0, PX(13, 90)) == 0x07 &&
+             t_vpeek(0, PX(14, 90)) == 0xFF &&    /* transparent */
+             t_vpeek(0, PX(15, 90)) == 0x09 &&    /* NOT shifted left */
+             t_vpeek(0, PX(16, 90)) == 0xFF) ? 1 : 0,   /* past the end */
+            "GFX_BLITM");
+}
+
 /* x >= 320 and y >= 240 are off screen. Unclipped, pset(320,0) would
 ** land on pixel (0,1) and pset(0,240) at offset $12C00 -- so poison
 ** both and check they stayed clean.
@@ -1208,6 +1299,9 @@ void main(void) {
 
     test_gfx_clear();
     test_gfx_pset();
+    test_g8_pattern();
+    test_g8_blit();
+    test_g8_blitm();
     test_gfx_clip();
     test_gfx_hline();
     test_gfx_vline();
