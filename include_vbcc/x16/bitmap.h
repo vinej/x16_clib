@@ -65,4 +65,55 @@ void x16_gfx_char(__reg("r0/r1") unsigned int x, __reg("r2") unsigned char y,
 void x16_gfx_text(__reg("r0/r1") unsigned int x, __reg("r2") unsigned char y,
                   __reg("r4") unsigned char color, __reg("r6/r7") const char *s);
 
+/* =====================================================================
+** Patterns and blits -- the same surface x16/bitmap2.h has
+** =====================================================================
+** Two-way parity between the engines: a program can move between
+** 320x240x256 and 640x480x4 without losing a primitive. Two of these
+** differ from their 2bpp counterparts, and both differences come from
+** one byte being one pixel here rather than four.
+**
+** Neither blit clips; keep them on screen.
+** =====================================================================
+*/
+
+/* An 8x8 1bpp pattern (8 row bytes, bit 7 leftmost) cached for
+** x16_gfx_pattern_rect(). Background and foreground are whole bytes --
+** the 2bpp version packs two 2-bit colours into one argument, which
+** 8bpp colours do not fit in.
+**
+** Patterns anchor to the screen origin, so adjacent fills always knit
+** together.
+*/
+void x16_gfx_pattern_set(__reg("a/x") const unsigned char *pattern,
+                         __reg("r0") unsigned char bg,
+                         __reg("r1") unsigned char fg);
+
+void x16_gfx_pattern_rect(__reg("r0/r1") unsigned int x,
+                          __reg("r2") unsigned char y,
+                          __reg("r4/r5") unsigned int w,
+                          __reg("r6") unsigned char h);
+
+/* Copy a row-major image from RAM into the bitmap, one byte per pixel.
+** `w` is in PIXELS (1-255). op: 0 copy, 1 OR, 2 AND, 3 XOR.
+*/
+void x16_gfx_blit(__reg("r0/r1") unsigned int x,
+                  __reg("r2") unsigned char y,
+                  __reg("r4") unsigned char w,
+                  __reg("r5") unsigned char h,
+                  __reg("r6/r7") const unsigned char *src,
+                  __reg("r3") unsigned char op);
+
+/* A masked blit: a source byte of 0 leaves the screen alone.
+**
+** At 8bpp the mask IS the data -- colour 0 means transparent -- so the
+** source is plain row-major pixels, where x16_gfx2_blitm() needs
+** interleaved (mask, data) pairs and pre-shifted columns.
+*/
+void x16_gfx_blitm(__reg("r0/r1") unsigned int x,
+                   __reg("r2") unsigned char y,
+                   __reg("r4") unsigned char w,
+                   __reg("r5") unsigned char h,
+                   __reg("r6/r7") const unsigned char *src);
+
 #endif /* X16_BITMAP_H */

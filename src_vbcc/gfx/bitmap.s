@@ -27,6 +27,7 @@
 ; r0/r1; y/color and other chars each take an even register (r2, r4, r6);
 ; a 16-bit len/width or a string pointer takes r4/r5 (or r6/r7).
         zpage	r0
+        zpage	r3
         zpage	r1
         zpage	r2
         zpage	r4
@@ -45,6 +46,10 @@
         global	_x16_gfx_line
         global	_x16_gfx_char
         global	_x16_gfx_text
+        global	_x16_gfx_pattern_set
+        global	_x16_gfx_pattern_rect
+        global	_x16_gfx_blit
+        global	_x16_gfx_blitm
 
         ; primitives the shared shape module (gfx/shapes.s) plots through
         global	gfx_pset
@@ -320,6 +325,27 @@ gfx_setptr:
 
         lda     #VERA_CTRL_ADDRSEL
         trb     VERA_CTRL
+        lda     X16_T0
+        sta     VERA_ADDR_L
+        lda     X16_T1
+        sta     VERA_ADDR_M
+        lda     X16_T2
+        and     #VERA_ADDR_H_BANK
+        ora     X16_T5
+        sta     VERA_ADDR_H
+        rts
+
+; ---------------------------------------------------------------------
+; gfx_ld1 -- point VERA port 1 at the address gfx_setptr just computed
+;
+; gfx_blit's read-modify-write ops read the screen back while writing it,
+; and DATA1 always reads port 1 whatever ADDRSEL says. T0/T1/T2 and T5
+; still hold gfx_setptr's answer, so this is the same store sequence
+; against the other port.
+; ---------------------------------------------------------------------
+gfx_ld1:
+        lda     #VERA_CTRL_ADDRSEL
+        tsb     VERA_CTRL
         lda     X16_T0
         sta     VERA_ADDR_L
         lda     X16_T1
@@ -817,3 +843,287 @@ gl_e2:     reserve 2
 gl_sx:     reserve 2
 gl_sy:     reserve 1
 gl_tmp:    reserve 1
+
+        section text                    ; the block above ended in bss
+
+; ---------------------------------------------------------------------
+; void x16_gfx_pattern_set(__reg("a/x") const unsigned char *pattern,
+;                          __reg("r0") unsigned char bg,
+;                          __reg("r1") unsigned char fg)
+;   the body wants A/X = pattern, P4 = bg, P5 = fg.
+; ---------------------------------------------------------------------
+_x16_gfx_pattern_set:
+        pha
+        lda     r0
+        sta     X16_P4                  ; bg
+        lda     r1
+        sta     X16_P5                  ; fg
+        pla                             ; A/X = pattern again
+        jmp     gfx_pattern_set
+
+; ---------------------------------------------------------------------
+; void x16_gfx_pattern_rect(__reg("r0/r1") unsigned int x,
+;                           __reg("r2") unsigned char y,
+;                           __reg("r4/r5") unsigned int w,
+;                           __reg("r6") unsigned char h)
+; ---------------------------------------------------------------------
+_x16_gfx_pattern_rect:
+        lda     r0
+        sta     X16_P0                  ; x
+        lda     r1
+        sta     X16_P1
+        lda     r2
+        sta     X16_P2                  ; y
+        lda     r4
+        sta     X16_P4                  ; w
+        lda     r5
+        sta     X16_P5
+        lda     r6
+        sta     X16_P6                  ; h
+        jmp     gfx_pattern_rect
+
+; ---------------------------------------------------------------------
+; void x16_gfx_blit(__reg("r0/r1") unsigned int x,
+;                   __reg("r2") unsigned char y,
+;                   __reg("r4") unsigned char w,
+;                   __reg("r5") unsigned char h,
+;                   __reg("r6/r7") const unsigned char *src,
+;                   __reg("r3") unsigned char op)
+;   Six arguments, each pinned to its own register rather than left to
+;   the even-slot rule, which would spill two onto the C soft stack.
+; ---------------------------------------------------------------------
+_x16_gfx_blit:
+        lda     r0
+        sta     X16_P0                  ; x
+        lda     r1
+        sta     X16_P1
+        lda     r2
+        sta     X16_P2                  ; y
+        lda     r4
+        sta     X16_P4                  ; w
+        lda     r5
+        sta     X16_P5                  ; h
+        lda     r6
+        sta     X16_P6                  ; src -- P6/P7 is X16_PTR3
+        lda     r7
+        sta     X16_P7
+        lda     r3                      ; A = op
+        jmp     gfx_blit
+
+; ---------------------------------------------------------------------
+; void x16_gfx_blitm(__reg("r0/r1") unsigned int x,
+;                    __reg("r2") unsigned char y,
+;                    __reg("r4") unsigned char w,
+;                    __reg("r5") unsigned char h,
+;                    __reg("r6/r7") const unsigned char *src)
+; ---------------------------------------------------------------------
+_x16_gfx_blitm:
+        lda     r0
+        sta     X16_P0
+        lda     r1
+        sta     X16_P1
+        lda     r2
+        sta     X16_P2
+        lda     r4
+        sta     X16_P4
+        lda     r5
+        sta     X16_P5
+        lda     r6
+        sta     X16_P6
+        lda     r7
+        sta     X16_P7
+        jmp     gfx_blitm
+
+; ---------------------------------------------------------------------
+; gfx_pattern_set -- cache an 8x8 1bpp pattern for gfx_pattern_rect
+;   in:  A = pattern low, X = pattern high (8 row bytes, top first;
+;            bit 7 is the leftmost pixel)
+;        X16_P4 = background colour, X16_P5 = foreground colour
+; ---------------------------------------------------------------------
+gfx_pattern_set:
+        sta     X16_T0
+        stx     X16_T0+1
+        ldy     #7
+gp8_cp:
+        lda     (X16_T0),y
+        sta     gp8_pat,y
+        dey
+        bpl     gp8_cp
+        lda     X16_P4
+        sta     gp8_bg
+        lda     X16_P5
+        sta     gp8_fg
+        rts
+
+; ---------------------------------------------------------------------
+; gfx_pattern_rect -- fill a rectangle with the cached pattern
+;   in:  X16_P0/P1 = x, X16_P2 = y, X16_P4/P5 = width, X16_P6 = height
+;   (P2 and P6 are consumed)
+;
+; Tiles from the screen origin, like the 2bpp module: the pattern cell
+; under a pixel depends only on the pixel, not the rectangle.
+; ---------------------------------------------------------------------
+gfx_pattern_rect:
+        lda     X16_P4                  ; zero width or height: draw nothing
+        ora     X16_P5
+        beq     gp8_done
+        lda     X16_P6
+        beq     gp8_done
+        lda     X16_P0                  ; the column phase: x & 7, fixed for
+        and     #7                      ; every row
+        sta     gp8_rot
+gp8_row:
+        lda     #VERA_INC_1
+        jsr     gfx_setptr
+        lda     X16_P2                  ; the pattern row: y & 7
+        and     #7
+        tay
+        lda     gp8_pat,y
+        ldy     gp8_rot                 ; pre-rotate to the column phase
+        beq     gp8_go
+gp8_pre:
+        asl     a
+        adc     #0                      ; circular left: bit 7 wraps to bit 0
+        dey
+        bne     gp8_pre
+gp8_go:
+        sta     gp8_cur
+        lda     X16_P4                  ; the width countdown, 16-bit
+        sta     gb_t
+        lda     X16_P5
+        sta     gb_t+1
+gp8_px:
+        lda     gp8_cur                 ; bit 7 = this pixel
+        bmi     gp8_fgpix
+        lda     gp8_bg
+        bra     gp8_out
+gp8_fgpix:
+        lda     gp8_fg
+gp8_out:
+        sta     VERA_DATA0
+        lda     gp8_cur                 ; rotate to the next column
+        asl     a
+        adc     #0
+        sta     gp8_cur
+        lda     gb_t                    ; width--
+        bne     gp8_nodec
+        dec     gb_t+1
+gp8_nodec:
+        dec     gb_t
+        lda     gb_t
+        ora     gb_t+1
+        bne     gp8_px
+        inc     X16_P2                  ; the next row
+        dec     X16_P6
+        bne     gp8_row
+gp8_done:
+        rts
+
+; ---------------------------------------------------------------------
+; gfx_blit -- rows of pixel bytes from RAM to the framebuffer
+;   in:  A = raster op: 0 copy, 1 OR, 2 AND, 3 XOR
+;        X16_P0/P1 = x, X16_P2 = y, X16_P4 = width in PIXELS (1-255),
+;        X16_P5 = height in rows, X16_P6/P7 = source (row-major)
+;
+; The source pointer is X16_PTR3 -- P6/P7 double as real zero page, the
+; 2bpp module's own trick. No clipping. P2 and P5 are consumed.
+;
+; The three RMW ops share one loop: the opcode of the instruction at
+; gb_opcode is patched from gb_optab (ora/and/eor abs), the gfx_text
+; trick one byte earlier.
+; ---------------------------------------------------------------------
+gfx_blit:
+        and     #3
+        sta     gb_op
+        beq     gb_row                  ; copy: no opcode to patch
+        tax
+        lda     gb_optab-1,x
+        sta     gb_opcode
+gb_row:
+        lda     #VERA_INC_1
+        jsr     gfx_setptr
+        lda     gb_op
+        beq     gb_copy
+        jsr     gfx_ld1                 ; the RMW ops read through port 1
+        ldy     #0
+gb_oploop:
+        lda     (X16_PTR3),y
+gb_opcode:
+        ora     VERA_DATA1              ; patched: op 1/2/3 = ora/and/eor
+        sta     VERA_DATA0
+        iny
+        cpy     X16_P4
+        bne     gb_oploop
+        bra     gb_next
+gb_copy:
+        ldy     #0
+gb_copyloop:
+        lda     (X16_PTR3),y
+        sta     VERA_DATA0
+        iny
+        cpy     X16_P4
+        bne     gb_copyloop
+gb_next:
+        clc                             ; the next source row
+        lda     X16_PTR3
+        adc     X16_P4
+        sta     X16_PTR3
+        bcc     gb_nocarry
+        inc     X16_PTR3+1
+gb_nocarry:
+        inc     X16_P2
+        dec     X16_P5
+        bne     gb_row
+        rts
+
+gb_optab: byte $0D, $2D, $4D           ; ora / and / eor absolute
+
+; ---------------------------------------------------------------------
+; gfx_blitm -- a masked blit: byte $00 is transparent
+;   in:  X16_P0/P1 = x, X16_P2 = y, X16_P4 = width in PIXELS (1-255),
+;        X16_P5 = height, X16_P6/P7 = source (row-major)
+;
+; At 8bpp the mask IS the data: colour 0 means "leave the screen alone"
+; (a read still advances the port, which is the whole trick). The 2bpp
+; module needs interleaved mask bytes; one byte per pixel does not.
+; P2 and P5 are consumed.
+; ---------------------------------------------------------------------
+gfx_blitm:
+gm_row:
+        lda     #VERA_INC_1
+        jsr     gfx_setptr
+        ldy     #0
+gm_px:
+        lda     (X16_PTR3),y
+        beq     gm_skip
+        sta     VERA_DATA0
+        bra     gm_next
+gm_skip:
+        lda     VERA_DATA0              ; advance without writing
+gm_next:
+        iny
+        cpy     X16_P4
+        bne     gm_px
+        clc
+        lda     X16_PTR3
+        adc     X16_P4
+        sta     X16_PTR3
+        bcc     gm_nocarry
+        inc     X16_PTR3+1
+gm_nocarry:
+        inc     X16_P2
+        dec     X16_P5
+        bne     gm_row
+        rts
+
+        section bss
+
+gp8_pat:  reserve 8
+gp8_bg:   reserve 1
+gp8_fg:   reserve 1
+gp8_rot:  reserve 1
+gp8_cur:  reserve 1
+gb_op:    reserve 1
+gb_t:     reserve 2
+
+        section text

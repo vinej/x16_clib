@@ -367,6 +367,94 @@ static void test_gfx_text_ptr_last(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* the 8bpp pattern and blit shims                                     */
+/* ------------------------------------------------------------------ */
+
+/* x16_gfx_pattern_set() is the only shim in the library that takes a
+** pointer FIRST and two plain bytes after it, and the two bytes are not
+** interchangeable: bg 0 and fg 5 read back differently whichever way
+** round they land. The x=2 fill then pins the phase, since patterns
+** anchor to the screen rather than to the rectangle.
+*/
+static const unsigned char g8_pat_half[8] = {
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0
+};
+
+static void test_g8_pattern(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 9; ++i) {
+        t_vpoke(0x55, PIXEL(i, 70));
+        t_vpoke(0x55, PIXEL(i + 2, 74));
+    }
+
+    x16_gfx_pattern_set(g8_pat_half, 0, 5);     /* bg 0, fg 5 */
+    x16_gfx_pattern_rect(0, 70, 8, 1);
+    x16_gfx_pattern_rect(2, 74, 8, 1);
+
+    t_check(vpeek(PIXEL(0, 70)) == 5 &&
+            vpeek(PIXEL(3, 70)) == 5 &&
+            vpeek(PIXEL(4, 70)) == 0 &&
+            vpeek(PIXEL(7, 70)) == 0 &&
+            vpeek(PIXEL(8, 70)) == 0x55 &&      /* stopped at the width */
+            vpeek(PIXEL(2, 74)) == 5 &&         /* phase 2 */
+            vpeek(PIXEL(4, 74)) == 0 &&
+            vpeek(PIXEL(8, 74)) == 5,
+            "ABI_GFX_PATTERN");
+}
+
+/* Six arguments -- two of them a 16-bit pair and a pointer -- which is
+** the widest shim in this module. The XOR pass proves `op` arrived: a
+** shim that dropped it would copy twice and leave the image standing.
+*/
+static const unsigned char g8_img[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+
+static void test_g8_blit(void)
+{
+    t_vpoke(0x00, PIXEL(8, 80));
+    t_vpoke(0x00, PIXEL(9, 80));
+    t_vpoke(0x00, PIXEL(8, 81));
+    t_vpoke(0x00, PIXEL(9, 81));
+
+    x16_gfx_blit(8, 80, 2, 2, g8_img, 0);       /* copy */
+    if (vpeek(PIXEL(8, 80)) != 0xDE || vpeek(PIXEL(9, 80)) != 0xAD ||
+        vpeek(PIXEL(8, 81)) != 0xBE || vpeek(PIXEL(9, 81)) != 0xEF) {
+        t_check(0, "ABI_GFX_BLIT");
+        return;
+    }
+
+    x16_gfx_blit(8, 80, 2, 2, g8_img, 3);       /* XOR it away again */
+    t_check(vpeek(PIXEL(8, 80)) == 0x00 &&
+            vpeek(PIXEL(9, 81)) == 0x00,
+            "ABI_GFX_BLIT");
+}
+
+/* The same placement without the trailing op, and the transparent
+** pixels are interleaved: a skip that fails to advance the port shifts
+** everything after the first hole, which the last byte catches.
+*/
+static const unsigned char g8_mask[4] = { 0x00, 0x07, 0x00, 0x09 };
+
+static void test_g8_blitm(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 5; ++i) {
+        t_vpoke(0xFF, PIXEL(12 + i, 90));
+    }
+
+    x16_gfx_blitm(12, 90, 4, 1, g8_mask);
+
+    t_check(vpeek(PIXEL(12, 90)) == 0xFF &&     /* transparent */
+            vpeek(PIXEL(13, 90)) == 0x07 &&
+            vpeek(PIXEL(14, 90)) == 0xFF &&     /* transparent */
+            vpeek(PIXEL(15, 90)) == 0x09 &&     /* NOT shifted left */
+            vpeek(PIXEL(16, 90)) == 0xFF,       /* one past the end */
+            "ABI_GFX_BLITM");
+}
+
+/* ------------------------------------------------------------------ */
 /* three pointers plus a byte                                          */
 /* ------------------------------------------------------------------ */
 
@@ -1039,6 +1127,9 @@ int main(void)
     test_sprite_image_argorder();
 
     test_gfx_text_ptr_last();
+    test_g8_pattern();
+    test_g8_blit();
+    test_g8_blitm();
     test_fx_triangle_3ptr();
     test_fx_copy_rc8();
 
