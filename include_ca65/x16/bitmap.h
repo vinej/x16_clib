@@ -73,4 +73,48 @@ void __fastcall__ x16_gfx_char (unsigned int x, unsigned char y,
 void __fastcall__ x16_gfx_text (unsigned int x, unsigned char y,
                                 unsigned char color, const char *s);
 
+/* =====================================================================
+** Patterns and blits -- the same surface x16/bitmap2.h has
+** =====================================================================
+** Two-way parity between the engines: a program can move between
+** 320x240x256 and 640x480x4 without losing a primitive. Two of these
+** differ from their 2bpp counterparts, and both differences come from
+** one byte being one pixel here rather than four.
+**
+** Neither blit clips; keep them on screen.
+** =====================================================================
+*/
+
+/* An 8x8 1bpp pattern (8 row bytes, bit 7 leftmost) cached for
+** x16_gfx_pattern_rect(). Background and foreground are whole bytes --
+** the 2bpp version packs two 2-bit colours into one argument, which
+** 8bpp colours do not fit in.
+**
+** Patterns anchor to the screen origin, so adjacent fills always knit
+** together.
+*/
+void __fastcall__ x16_gfx_pattern_set (const unsigned char *pattern,
+                                       unsigned char bg, unsigned char fg);
+
+void __fastcall__ x16_gfx_pattern_rect (unsigned int x, unsigned int y,
+                                        unsigned int w, unsigned int h);
+
+/* Copy a row-major image from RAM into the bitmap, one byte per pixel.
+** `w` is in PIXELS (1-255). op: 0 copy, 1 OR, 2 AND, 3 XOR.
+*/
+void __fastcall__ x16_gfx_blit (unsigned int x, unsigned int y,
+                                unsigned char w, unsigned char h,
+                                const unsigned char *src,
+                                unsigned char op);
+
+/* A masked blit: a source byte of 0 leaves the screen alone.
+**
+** At 8bpp the mask IS the data -- colour 0 means transparent -- so the
+** source is plain row-major pixels, where x16_gfx2_blitm() needs
+** interleaved (mask, data) pairs and pre-shifted columns.
+*/
+void __fastcall__ x16_gfx_blitm (unsigned int x, unsigned int y,
+                                 unsigned char w, unsigned char h,
+                                 const unsigned char *src);
+
 #endif /* X16_BITMAP_H */

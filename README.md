@@ -17,20 +17,20 @@ The same modules and the same API build under **cc65**, under
 any; they share no object code.
 
 ```
-include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      173 tests
-include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos   63 tests
-include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     138 tests
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   138 tests
-include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc       74 tests
+include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      192 tests
+include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos   72 tests
+include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     153 tests
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   153 tests
+include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc       78 tests
 examples/       doc/        emulator/      tools/             shared
 ```
 
 ```powershell
-.\build_ca65.ps1 -Test                 # cc65:     173/173
-.\build_llvm.ps1 -Test                 # llvm-mos:  63/63
-.\build_kickc.ps1 -Test                # KickC:    138/138
-.\build_oscar64.ps1 -Test              # Oscar64:  138/138
-.\build_vbcc.ps1  -Test -Source test_vbcc\runner.c   # vbcc: 74/74
+.\build_ca65.ps1 -Test                 # cc65:     192/192
+.\build_llvm.ps1 -Test                 # llvm-mos:  72/72
+.\build_kickc.ps1 -Test                # KickC:    153/153
+.\build_oscar64.ps1 -Test              # Oscar64:  153/153
+.\build_vbcc.ps1  -Test -Source test_vbcc\runner.c   # vbcc: 78/78
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
@@ -110,7 +110,7 @@ all**, and only enable-toggles for sprites and layers.
 | Header | Covers |
 |---|---|
 | `x16/vera.h` | VRAM data ports: fast fill, port-to-port copy, FX probe |
-| `x16/screen.h` | screen mode (including 320x240 bitmap), text, cursor |
+| `x16/screen.h` | screen mode (including 320x240 bitmap), text, cursor, and **direct text-map access: blits, fills and VRAM-side scrolling** |
 | `x16/palette.h` | 256 entries of 12-bit colour, single and bulk |
 | `x16/tile.h` | tilemap cells, layer config, 12-bit hardware scroll |
 | `x16/sprite.h` | all 128 hardware sprites |
@@ -126,7 +126,7 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/irq.h` | VSYNC frame counter, **raster interrupts, hardware sprite collision** |
 | `x16/bank.h` | banked RAM, boundary-crossing copies, **a whole-bank allocator** |
 | `x16/mem.h` | **KERNAL block ops: fill, copy, CRC-16, and LZSA2 depacking** |
-| `x16/load.h` | load and save, including straight into VRAM |
+| `x16/load.h` | load and save, including straight into VRAM, and **a PRG's SYS entry address without loading it** |
 | `x16/dos.h` | **the DOS command channel: status, delete, rename, mkdir, chdir** |
 | `x16/bmx.h` | **BMX, the X16's native bitmap file format** |
 | `x16/zx0.h` | **ZX0 depacking, tighter than LZSA2** |
@@ -460,14 +460,14 @@ next deep call; the wrapper copies it into yours before returning.
 ## Tests
 
 ```powershell
-.\build_ca65.ps1 -Test           # cc65, headless: 173 in a few seconds
-.\build_ca65.ps1 -Test -Windowed # ...with video: 165, one skip
-.\build_llvm.ps1 -Test           # llvm-mos: 46, all ABI-focused
-.\build_kickc.ps1 -Test          # KickC: 138, in four PRGs
-.\build_oscar64.ps1 -Test        # Oscar64: the same 138
+.\build_ca65.ps1 -Test           # cc65, headless: 192 in a few seconds
+.\build_ca65.ps1 -Test -Windowed # ...with video: 184, one skip
+.\build_llvm.ps1 -Test           # llvm-mos: 72, all ABI-focused
+.\build_kickc.ps1 -Test          # KickC: 153, in four PRGs
+.\build_oscar64.ps1 -Test        # Oscar64: the same 153
 ```
 
-**The suite is two programs.** All 30 library modules plus 170-odd test
+**The suite is two programs.** All 30 library modules plus 190-odd test
 functions no longer fit in the X16's 38.6 KB of program RAM — the code
 alone reaches 33 KB, leaving nothing for BSS. So `test_ca65/runner.c`
 compiles twice: `test_ca65/runner2.c` is three lines that set `SUITE` to 2 and

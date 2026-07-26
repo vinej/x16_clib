@@ -3825,6 +3825,102 @@ static void test_g2_blitm(void)
             "G2_BLITM");
 }
 
+/* ------------------------------------------------------------------ */
+/* 8bpp patterns and blits -- parity with the 2bpp engine              */
+/* ------------------------------------------------------------------ */
+
+/* Pattern $F0: the left four pixels of every 8-pixel cell are ink. At
+** 8bpp one bit becomes one whole byte, where the 2bpp engine packs four
+** pixels into one -- so the fill is checked pixel by pixel.
+**
+** The second fill starts at x=2, which is the point: patterns anchor to
+** the SCREEN, not to the rectangle, so the cell is pre-rotated by x & 7
+** and the run reads ink, ink, then four background, then ink again. A
+** version that started every rectangle at phase 0 would lay down four
+** ink pixels first and pass a test that only filled at x=0.
+*/
+static const unsigned char g8_pat_half[8] = {
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0
+};
+
+static void test_g8_pattern(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 9; ++i) {
+        vpoke(0x55, PIXEL(i, 70));
+        vpoke(0x55, PIXEL(i + 2, 74));
+    }
+
+    x16_gfx_pattern_set(g8_pat_half, 0, 5);     /* bg 0, fg 5 */
+    x16_gfx_pattern_rect(0, 70, 8, 1);
+    x16_gfx_pattern_rect(2, 74, 8, 1);
+
+    t_check(vpeek(PIXEL(0, 70)) == 5 &&         /* phase 0: 4 ink... */
+            vpeek(PIXEL(3, 70)) == 5 &&
+            vpeek(PIXEL(4, 70)) == 0 &&         /* ...then 4 background */
+            vpeek(PIXEL(7, 70)) == 0 &&
+            vpeek(PIXEL(8, 70)) == 0x55 &&      /* stopped at the width */
+            vpeek(PIXEL(2, 74)) == 5 &&         /* phase 2: 2 ink, */
+            vpeek(PIXEL(3, 74)) == 5 &&
+            vpeek(PIXEL(4, 74)) == 0 &&         /* 4 background, */
+            vpeek(PIXEL(7, 74)) == 0 &&
+            vpeek(PIXEL(8, 74)) == 5,           /* and ink again */
+            "GFX_PATTERN");
+}
+
+/* A 2x2 image copied in, then XORed with itself to leave zeros. The XOR
+** pass is what proves the read-modify-write path reads the SCREEN back
+** through port 1 rather than just writing again.
+*/
+static const unsigned char g8_img[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+
+static void test_g8_blit(void)
+{
+    vpoke(0x00, PIXEL(8, 80));
+    vpoke(0x00, PIXEL(9, 80));
+    vpoke(0x00, PIXEL(8, 81));
+    vpoke(0x00, PIXEL(9, 81));
+
+    x16_gfx_blit(8, 80, 2, 2, g8_img, 0);       /* copy */
+    if (vpeek(PIXEL(8, 80)) != 0xDE || vpeek(PIXEL(9, 80)) != 0xAD ||
+        vpeek(PIXEL(8, 81)) != 0xBE || vpeek(PIXEL(9, 81)) != 0xEF) {
+        t_check(0, "GFX_BLIT");
+        return;
+    }
+
+    x16_gfx_blit(8, 80, 2, 2, g8_img, 3);       /* XOR it away again */
+    t_check(vpeek(PIXEL(8, 80)) == 0x00 &&
+            vpeek(PIXEL(9, 81)) == 0x00,
+            "GFX_BLIT");
+}
+
+/* Masked: a source byte of 0 leaves the screen alone. The transparent
+** pixels here are INTERLEAVED with opaque ones, which is what makes this
+** able to fail -- skipping a pixel must still advance the VERA port, and
+** a version that simply skipped the store would shift every pixel after
+** the first hole one place left. The last byte catches exactly that.
+*/
+static const unsigned char g8_mask[4] = { 0x00, 0x07, 0x00, 0x09 };
+
+static void test_g8_blitm(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 5; ++i) {
+        vpoke(0xFF, PIXEL(12 + i, 90));
+    }
+
+    x16_gfx_blitm(12, 90, 4, 1, g8_mask);
+
+    t_check(vpeek(PIXEL(12, 90)) == 0xFF &&     /* transparent */
+            vpeek(PIXEL(13, 90)) == 0x07 &&
+            vpeek(PIXEL(14, 90)) == 0xFF &&     /* transparent */
+            vpeek(PIXEL(15, 90)) == 0x09 &&     /* NOT shifted left */
+            vpeek(PIXEL(16, 90)) == 0xFF,       /* one past the end */
+            "GFX_BLITM");
+}
+
 /* Exactly the 76,800 framebuffer bytes and not one more. */
 static void test_g2_clear(void)
 {
@@ -4248,6 +4344,9 @@ int main(void)
     test_g2_pattern();
     test_g2_blit();
     test_g2_blitm();
+    test_g8_pattern();
+    test_g8_blit();
+    test_g8_blitm();
     if (x16_vera_has_fx()) {
         test_g2_clear();
     } else {
