@@ -145,6 +145,70 @@ static void test_screen_get_cursor_both(void)
     t_check(row == 2 && col == 9 && row != col, "SCREEN_GET_CURSOR_BOTH");
 }
 
+/* The same two-pointer placement as get_cursor, but the answer comes from
+** SCREEN rather than PLOT. Checking two modes is what makes it able to
+** fail: a shim returning constants would satisfy either half alone. */
+static void test_screen_get_size(void)
+{
+    unsigned char c80 = 0, r60 = 0, c40 = 0, r30 = 0;
+
+    x16_screen_set_mode(0x00);                  /* 80x60 */
+    x16_screen_get_size(&c80, &r60);
+
+    x16_screen_set_mode(0x03);                  /* 40x30 */
+    x16_screen_get_size(&c40, &r30);
+
+    x16_screen_set_mode(0x00);
+
+    t_check(c80 == 80 && r60 == 60 && c40 == 40 && r30 == 30,
+            "SCREEN_GET_SIZE");
+}
+
+/* The default text map sits at $1B000, and 80x60 uses a 128-tile map
+** width, so a row is 256 bytes and a cell is two: screen code then
+** colour.
+**
+** x16_screen_addr() takes row in r0 and col in r1 and hands them to a
+** body wanting X and Y; the row and column here differ, and by enough
+** that a transposed pair lands on a different cell. x16_screen_blit()
+** then has to keep a pointer in a/x apart from two chars in r0/r1. */
+#define TEXTCELL(r, c)  (0x1B000UL + (unsigned long)(r) * 256 + (c) * 2)
+
+static void test_screen_addr_blit(void)
+{
+    static const char text[] = { 0x41, 0x42 };  /* PETSCII 'A', 'B' */
+
+    x16_screen_addr(2, 7);
+    x16_screen_blit(text, 2, X16_TEXT_COLOR(1, 6));
+
+    t_check(t_vpeek(TEXTCELL(2, 7))     == 0x01 &&      /* 'A' */
+            t_vpeek(TEXTCELL(2, 7) + 1) == 0x61 &&      /* fg 1, bg 6 */
+            t_vpeek(TEXTCELL(2, 8))     == 0x02 &&      /* 'B' */
+            t_vpeek(TEXTCELL(7, 2))     != 0x01,        /* NOT transposed */
+            "SCREEN_ADDR_BLIT");
+}
+
+/* Six chars, each pinned to its own register rather than spilled onto the
+** soft stack. The three rows carry distinct markers, so a scroll that
+** took the wrong distance or direction lands a different letter in the
+** top row rather than passing anyway. */
+static void test_screen_scroll(void)
+{
+    x16_screen_addr(20, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x41);         /* A */
+    x16_screen_addr(21, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x42);         /* B */
+    x16_screen_addr(22, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x43);         /* C */
+
+    x16_screen_scroll(20, 0, 3, 4, 1, 0);       /* up one row */
+
+    t_check(t_vpeek(TEXTCELL(20, 0)) == 0x02 &&
+            t_vpeek(TEXTCELL(21, 0)) == 0x03 &&
+            t_vpeek(TEXTCELL(22, 0)) == 0x03,   /* uncovered: unchanged */
+            "SCREEN_SCROLL");
+}
+
 /* Mode 0 is the default text mode and is always supported; $FF is not a
 ** mode at all. The routine answers 1 / 0, not the KERNAL's carry. */
 static void test_screen_mode(void)
@@ -1257,6 +1321,9 @@ int main(void)
     test_screen_color();
     test_screen_cursor_roundtrip();
     test_screen_get_cursor_both();
+    test_screen_get_size();
+    test_screen_addr_blit();
+    test_screen_scroll();
     test_screen_mode();
 
     test_rb_int_minus_one();

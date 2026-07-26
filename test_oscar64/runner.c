@@ -213,6 +213,126 @@ void test_set_mode_bad(void) {
             "SCREEN_SET_MODE_BAD");
 }
 
+/* x16_screen_get_size() reports the LIVE grid, so it has to follow a mode
+** change rather than answering 80x60 forever. Checking both modes is what
+** makes that real: constants would satisfy either half alone.
+*/
+void test_screen_get_size(void) {
+    unsigned char c80 = 0;
+    unsigned char r60 = 0;
+    unsigned char c40 = 0;
+    unsigned char r30 = 0;
+
+    x16_screen_set_mode(X16_MODE_80x60);
+    x16_screen_get_size(&c80, &r60);
+
+    x16_screen_set_mode(X16_MODE_40x30);
+    x16_screen_get_size(&c40, &r30);
+
+    x16_screen_set_mode(X16_MODE_80x60);        /* restore for what follows */
+
+    t_check((c80 == 80 && r60 == 60 && c40 == 40 && r30 == 30) ? 1 : 0,
+            "SCREEN_GET_SIZE");
+}
+
+/* ------------------------------------------------------------------ */
+/* direct text-map access                                              */
+/* ------------------------------------------------------------------ */
+
+/* The default text map sits at $1B000 -- bank 1, offset $B000 -- and
+** 80x60 uses a 128-tile map width, so a row is 256 bytes and a cell is
+** two: the character's screen code then its colour.
+**
+** Everything below writes through the library and reads back with
+** t_vpeek(), the independent path, so a wrong address calculation cannot
+** hide behind itself.
+*/
+#define TEXTOFF(r, c)   (0xB000 + (unsigned int)(r) * 256 + (c) * 2)
+
+/* PETSCII to screen code. $41 ('A') sits in the $40-$5F band that folds
+** down by $40, so it becomes $01; $20 (space) passes through unchanged.
+*/
+void test_screen_scode(void) {
+    t_check((x16_screen_scode(0x41) == 0x01 &&  /* 'A'  -> -$40 */
+             x16_screen_scode(0x20) == 0x20 &&  /* ' '  -> same */
+             x16_screen_scode(0x61) == 0x41 &&  /* $60-$7F -> -$20 */
+             x16_screen_scode(0x05) == 0x85) ? 1 : 0,   /* $00-$1F -> +$80 */
+            "SCREEN_SCODE");
+}
+
+/* addr + blit at a row and column neither of which is zero, and which
+** differ -- so a stride error, a column that was not doubled, or a
+** transposed pair all land somewhere other than the right cell.
+*/
+const char sc_text[2] = { 0x41, 0x42 };         /* PETSCII 'A', 'B' */
+
+void test_screen_blit(void) {
+    x16_screen_addr(2, 7);
+    x16_screen_blit(sc_text, 2, X16_TEXT_COLOR(1, 6));
+
+    t_check((t_vpeek(1, TEXTOFF(2, 7))     == 0x01 &&   /* 'A' */
+             t_vpeek(1, TEXTOFF(2, 7) + 1) == 0x61 &&   /* fg 1, bg 6 */
+             t_vpeek(1, TEXTOFF(2, 8))     == 0x02 &&   /* 'B', next cell */
+             t_vpeek(1, TEXTOFF(7, 2))     != 0x01) ? 1 : 0,  /* not transposed */
+            "SCREEN_BLIT");
+}
+
+/* blitfill repeats one character, and must fold it rather than writing
+** the raw PETSCII byte.
+*/
+void test_screen_blitfill(void) {
+    x16_screen_addr(4, 0);
+    x16_screen_blitfill(3, X16_TEXT_COLOR(2, 0), 0x41);
+
+    t_check((t_vpeek(1, TEXTOFF(4, 0))     == 0x01 &&
+             t_vpeek(1, TEXTOFF(4, 1))     == 0x01 &&
+             t_vpeek(1, TEXTOFF(4, 2))     == 0x01 &&
+             t_vpeek(1, TEXTOFF(4, 2) + 1) == 0x02 &&
+             t_vpeek(1, TEXTOFF(4, 3))     != 0x01) ? 1 : 0, /* stopped at count */
+            "SCREEN_BLITFILL");
+}
+
+/* Scroll three rows up by one. Distinct markers in every row are the
+** point: a wrong distance or direction lands a different letter in the
+** top row, and a copy that ran the wrong way would leave B in both.
+*/
+void test_screen_scroll(void) {
+    x16_screen_addr(10, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x41);         /* A */
+    x16_screen_addr(11, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x42);         /* B */
+    x16_screen_addr(12, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x43);         /* C */
+
+    x16_screen_scroll(10, 0, 3, 4, 1, 0);       /* up one row */
+
+    t_check((t_vpeek(1, TEXTOFF(10, 0)) == 0x02 &&
+             t_vpeek(1, TEXTOFF(11, 0)) == 0x03 &&
+             t_vpeek(1, TEXTOFF(12, 0)) == 0x03) ? 1 : 0,  /* uncovered */
+            "SCREEN_SCROLL");
+}
+
+/* A distance of zero, and one that would leave nothing, both mean "do
+** nothing" -- the caller repaints instead.
+*/
+void test_screen_scroll_noop(void) {
+    unsigned char zero_dist;
+    unsigned char too_far;
+
+    x16_screen_addr(14, 0);
+    x16_screen_blitfill(2, X16_TEXT_COLOR(1, 0), 0x41);         /* A */
+    x16_screen_addr(15, 0);
+    x16_screen_blitfill(2, X16_TEXT_COLOR(1, 0), 0x42);         /* B */
+
+    x16_screen_scroll(14, 0, 2, 2, 0, 0);       /* distance 0 */
+    zero_dist = t_vpeek(1, TEXTOFF(14, 0));
+    x16_screen_scroll(14, 0, 2, 2, 2, 0);       /* distance == height */
+    too_far = t_vpeek(1, TEXTOFF(14, 0));
+
+    t_check((zero_dist == 0x01 && too_far == 0x01) ? 1 : 0,
+            "SCREEN_SCROLL_NOOP");
+}
+
 /* Enter with ADDRSEL = 1, the state x16_vera_addr1() and
 ** x16_vera_copy() leave behind. The KERNAL's screen code writes VERA's
 ** address registers before selecting a port, so cls corrupts the
@@ -1065,6 +1185,12 @@ int main(void) {
     test_border();
     test_set_mode();
     test_set_mode_bad();
+    test_screen_get_size();
+    test_screen_scode();
+    test_screen_blit();
+    test_screen_blitfill();
+    test_screen_scroll();
+    test_screen_scroll_noop();
     test_cls_clears();
     test_color_reaches_vram();
 

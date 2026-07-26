@@ -500,6 +500,82 @@ static void test_fs_prg_entry(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* the text-map shims                                                  */
+/* ------------------------------------------------------------------ */
+
+/* The default text map sits at $1B000, and 80x60 uses a 128-tile map
+** width, so a row is 256 bytes and a cell is two: screen code then
+** colour.
+*/
+#define TEXTMAP         0x1B000UL
+#define TEXTCELL(r, c)  (TEXTMAP + (unsigned long)(r) * 256 + (c) * 2)
+
+/* x16_screen_addr() takes its two integers in A and X, and hands them to
+** an assembly routine that wants them in X and Y -- the other way round.
+** Getting that backwards writes at (col, row), so the row and column
+** here differ, and differ by enough that the transposed cell is a
+** different cell.
+**
+** x16_screen_blit() then has to move a POINTER out of __rc2/__rc3 while
+** leaving count in A and colour in X untouched.
+*/
+static void test_screen_addr_blit(void)
+{
+    static const char text[] = "AB";            /* ASCII here == PETSCII */
+
+    x16_screen_addr(2, 7);
+    x16_screen_blit(text, 2, X16_TEXT_COLOR(1, 6));
+
+    t_check(vpeek(TEXTCELL(2, 7))     == 0x01 &&        /* 'A' */
+            vpeek(TEXTCELL(2, 7) + 1) == 0x61 &&        /* fg 1, bg 6 */
+            vpeek(TEXTCELL(2, 8))     == 0x02 &&        /* 'B' */
+            vpeek(TEXTCELL(7, 2))     != 0x01,          /* NOT transposed */
+            "ABI_SCREEN_ADDR_BLIT");
+}
+
+/* Two pointer out-params, both in __rc pairs with nothing in A/X, and
+** the answer arriving in X and Y. Checking two modes is what makes it
+** able to fail: constants would satisfy either half alone.
+*/
+static void test_screen_get_size(void)
+{
+    unsigned char c80 = 0, r60 = 0, c40 = 0, r30 = 0;
+
+    x16_screen_set_mode(X16_MODE_80x60);
+    x16_screen_get_size(&c80, &r60);
+
+    x16_screen_set_mode(X16_MODE_40x30);
+    x16_screen_get_size(&c40, &r30);
+
+    x16_screen_set_mode(X16_MODE_80x60);
+
+    t_check(c80 == 80 && r60 == 60 && c40 == 40 && r30 == 30,
+            "ABI_SCREEN_GET_SIZE");
+}
+
+/* Six arguments -- A, X, then __rc2..__rc5 -- which is the widest shim
+** in the module. The three rows carry distinct markers, so a scroll that
+** took the wrong distance or direction lands a different letter in the
+** top row rather than passing anyway.
+*/
+static void test_screen_scroll(void)
+{
+    x16_screen_addr(20, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x41);         /* A */
+    x16_screen_addr(21, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x42);         /* B */
+    x16_screen_addr(22, 0);
+    x16_screen_blitfill(4, X16_TEXT_COLOR(1, 0), 0x43);         /* C */
+
+    x16_screen_scroll(20, 0, 3, 4, 1, 0);       /* up one row */
+
+    t_check(vpeek(TEXTCELL(20, 0)) == 0x02 &&
+            vpeek(TEXTCELL(21, 0)) == 0x03 &&
+            vpeek(TEXTCELL(22, 0)) == 0x03,     /* uncovered: unchanged */
+            "ABI_SCREEN_SCROLL");
+}
+
+/* ------------------------------------------------------------------ */
 /* struct block copies through a pointer                               */
 /* ------------------------------------------------------------------ */
 
@@ -969,6 +1045,9 @@ int main(void)
     test_fs_roundtrip_and_end();
     test_fs_load_null_end();
     test_fs_prg_entry();
+    test_screen_addr_blit();
+    test_screen_get_size();
+    test_screen_scroll();
 
     test_bmx_info_roundtrip();
     test_clip_argorder();

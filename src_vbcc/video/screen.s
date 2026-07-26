@@ -40,9 +40,14 @@
 ; own pointer scratch is X16_PTR2 (P4/P5), clear of vbcc's r-block.
         zpage	r0
         zpage	r1
+        zpage	r2
+        zpage	r3
+        zpage	r4
+        zpage	r5
 
         global	_x16_screen_set_mode
         global	_x16_screen_get_mode
+        global	_x16_screen_get_size
         global	_x16_screen_reset
         global	_x16_screen_cls
         global	_x16_screen_chrout
@@ -52,6 +57,12 @@
         global	_x16_screen_get_cursor
         global	_x16_screen_charset
         global	_x16_screen_puts
+        global	_x16_screen_addr
+        global	_x16_screen_addr1
+        global	_x16_screen_scode
+        global	_x16_screen_blit
+        global	_x16_screen_blitfill
+        global	_x16_screen_scroll
 
 ; Cross-module: gfx/bitmap.s switches to bitmap mode through this.
         global	screen_set_mode
@@ -92,6 +103,38 @@ screen_get_mode:
         vera_addrsel 0
         sec
         jmp     SCREEN_MODE
+
+; ---------------------------------------------------------------------
+; void x16_screen_get_size(__reg("a/x") unsigned char *cols,
+;                          __reg("r0/r1") unsigned char *rows)
+;   The LIVE text grid, after whatever x16_screen_set_mode() left behind
+;   -- not the 80x60 default.
+;
+; Two pointers, placed exactly as x16_screen_get_cursor's are. SCREEN
+; answers in X and Y, both of which the store loop needs, so stash them
+; before touching either.
+; ---------------------------------------------------------------------
+_x16_screen_get_size:
+        sta     X16_PTR2                ; cols* = a/x
+        stx     X16_PTR2+1
+        lda     r0
+        sta     X16_PTR3                ; rows* = r0/r1
+        lda     r1
+        sta     X16_PTR3+1
+
+        jsr     screen_get_size         ; X = columns, Y = rows
+        stx     X16_T3
+        sty     X16_T4
+
+        ldy     #0
+        lda     X16_T3
+        sta     (X16_PTR2),y
+        lda     X16_T4
+        sta     (X16_PTR3),y
+        rts
+
+screen_get_size:
+        jmp     SCREEN
 
 ; ---------------------------------------------------------------------
 ; void x16_screen_reset(void) -- restore the default text mode (CINT)
@@ -255,6 +298,365 @@ screen_puts:
         beq     .done
         jsr     CHROUT
         iny
+        bne     .loop
+.done:
+        rts
+
+; =====================================================================
+; Direct text-map access
+; =====================================================================
+; CHROUT costs several hundred cycles a character once the editor's
+; scroll checks, colour handling and cursor bookkeeping are paid for. A
+; program that repaints a whole text screen -- a spreadsheet, a file
+; browser, any full-screen TUI -- cannot afford that, so these write
+; VERA's tile map itself: screen_addr points port 0 at a cell with
+; auto-increment 1, and each following pair of bytes is one character
+; and its colour. The address walks the row on its own, so a whole line
+; costs one set-up and two stores per column.
+;
+; The KERNAL is not involved and neither is its cursor: these do not
+; scroll, do not wrap, and do not move the CHROUT cursor. Do not print
+; past the end of a row.
+;
+; Text is PETSCII on the way in -- the same bytes you would give CHROUT
+; -- and is folded to screen codes here, so the caller never has to know
+; the difference.
+;
+; The colour byte is foreground | background << 4, the same layout
+; x16_screen_color() builds.
+;
+; As everywhere else in this module, the arguments are pinned to single
+; registers with __reg() rather than left to vbcc's even-slot rule --
+; screen_scroll takes six chars, which would otherwise spill two of them
+; onto the C soft stack for no gain.
+; =====================================================================
+
+; ---------------------------------------------------------------------
+; void x16_screen_addr(__reg("r0") unsigned char row,
+;                      __reg("r1") unsigned char col)
+; void x16_screen_addr1(... the same ...)
+;   the body wants X = row, Y = column.
+; ---------------------------------------------------------------------
+_x16_screen_addr:
+        ldx     r0                      ; row
+        ldy     r1                      ; column
+        jmp     screen_addr
+
+_x16_screen_addr1:
+        ldx     r0
+        ldy     r1
+        jmp     screen_addr1
+
+; ---------------------------------------------------------------------
+; unsigned char x16_screen_scode(__reg("a") unsigned char petscii)
+;   the body wants A = the byte and hands one back in A: no shim beyond
+;   the int-promotion high byte.
+; ---------------------------------------------------------------------
+_x16_screen_scode:
+        jsr     screen_scode
+        ldx     #0                      ; high byte, for int-promoting callers
+        rts
+
+; ---------------------------------------------------------------------
+; void x16_screen_blit(__reg("a/x") const char *text,
+;                      __reg("r0") unsigned char count,
+;                      __reg("r1") unsigned char color)
+;   the body wants P0/P1 = source, A = count, X = colour.
+; ---------------------------------------------------------------------
+_x16_screen_blit:
+        sta     X16_P0                  ; source (a/x)
+        stx     X16_P1
+        ldx     r1                      ; colour
+        lda     r0                      ; count
+        jmp     screen_blit
+
+; ---------------------------------------------------------------------
+; void x16_screen_blitfill(__reg("r0") unsigned char count,
+;                          __reg("r1") unsigned char color,
+;                          __reg("r2") unsigned char ch)
+;   the body wants A = count, X = colour, Y = character.
+; ---------------------------------------------------------------------
+_x16_screen_blitfill:
+        ldy     r2                      ; character
+        ldx     r1                      ; colour
+        lda     r0                      ; count
+        jmp     screen_blitfill
+
+; ---------------------------------------------------------------------
+; void x16_screen_scroll(__reg("r0") unsigned char top,
+;                        __reg("r1") unsigned char left,
+;                        __reg("r2") unsigned char height,
+;                        __reg("r3") unsigned char width,
+;                        __reg("r4") unsigned char distance,
+;                        __reg("r5") unsigned char down)
+;   the body wants P0 = top, P1 = left, P2 = height, P3 = width,
+;   P4 = distance, A = direction.
+; ---------------------------------------------------------------------
+_x16_screen_scroll:
+        lda     r0
+        sta     X16_P0                  ; top
+        lda     r1
+        sta     X16_P1                  ; left
+        lda     r2
+        sta     X16_P2                  ; height
+        lda     r3
+        sta     X16_P3                  ; width
+        lda     r4
+        sta     X16_P4                  ; distance
+        lda     r5                      ; A = direction
+        jmp     screen_scroll
+
+; =====================================================================
+; Internal routines
+; =====================================================================
+
+; ---------------------------------------------------------------------
+; screen_addr -- point VERA port 0 at a character cell
+;   in:  X = row, Y = column
+;
+; Reads L1_MAPBASE and L1_CONFIG, so it follows whatever screen_set_mode
+; left behind rather than assuming the 80x60 default. Leaves ADDRSEL = 0
+; and the increment set to 1.
+; ---------------------------------------------------------------------
+screen_addr:
+        jsr     screen_addr_calc
+        vera_addrsel 0
+        jmp     screen_addr_store
+
+; ---------------------------------------------------------------------
+; screen_addr1 -- the same, for VERA port 1
+;   in:  X = row, Y = column
+;
+; Port 1 is what you point at the destination when moving text around
+; with vera_copy; screen_scroll below is the usual reason to want it.
+; ---------------------------------------------------------------------
+screen_addr1:
+        jsr     screen_addr_calc
+        vera_addrsel 1
+screen_addr_store:
+        lda     X16_T0
+        sta     VERA_ADDR_L
+        lda     X16_T1
+        sta     VERA_ADDR_M
+        lda     X16_T2
+        and     #VERA_ADDR_H_BANK       ; bit 16 of the address
+        ora     #$10                    ; increment 1
+        sta     VERA_ADDR_H
+        rts
+
+; address of (X = row, Y = column) into X16_T0/T1/T2, port untouched
+screen_addr_calc:
+        sty     X16_T5                  ; column
+        stx     X16_T6                  ; row
+
+        lda     VERA_L1_MAPBASE         ; map base = MAPBASE << 9
+        asl     a                       ; carry = bit 16
+        sta     X16_T1                  ; mid
+        lda     #0
+        rol     a
+        sta     X16_T2                  ; high
+        stz     X16_T0                  ; low
+
+        lda     VERA_L1_CONFIG          ; MAP_WIDTH: 0=32 1=64 2=128 3=256
+        lsr     a
+        lsr     a
+        lsr     a
+        lsr     a
+        and     #3
+        clc
+        adc     #6                      ; bytes per row = 2 << (5 + width)
+        tay
+
+        lda     X16_T6                  ; row << Y
+        sta     X16_T3
+        stz     X16_T4
+.shift:
+        asl     X16_T3
+        rol     X16_T4
+        dey
+        bne     .shift
+
+        clc                             ; base += row * stride
+        lda     X16_T0
+        adc     X16_T3
+        sta     X16_T0
+        lda     X16_T1
+        adc     X16_T4
+        sta     X16_T1
+        bcc     .nocarry1
+        inc     X16_T2
+.nocarry1:
+        lda     X16_T5                  ; base += column * 2
+        asl     a
+        tax
+        lda     #0
+        rol     a
+        tay
+        txa
+        clc
+        adc     X16_T0
+        sta     X16_T0
+        tya
+        adc     X16_T1
+        sta     X16_T1
+        bcc     .nocarry2
+        inc     X16_T2
+.nocarry2:
+        rts
+
+; ---------------------------------------------------------------------
+; screen_scode -- PETSCII to screen code
+;   in:  A = PETSCII, out: A = screen code
+;
+; The standard CBM folding.
+; ---------------------------------------------------------------------
+screen_scode:
+        cmp     #$20
+        bcc     .plus80                 ; $00-$1F
+        cmp     #$40
+        bcc     .same                   ; $20-$3F
+        cmp     #$60
+        bcc     .minus40                ; $40-$5F
+        cmp     #$80
+        bcc     .minus20                ; $60-$7F
+        cmp     #$A0
+        bcc     .plus40                 ; $80-$9F
+        cmp     #$C0
+        bcc     .minus40                ; $A0-$BF
+.minus80:                               ; $C0-$FF
+        sec
+        sbc     #$80
+.same:
+        rts
+.plus80:
+        clc
+        adc     #$80
+        rts
+.minus40:
+        sec
+        sbc     #$40
+        rts
+.minus20:
+        sec
+        sbc     #$20
+        rts
+.plus40:
+        clc
+        adc     #$40
+        rts
+
+; ---------------------------------------------------------------------
+; screen_blit -- write a run of characters, all one colour
+;   in:  X16_P0/P1 = source, A = count (1-255), X = colour byte
+; ---------------------------------------------------------------------
+screen_blit:
+        sta     X16_T7                  ; count
+        stx     X16_T3                  ; colour
+        ldy     #0
+.loop:
+        lda     (X16_P0),y
+        jsr     screen_scode
+        sta     VERA_DATA0
+        lda     X16_T3
+        sta     VERA_DATA0
+        iny
+        cpy     X16_T7
+        bne     .loop
+        rts
+
+; ---------------------------------------------------------------------
+; screen_blitfill -- write a run of one repeated character
+;   in:  A = count (1-255), X = colour byte, Y = character (PETSCII)
+; ---------------------------------------------------------------------
+screen_blitfill:
+        sta     X16_T7                  ; count
+        stx     X16_T3                  ; colour
+        tya
+        jsr     screen_scode
+        sta     X16_T4                  ; screen code, converted once
+        ldy     #0
+.loop:
+        lda     X16_T4
+        sta     VERA_DATA0
+        lda     X16_T3
+        sta     VERA_DATA0
+        iny
+        cpy     X16_T7
+        bne     .loop
+        rts
+
+; ---------------------------------------------------------------------
+; screen_scroll -- slide a rectangle of the text screen up or down
+;   in:  X16_P0 = top row of the region
+;        X16_P1 = left column
+;        X16_P2 = height, in rows
+;        X16_P3 = width, in columns
+;        X16_P4 = distance to move, in rows
+;        A      = 0 to move the picture up (toward row 0), 1 for down
+;
+; The point is not to save typing: a full-screen program that re-renders
+; its whole grid to scroll one line pays for every cell it draws, and for
+; a spreadsheet or a directory listing most of that cost is formatting
+; the contents, not the drawing. Moving the picture inside VRAM and
+; rendering only the row that appears costs one row instead of a
+; screenful, whatever the contents happen to be.
+;
+; Vertical only. Scrolling sideways would move a row onto itself, and
+; vera_copy walks forward, so the two would overlap.
+; ---------------------------------------------------------------------
+screen_scroll:
+        sta     X16_P7                  ; direction
+        lda     X16_P4
+        beq     .done                   ; nothing to do
+        cmp     X16_P2
+        bcs     .done                   ; nothing survives: caller repaints
+
+        sec
+        lda     X16_P2
+        sbc     X16_P4
+        sta     X16_P5                  ; rows to copy
+        stz     X16_P6                  ; index
+.loop:
+        lda     X16_P7
+        bne     .down
+        lda     X16_P0                  ; up: dst = top + i, src = dst + dist
+        clc
+        adc     X16_P6
+        sta     X16_T7
+        clc
+        adc     X16_P4
+        tax
+        bra     .move
+.down:
+        lda     X16_P0                  ; down: dst = bottom - i, src = dst - dist
+        clc
+        adc     X16_P2
+        sec
+        sbc     #1
+        sec
+        sbc     X16_P6
+        sta     X16_T7
+        sec
+        sbc     X16_P4
+        tax
+.move:
+        phx                             ; port 1 = destination
+        ldx     X16_T7
+        ldy     X16_P1
+        jsr     screen_addr1
+        plx                             ; port 0 = source
+        ldy     X16_P1
+        jsr     screen_addr
+        lda     X16_P3                  ; width in cells -> bytes
+        asl     a
+        tax
+        lda     #0
+        rol     a
+        tay
+        jsr     vera_copy
+        inc     X16_P6
+        lda     X16_P6
+        cmp     X16_P5
         bne     .loop
 .done:
         rts
