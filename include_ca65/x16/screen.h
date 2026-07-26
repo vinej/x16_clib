@@ -69,4 +69,77 @@ void __fastcall__ x16_screen_get_cursor (unsigned char *row, unsigned char *col)
 
 void __fastcall__ x16_screen_charset (unsigned char charset);
 
+/* The LIVE text grid, after whatever x16_screen_set_mode() left behind
+** -- not the 80x60 default.
+*/
+void __fastcall__ x16_screen_get_size (unsigned char *cols,
+                                       unsigned char *rows);
+
+/* =====================================================================
+** Direct text-map access
+** =====================================================================
+** CHROUT costs several hundred cycles a character once the editor's
+** scroll checks, colour handling and cursor bookkeeping are paid for. A
+** program that repaints a whole text screen -- a spreadsheet, a file
+** browser, any full-screen TUI -- cannot afford that, so these write
+** VERA's tile map itself:
+**
+**     x16_screen_addr(row, col);
+**     x16_screen_blit("READY.", 6, X16_TEXT_COLOR(1, 6));
+**
+** The address auto-increments, so a whole line costs one set-up and two
+** stores per column, and consecutive runs can be chained.
+**
+** The KERNAL is not involved and neither is its cursor: these do not
+** scroll, do not wrap, and do not move the CHROUT cursor. Do not print
+** past the end of a row.
+**
+** Text is PETSCII on the way in -- the same bytes you would give CHROUT
+** -- and is folded to screen codes for you.
+** =====================================================================
+*/
+
+/* The colour byte these take: foreground | background << 4, the same
+** layout x16_screen_color() builds.
+*/
+#define X16_TEXT_COLOR(fg, bg)  ((unsigned char)(((fg) & 0x0F) | ((bg) << 4)))
+
+/* Point VERA port 0 (or port 1) at a character cell. */
+void __fastcall__ x16_screen_addr (unsigned char row, unsigned char col);
+void __fastcall__ x16_screen_addr1 (unsigned char row, unsigned char col);
+
+/* PETSCII to screen code, for a caller building its own tile data. */
+unsigned char __fastcall__ x16_screen_scode (unsigned char petscii);
+
+/* Write a run of characters, all one colour, at the current port-0
+** address. Count is 1-255.
+*/
+void __fastcall__ x16_screen_blit (const char *text, unsigned char count,
+                                   unsigned char color);
+
+/* The same, with one repeated character: the usual way to blank part of
+** a line.
+*/
+void __fastcall__ x16_screen_blitfill (unsigned char count,
+                                       unsigned char color,
+                                       unsigned char ch);
+
+/* Slide a rectangle of the text screen up (down = 0) or down (down = 1)
+** by `distance` rows.
+**
+** Re-rendering a whole grid to scroll one line pays for every cell; for
+** a spreadsheet or a directory listing most of that cost is formatting
+** the contents, not drawing them. This moves the picture inside VRAM,
+** so only the row that appears has to be rendered.
+**
+** The rows uncovered at the trailing edge keep their old contents -- you
+** draw what belongs there. Nothing happens when `distance` is 0, or when
+** it is large enough that nothing would survive; repaint in that case.
+**
+** Vertical only: scrolling sideways would move a row onto itself.
+*/
+void __fastcall__ x16_screen_scroll (unsigned char top, unsigned char left,
+                                     unsigned char height, unsigned char width,
+                                     unsigned char distance, unsigned char down);
+
 #endif /* X16_SCREEN_H */

@@ -26,6 +26,9 @@
 ; sufficed; separate objects need a real export.
         .export         vera_fill
 
+; Cross-module: video/screen.s scrolls a text region with this.
+        .export         vera_copy
+
         .segment        "CODE"
 
 ; =====================================================================
