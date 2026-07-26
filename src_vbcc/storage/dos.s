@@ -53,6 +53,7 @@ CH_ZERO  = $30                          ; '0'
         global	_x16_dos_rename
 
 DOS_MSG_MAX = 64
+DOS_CMD_MAX = 80
 
         section text
 
@@ -295,6 +296,9 @@ dos_rename:
         sta     dos_cmdbuf+1
         ldx     #2
         jsr     append                  ; R:new
+        bcs     too_long
+        cpx     #DOS_CMD_MAX
+        bcs     too_long
         lda     #CH_EQ
         sta     dos_cmdbuf,x
         inx
@@ -302,6 +306,8 @@ dos_rename:
 .old:
         cpy     X16_P2
         beq     .send
+        cpx     #DOS_CMD_MAX
+        bcs     too_long
         lda     (X16_P0),y
         sta     dos_cmdbuf,x
         inx
@@ -320,6 +326,7 @@ stash_name:
 ; copy the stashed name into dos_cmdbuf at X, then send; X advances
 append_send:
         jsr     append
+        bcs     too_long
 send:
         txa
         tay                             ; Y = total command length
@@ -332,12 +339,26 @@ append:
 .cp:
         cpy     X16_T2
         beq     .done
+        cpx     #DOS_CMD_MAX
+        bcs     .too_long
         lda     (X16_T0),y
         sta     dos_cmdbuf,x
         inx
         iny
         bra     .cp
 .done:
+        clc
+        rts
+.too_long:
+        sec
+        rts
+
+; local construction failure: no command was sent
+too_long:
+        stz     dos_msg
+        ldy     #0
+        lda     #$FF
+        sec
         rts
 
 ; The device has a nonzero default, so it lives in DATA rather than BSS.
@@ -348,4 +369,4 @@ dos_device: byte 8
         section bss
 
 dos_msg:    reserve DOS_MSG_MAX
-dos_cmdbuf: reserve 80
+dos_cmdbuf: reserve DOS_CMD_MAX

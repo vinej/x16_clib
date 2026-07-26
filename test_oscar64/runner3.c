@@ -471,6 +471,52 @@ void test_dos_rename(void) {
             "DOS_RENAME");
 }
 
+/* A name longer than the 80-byte command buffer used to be copied in
+** anyway, over whatever followed it, and the mangled command went to the
+** drive regardless. Both routes that build a command are now bounded, and
+** an overlong one is abandoned locally: nothing is sent, so the answer is
+** X16_DOS_NO_CHANNEL and the message is empty.
+**
+** Asserting that exact pair is what makes these able to fail. Without the
+** guard the drive DOES answer -- with 30, SYNTAX ERROR or 33 -- so a test
+** that merely demanded "an error" would pass over the bug it exists for.
+*/
+char dos_long[90];
+
+void dos_fill_long(void) {
+    unsigned char i;
+    for (i = 0; i < 90; i++) {
+        dos_long[i] = 'X';
+    }
+}
+
+void test_dos_rename_too_long(void) {
+    unsigned char code;
+    const char *msg;
+
+    dos_fill_long();
+    code = x16_dos_rename(dos_old, 10, dos_long, 90);
+    msg = x16_dos_msg();
+
+    t_check((code == X16_DOS_NO_CHANNEL && msg[0] == 0) ? 1 : 0,
+            "DOS_RENAME_TOO_LONG");
+}
+
+/* The same bound, reached down the other path: delete/mkdir/rmdir/chdir
+** all append one name after a two- or three-byte prefix.
+*/
+void test_dos_delete_too_long(void) {
+    unsigned char code;
+    const char *msg;
+
+    dos_fill_long();
+    code = x16_dos_delete(dos_long, 90);
+    msg = x16_dos_msg();
+
+    t_check((code == X16_DOS_NO_CHANNEL && msg[0] == 0) ? 1 : 0,
+            "DOS_DELETE_TOO_LONG");
+}
+
 /* ------------------------------------------------------------------ */
 /* BMX                                                                 */
 /* ------------------------------------------------------------------ */
@@ -735,6 +781,8 @@ int main(void) {
     test_dos_delete_missing();
     test_dos_delete();
     test_dos_rename();
+    test_dos_rename_too_long();
+    test_dos_delete_too_long();
 
     test_bmx_roundtrip();
     test_bmx_bad_format();

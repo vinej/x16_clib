@@ -21,6 +21,17 @@ __mem volatile char x16__dos_t;
 __mem char x16__dos_msg[64];
 __mem char x16__dos_buf[80];
 
+// The command buffer is the hard limit on a constructed command. A name
+// long enough to run past it used to be written anyway, over whatever
+// followed; now the command is abandoned and nothing is sent.
+#define X16__DOS_CMD_MAX 80
+
+// Construction failed locally: no command reached the drive.
+unsigned char x16__dos_too_long(void) {
+    x16__dos_msg[0] = 0;
+    return 0xFF;
+}
+
 void x16_dos_set_device(__mem unsigned char device) {
     x16__dos_device = device;
 }
@@ -113,6 +124,9 @@ unsigned char x16_dos_status(void) {
 unsigned char x16__dos_name_cmd(const char *name, unsigned char len,
                                 unsigned char at) {
     unsigned char i;
+    if (len > (unsigned char)(X16__DOS_CMD_MAX - at)) {
+        return x16__dos_too_long();
+    }
     for (i = 0; i < len; i++) {
         x16__dos_buf[at + i] = name[i];
     }
@@ -155,6 +169,14 @@ unsigned char x16_dos_rename(const char *oldname, unsigned char oldlen,
                              const char *newname, unsigned char newlen) {
     unsigned char i;
     unsigned char at;
+
+    // "R:" + new + "=" + old must fit: 3 fixed bytes plus both names.
+    if (newlen > (unsigned char)(X16__DOS_CMD_MAX - 3)) {
+        return x16__dos_too_long();
+    }
+    if (oldlen > (unsigned char)(X16__DOS_CMD_MAX - 3 - newlen)) {
+        return x16__dos_too_long();
+    }
 
     x16__dos_buf[0] = 0x52;             // 'R'
     x16__dos_buf[1] = 0x3A;             // ':'
