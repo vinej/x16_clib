@@ -743,6 +743,35 @@ static void test_fs_load_null_end(void)
             "FS_LOAD_NULL_END");
 }
 
+/* x16_fs_prg_entry() is the module's only 16-bit return: name in r0/r1,
+** len in r2, device in r4, answer back in A/X low byte first.
+**
+** 2061 is $080D, so the two halves differ and a shim that returns them
+** the other way round lands on 3336 rather than passing anyway. The stub
+** is written here rather than committed: fs_save puts the buffer's own
+** address in the first two bytes, which is exactly where a PRG's load
+** address lives, and the routine skips those without looking.
+*/
+static void test_fs_prg_entry(void)
+{
+    static const char name[] = "ABISTUB.PRG";
+    static unsigned char stub[] = {
+        0x0B, 0x08,             /* link to the next BASIC line */
+        0x13, 0x02,             /* line number 531 */
+        0x9E,                   /* SYS */
+        0x32, 0x30, 0x36, 0x31, /* "2061" */
+        0x00                    /* end of line */
+    };
+    unsigned int entry;
+
+    x16_fs_save(name, sizeof name - 1, X16_DEVICE_SD,
+                stub, stub + sizeof stub);
+    entry = x16_fs_prg_entry(name, sizeof name - 1, X16_DEVICE_SD);
+    x16_dos_delete(name, sizeof name - 1);
+
+    t_check(entry == 2061, "FS_PRG_ENTRY");
+}
+
 /* ------------------------------------------------------------------ */
 /* bmx: struct block copy through a pointer                             */
 /* ------------------------------------------------------------------ */
@@ -1279,6 +1308,7 @@ int main(void)
     test_dos_msg_ptr_return();
     test_fs_roundtrip_and_end();
     test_fs_load_null_end();
+    test_fs_prg_entry();
     test_bmx_info_roundtrip();
 
     test_fx_mult();

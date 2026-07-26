@@ -138,3 +138,135 @@ unsigned char x16_fs_vload(const char *name, unsigned char len,
         sta accu
     };
 }
+
+// ---------------------------------------------------------------------
+// The SYS address out of a PRG's BASIC stub, read without loading the
+// file. A launcher has to know where to JSR before it hands the machine
+// over, and loading the file to find out is the one thing it cannot do:
+// the load would overwrite the launcher asking the question. So this
+// reads the first few bytes off the disk and parses the stub in place:
+//
+//   two load-address bytes, two link bytes, two line-number bytes,
+//   the SYS token ($9E), any spaces, then the address in ASCII.
+//
+// The address is read rather than assumed -- a compiler emitting
+// "SYS 2071" today moves that number the moment the stub text changes.
+// 0 doubles as "no entry here", since no PRG can start there.
+//
+// Uses logical file 1, as x16_fs_load does, on secondary address 2 so
+// the bytes arrive raw rather than as a program to relocate.
+//
+// Oscar64's inline assembler is NMOS-only, so the result is zeroed with
+// lda #0 / sta rather than stz, and pe_quit jumps past pe_getb.
+// ---------------------------------------------------------------------
+volatile char x16__pe_lo;               // the result, built a digit at a time
+volatile char x16__pe_hi;
+volatile char x16__pe_a;                // *10 scratch: the old low byte
+volatile char x16__pe_b;                // ...and the old high byte
+volatile char x16__pe_d;                // the digit being added
+volatile char x16__pe_c;                // bytes left to skip
+volatile char x16__pe_g;                // the byte pe_getb read
+
+unsigned int x16_fs_prg_entry(const char *name, unsigned char len,
+                              unsigned char device) {
+    return __asm {
+        lda #0
+        sta x16__pe_lo
+        sta x16__pe_hi
+        lda len
+        ldx name
+        ldy name+1
+        jsr 0xffbd                      /* SETNAM */
+        lda #1                          /* logical file */
+        ldx device
+        ldy #2                          /* a plain data channel */
+        jsr 0xffba                      /* SETLFS */
+        jsr 0xffc0                      /* OPEN */
+        bcs pe_quit
+        ldx #1
+        jsr 0xffc6                      /* CHKIN */
+        bcs pe_quit
+
+        lda #6                          /* load address, link, line number */
+        sta x16__pe_c           /* CHRIN may clobber Y, so not there */
+    pe_skip:
+        jsr pe_getb
+        bcs pe_quit
+        dec x16__pe_c
+        bne pe_skip
+
+        jsr pe_getb                     /* the SYS token */
+        bcs pe_quit
+        cmp #0x9e
+        bne pe_quit
+    pe_space:
+        jsr pe_getb
+        bcs pe_quit
+        cmp #0x20
+        beq pe_space
+                                /* A = the first character after them */
+    pe_digit:
+        cmp #0x30               /* a non-digit ends the number, and */
+        bcc pe_quit             /* ending it before it starts leaves 0 */
+        cmp #0x3a
+        bcs pe_quit
+
+        sec
+        sbc #0x30
+        sta x16__pe_d
+
+        lda x16__pe_lo                  /* res = res * 10 + digit, */
+        sta x16__pe_a           /* taking *10 as ((r * 4) + r) * 2 */
+        lda x16__pe_hi
+        sta x16__pe_b
+        asl x16__pe_lo
+        rol x16__pe_hi
+        asl x16__pe_lo
+        rol x16__pe_hi
+        clc
+        lda x16__pe_lo
+        adc x16__pe_a
+        sta x16__pe_lo
+        lda x16__pe_hi
+        adc x16__pe_b
+        sta x16__pe_hi
+        asl x16__pe_lo
+        rol x16__pe_hi
+        clc
+        lda x16__pe_lo
+        adc x16__pe_d
+        sta x16__pe_lo
+        lda x16__pe_hi
+        adc #0
+        sta x16__pe_hi
+
+        jsr pe_getb
+        bcc pe_digit            /* ran out of file: keep what we have */
+
+    pe_quit:
+        jsr 0xffcc                      /* CLRCHN */
+        lda #1
+        jsr 0xffc3                      /* CLOSE */
+        jmp pe_done                     /* do not fall into pe_getb */
+
+        /* one byte from the open channel; carry set if the file ended */
+    pe_getb:
+        jsr 0xffcf                      /* CHRIN */
+        sta x16__pe_g
+        jsr 0xffb7                      /* READST */
+        cmp #0
+        bne pe_getb_end
+        lda x16__pe_g
+        clc
+        rts
+    pe_getb_end:
+        sec
+        rts
+
+    pe_done:
+        lda x16__pe_lo
+        sta accu
+        lda x16__pe_hi
+        sta accu+1
+    };
+}

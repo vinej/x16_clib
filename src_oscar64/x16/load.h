@@ -66,6 +66,19 @@ unsigned char x16_fs_vload (const char *name, unsigned char len,
 /* KERNAL SETNAM, for driving OPEN and friends yourself. */
 void x16_fs_setname (const char *name, unsigned char len);
 
+/* The SYS address out of a PRG's BASIC stub, read WITHOUT loading it.
+**
+** A launcher needs the entry address before it hands the machine over,
+** and loading the file to find out is the one thing it cannot do -- the
+** load would overwrite the launcher asking the question. This opens the
+** file, parses the stub where it lies, and closes it again.
+**
+** Returns 0 if the file cannot be read or does not begin with a stub;
+** no PRG can start at 0, so that doubles as "no entry here".
+*/
+unsigned int x16_fs_prg_entry (const char *name, unsigned char len,
+                               unsigned char device);
+
 /* pulls the implementation in with this header */
 #pragma compile("load.c")
 

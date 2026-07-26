@@ -2420,6 +2420,55 @@ static void test_fs_vload(void)
             "FS_VLOAD");
 }
 
+/* x16_fs_prg_entry() reads the SYS address out of a PRG's BASIC stub
+** without loading the file.
+**
+** The file is built here rather than committed, so the number being
+** parsed is one this test chose. fs_save writes the buffer's own address
+** as the 2-byte load-address header, which is exactly what the stub's
+** first two bytes are -- and the routine skips them without looking, so
+** any address serves. What follows is a real stub: a link word, a line
+** number, the SYS token, the digits, and the terminating zero.
+**
+** 2061 is written as its digit bytes: cc65's cx16 charmap leaves digits
+** alone, but these end up on a disk, so they are spelled out.
+*/
+static void test_fs_prg_entry(void)
+{
+    static const char name[] = "PRGSTUB.PRG";
+    static unsigned char stub[] = {
+        0x0B, 0x08,             /* link to the next BASIC line */
+        0x13, 0x02,             /* line number 531 */
+        0x9E,                   /* SYS */
+        0x32, 0x30, 0x36, 0x31, /* "2061" */
+        0x00                    /* end of line */
+    };
+    unsigned int entry;
+
+    x16_fs_save(name, sizeof name - 1, X16_DEVICE_SD,
+                stub, stub + sizeof stub);
+    entry = x16_fs_prg_entry(name, sizeof name - 1, X16_DEVICE_SD);
+    x16_dos_delete(name, sizeof name - 1);
+
+    t_check(entry == 2061, "FS_PRG_ENTRY");
+}
+
+/* Two ways there is no answer, both of which must read back as 0 rather
+** than as whatever the parse happened to accumulate: a file that is not
+** there at all, and one whose first bytes are not a BASIC stub.
+** TESTDATA.BIN is 16 bytes of data, so the byte where the SYS token
+** would be is not $9E.
+*/
+static void test_fs_prg_entry_none(void)
+{
+    static const char missing[] = "NOSUCH.PRG";
+    static const char data[] = "TESTDATA.BIN";
+
+    t_check(x16_fs_prg_entry(missing, sizeof missing - 1, X16_DEVICE_SD) == 0 &&
+            x16_fs_prg_entry(data, sizeof data - 1, X16_DEVICE_SD) == 0,
+            "FS_PRG_ENTRY_NONE");
+}
+
 #if SUITE == 2
 
 /* ------------------------------------------------------------------ */
@@ -3933,6 +3982,8 @@ int main(void)
     test_fs_load_null_end();
     test_fs_load_missing();
     test_fs_vload();
+    test_fs_prg_entry();
+    test_fs_prg_entry_none();
 
     test_f_roundtrip();
     test_f_neg();

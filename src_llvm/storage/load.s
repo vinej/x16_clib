@@ -39,6 +39,15 @@
         .globl  x16_fs_load
         .globl  x16_fs_save
         .globl  x16_fs_vload
+        .globl  x16_fs_prg_entry
+
+; The bytes fs_prg_entry compares come off a disk, so they are written as
+; their values rather than as character literals -- the same rule
+; storage/dos.s follows.
+CH_SPACE = $20
+CH_ZERO  = $30                          ; '0'
+CH_NINE1 = $3A                          ; one past '9'
+TOK_SYS  = $9E                          ; BASIC's SYS token
 
         .section .text,"ax",@progbits
 
@@ -181,6 +190,29 @@ x16_fs_vload:
 .Lx16_fs_vload_failed:
         rts
 
+; ---------------------------------------------------------------------
+; unsigned int __fastcall__ x16_fs_prg_entry(const char *name,
+;                                            unsigned char len,
+;                                            unsigned char device)
+;   The SYS address out of a PRG's BASIC stub, read without loading the
+;   file. 0 means the file could not be read or does not begin with one.
+; ---------------------------------------------------------------------
+; name -> __rc2/__rc3, len -> A, device -> X. A 16-bit return goes back
+; in A/X, low byte first, as x16_key_peek does.
+x16_fs_prg_entry:
+        sta     X16_P2                  ; name length
+        stx     X16_P3                  ; device
+        lda     __rc2
+        sta     X16_P0                  ; name
+        lda     __rc3
+        sta     X16_P1
+
+        jsr     fs_prg_entry            ; X = low, Y = high
+        phy
+        txa                             ; A = low
+        plx                             ; X = high
+        rts
+
 ; =====================================================================
 ; Internal routines
 ; =====================================================================
@@ -274,3 +306,122 @@ fs_vload:
         adc     #2                      ; LOAD A: bank 0 -> 2, bank 1 -> 3
         stz     X16_P4                  ; SETLFS SA = 0 (does not disturb A)
         bra     load_common
+
+; ---------------------------------------------------------------------
+; fs_prg_entry -- a PRG's entry address, read without loading the file
+;   in:  X16_P0/P1 = filename address
+;        X16_P2    = filename length
+;        X16_P3    = device (usually 8)
+;   out: X/Y = the SYS address out of the file's BASIC stub, or $0000 if
+;        the file cannot be read or does not begin with one
+;
+; A launcher has to know where to JSR before it hands the machine over,
+; and loading the file to find out is the one thing it cannot do: the
+; load would overwrite the launcher asking the question. So this reads
+; the first few bytes off the disk and parses the stub where it lies:
+;
+;   two load-address bytes, two link bytes, two line-number bytes,
+;   the SYS token ($9E), any spaces, then the address in ASCII.
+;
+; The address is read rather than assumed -- a compiler emitting
+; "SYS 2071" today moves that number the moment the stub text changes.
+; $0000 doubles as "no entry here", since no PRG can start there.
+;
+; Uses logical file 1, as fs_load does, on secondary address 2 so the
+; bytes arrive raw rather than being treated as a program to relocate.
+; ---------------------------------------------------------------------
+FS_PRG_SKIP = 6                         ; load address, link, line number
+
+fs_prg_entry:
+        stz     X16_T0                  ; the result, built a digit at a time
+        stz     X16_T1
+
+        lda     X16_P2
+        jsr     fs_setname
+        lda     #1                      ; logical file
+        ldx     X16_P3                  ; device
+        ldy     #2                      ; a plain data channel
+        jsr     SETLFS
+        jsr     OPEN
+        bcs     prg_quit
+        ldx     #1
+        jsr     CHKIN
+        bcs     prg_quit
+
+        lda     #FS_PRG_SKIP            ; CHRIN is free to clobber Y, so the
+        sta     X16_T6                  ; count cannot live there
+.Lfs_prg_entry_skip:
+        jsr     prg_getb
+        bcs     prg_quit
+        dec     X16_T6
+        bne     .Lfs_prg_entry_skip
+
+        jsr     prg_getb                ; the SYS token
+        bcs     prg_quit
+        cmp     #TOK_SYS
+        bne     prg_quit
+.Lfs_prg_entry_space:
+        jsr     prg_getb
+        bcs     prg_quit
+        cmp     #CH_SPACE
+        beq     .Lfs_prg_entry_space
+                                        ; A = the first character after them
+.Lfs_prg_entry_digit:
+        cmp     #CH_ZERO
+        bcc     prg_quit                ; a non-digit ends the number, and
+        cmp     #CH_NINE1               ; ending it before it starts leaves 0
+        bcs     prg_quit
+
+        sec
+        sbc     #CH_ZERO
+        sta     X16_T2
+
+        lda     X16_T0                  ; result = result * 10 + digit,
+        sta     X16_T3                  ; taking *10 as ((r * 4) + r) * 2
+        lda     X16_T1
+        sta     X16_T4
+        asl     X16_T0
+        rol     X16_T1
+        asl     X16_T0
+        rol     X16_T1
+        clc
+        lda     X16_T0
+        adc     X16_T3
+        sta     X16_T0
+        lda     X16_T1
+        adc     X16_T4
+        sta     X16_T1
+        asl     X16_T0
+        rol     X16_T1
+        clc
+        lda     X16_T0
+        adc     X16_T2
+        sta     X16_T0
+        lda     X16_T1
+        adc     #0
+        sta     X16_T1
+
+        jsr     prg_getb
+        bcc     .Lfs_prg_entry_digit    ; ran out of file: keep what we have
+
+prg_quit:
+        jsr     CLRCHN
+        lda     #1
+        jsr     CLOSE
+        ldx     X16_T0
+        ldy     X16_T1
+        rts
+
+; one byte from the open channel; carry set if the file ended first
+prg_getb:
+        jsr     CHRIN
+        sta     X16_T5
+        jsr     READST
+        cmp     #0
+        bne     .Lprg_getb_end
+        lda     X16_T5
+        clc
+        rts
+.Lprg_getb_end:
+        sec
+        rts

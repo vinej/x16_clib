@@ -402,6 +402,44 @@ void test_fs_vload(void) {
             "FS_VLOAD");
 }
 
+/* x16_fs_prg_entry() reads the SYS address out of a PRG's BASIC stub
+** without loading the file.
+**
+** The stub is written here rather than committed: fs_save puts the
+** buffer's own address in the first two bytes, which is exactly where a
+** PRG's load address lives, and the routine skips those without looking.
+** What follows is a real stub -- link word, line number, SYS token, the
+** digits, and the terminating zero.
+*/
+const char prg_name[] = "PRGSTUB.PRG";
+unsigned char prg_stub[10] = {
+    0x0B, 0x08,             /* link to the next BASIC line */
+    0x13, 0x02,             /* line number 531 */
+    0x9E,                   /* SYS */
+    0x32, 0x30, 0x36, 0x31, /* "2061" */
+    0x00                    /* end of line */
+};
+
+void test_fs_prg_entry(void) {
+    unsigned int entry;
+
+    x16_fs_save(prg_name, 11, X16_DEVICE_SD, prg_stub, prg_stub + 10);
+    entry = x16_fs_prg_entry(prg_name, 11, X16_DEVICE_SD);
+    x16_dos_delete(prg_name, 11);
+
+    t_check((entry == 2061) ? 1 : 0, "FS_PRG_ENTRY");
+}
+
+/* Two ways there is no answer, both of which must read back as 0 rather
+** than as whatever the parse happened to accumulate: a file that is not
+** there at all, and one whose first bytes are not a BASIC stub.
+*/
+void test_fs_prg_entry_none(void) {
+    t_check((x16_fs_prg_entry(fs_missing, 10, X16_DEVICE_SD) == 0 &&
+             x16_fs_prg_entry(fs_name, 12, X16_DEVICE_SD) == 0) ? 1 : 0,
+            "FS_PRG_ENTRY_NONE");
+}
+
 /* ------------------------------------------------------------------ */
 /* the DOS command channel                                             */
 /* ------------------------------------------------------------------ */
@@ -770,6 +808,8 @@ void main(void) {
     test_fs_roundtrip();
     test_fs_load_missing();
     test_fs_vload();
+    test_fs_prg_entry();
+    test_fs_prg_entry_none();
 
     test_dos_status();
     test_dos_delete_missing();
