@@ -116,6 +116,10 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/sprite.h` | all 128 hardware sprites |
 | `x16/bitmap8l.h` | 320x240x256 pset, lines, rects, Bresenham, glyphs and text |
 | `x16/bitmap2h.h` | **640x480x4 (2bpp)**: pset, read, spans, rects, Bresenham, screen-anchored patterns, raster-op blits, masked pre-shifted blits |
+| `x16/bitmap2l.h` | **320x240x4 (2bpp)**: the low-res twin of bitmap2h, same primitives, FX-accelerated clear |
+| `x16/bitmap4l.h` | **320x240x16 (4bpp)**: pset, read, spans, rects, Bresenham, glyphs and text, patterns, raster-op and masked blits |
+| `x16/bitmap4h.h` | **VERA_2 640x480x16**: the MiSTer SDRAM bitmap layer at 4bpp -- feature-detected, own palette, hardware SDRAM copy |
+| `x16/bitmap8h.h` | **VERA_2 640x480x256**: the MiSTer SDRAM bitmap layer at 8bpp -- feature-detected, own palette, hardware SDRAM copy |
 | `x16/shapes.h` | **circles, discs, ellipses, flood fill, regular polygons, rounded rectangles, arcs, pie wedges and cubic Beziers for BOTH bitmap modes** from one implementation: `x16_gfx8l_*` on the 8bpp plane, `x16_gfx2h_*` on the 2bpp plane |
 | `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines, filled triangles, blits, transparency** |
 | `x16/psg.h` | the 16-voice PSG, and **ASR envelopes** |
@@ -136,6 +140,28 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/clip.h` | **Cohen-Sutherland line clipping** |
 | `x16/buffers.h` | **a ring buffer and a stack** |
 | `x16/float.h` | a binding to the ROM's floating point library |
+| `x16/verafx_utils.h` | **the raw VERA FX register knobs**, for composing your own FX workflow |
+| `x16/string.h` | **NUL-terminated strings: copy, append, compare, hash, PETSCII and ISO case folding, ten `ctype` predicates, find/rfind, `*`/`?` pattern matching, slices and trims, and a pointer-array sort** |
+| `x16/sort.h` | **typed insertion sorts (u8/s8/u16/s16) and a comparator-callback sort** |
+| `x16/bcd.h` | **packed-BCD add and subtract at 8, 16 and 32 bits** |
+| `x16/bits.h` | masked bit set/clear/put/test, nibble helpers |
+| `x16/number.h` | **decimal, hex and binary rendering, and decimal parsing** |
+| `x16/tscrunch.h` | **TSCrunch depacking, faster than ZX0** |
+| `x16/fileio.h` | **the KERNAL channel verbs: OPEN through CLOSE, plus named-open conveniences** |
+| `x16/iec.h` | **raw IEC bus control: LISTEN/TALK, channels, and the block movers** |
+| `x16/dir.h` | **walk a device directory entry by entry** |
+| `x16/ringbuffer.h` | **an 8 KB FIFO living in a HIRAM bank** |
+| `x16/stack.h` | **an 8 KB LIFO living in a HIRAM bank** |
+| `x16/keyboard.h` | **keyboard buffer injection, modifiers, keymap get/set** |
+| `x16/mouse.h` | **raw mouse config, scan, and the wheel** |
+| `x16/clock.h` | **the jiffy timer and the RTC's date and time** |
+| `x16/i2c.h` | **the I2C bus: the SMC and the RTC's NVRAM** |
+| `x16/graph.h` | **the KERNAL GRAPH API: lines, rects, ovals, images, fonts** |
+| `x16/fb.h` | **the KERNAL framebuffer driver: pixel cursor, spans, filters** |
+| `x16/console.h` | **the KERNAL console: wrapping, paging, line input** |
+| `x16/spi.h` | **the VERA SPI master: select, clock, byte exchange, block moves** |
+| `x16/serial.h` | **the serial / WiFi card's 16C550 UARTs, polled** |
+| `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** |
 
 Several of those are things the machine can do that nothing else exposes
 to C. `x16_mem_decompress()` is an **LZSA2 depacker sitting in ROM**, and
