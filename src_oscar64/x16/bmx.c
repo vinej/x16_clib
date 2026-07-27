@@ -35,6 +35,8 @@ volatile char x16__bmx_cur[3];
 volatile char x16__bmx_row[2];
 volatile char x16__bmx_rows[2];
 volatile char x16__bmx_t;
+volatile char x16__bmx_code;            // the last BMX_ERR_*, for lasterr
+volatile char x16__bmx_nlen;            // load_hires' measured name length
 
 void x16_bmx_get_info(x16_bmx_info *out) {
     __asm {
@@ -65,6 +67,7 @@ void x16_bmx_set_info(const x16_bmx_info *in) {
 unsigned char x16_bmx_load(const char *name, unsigned char len,
                            unsigned char device,
                            unsigned long vaddr) {
+    x16__bmx_code = 0;
     /* --- open for sequential read ------------------------------- */
     return __asm {
         lda len
@@ -85,6 +88,7 @@ unsigned char x16_bmx_load(const char *name, unsigned char len,
         lda #2
         jsr 0xffc3                      /* CLOSE */
         lda #1                          /* X16_BMX_ERR_IO */
+        sta x16__bmx_code
         sta accu
         jmp bl_end
 
@@ -131,6 +135,7 @@ unsigned char x16_bmx_load(const char *name, unsigned char len,
         pha
         jsr bl_close
         pla
+        sta x16__bmx_code
         sta accu
         jmp bl_end
 
@@ -416,6 +421,7 @@ unsigned char x16_bmx_load(const char *name, unsigned char len,
 unsigned char x16_bmx_save(const char *name, unsigned char len,
                            unsigned char device,
                            unsigned long vaddr) {
+    x16__bmx_code = 0;
     /* --- open for write ------------------------------------------ */
     return __asm {
         lda len
@@ -436,6 +442,7 @@ unsigned char x16_bmx_save(const char *name, unsigned char len,
         lda #2
         jsr 0xffc3                      /* CLOSE */
         lda #1                          /* X16_BMX_ERR_IO */
+        sta x16__bmx_code
         sta accu
         jmp bs_end
 
@@ -640,5 +647,350 @@ unsigned char x16_bmx_save(const char *name, unsigned char len,
         rts
 
     bs_end:
+    };
+}
+
+// ---------------------------------------------------------------------
+// Why the last bmx_* call failed: the X16_BMX_ERR_* it returned, or 0
+// after a call that worked. For call sites that could not keep the
+// return value.
+// ---------------------------------------------------------------------
+unsigned char x16_bmx_lasterr(void) {
+    return x16__bmx_code;
+}
+
+// ---------------------------------------------------------------------
+// bmx_load's sibling for the MiSTer VERA_2 640x480 SDRAM layer (the
+// gfx8h engine): the palette goes to the VERA_2 palette registers, the
+// pixel rows stream into VERA_2 SDRAM 640 bytes apart from offset 0, so
+// a full-width 640x480x8 image is a plain contiguous load.
+//
+// Feature-detect with x16_gfx8h_has() first: on stock hardware (and the
+// emulator) the file still parses but the pixel writes go to open bus.
+//
+// Unlike x16_bmx_load there is no length argument: the name is an
+// ordinary NUL-terminated C string, measured here (up to 255 bytes).
+// The ca65 build keeps this in its own object so a program that never
+// loads into VERA_2 SDRAM never links it; Oscar64's whole-program strip
+// does that by itself, so it lives here beside its plumbing.
+// ---------------------------------------------------------------------
+unsigned char x16_bmx_load_hires(const char *name,
+                                 unsigned char device) {
+    x16__bmx_code = 0;
+    x16__bmx_nlen = 0;
+    while (name[x16__bmx_nlen] != 0) {
+        ++x16__bmx_nlen;                // a 255-byte name is its own problem
+    }
+    /* --- open for sequential read ------------------------------- */
+    return __asm {
+        lda x16__bmx_nlen
+        ldx name
+        ldy name+1
+        jsr 0xffbd                      /* SETNAM */
+        lda #2
+        ldx device
+        ldy #0                          /* sequential, no header games */
+        jsr 0xffba                      /* SETLFS */
+        jsr 0xffc0                      /* OPEN */
+        bcs bh_open_bad
+        ldx #2
+        jsr 0xffc6                      /* CHKIN */
+        bcc bh_hdr
+    bh_open_bad:
+        jsr 0xffcc                      /* CLRCHN */
+        lda #2
+        jsr 0xffc3                      /* CLOSE */
+        lda #1                          /* X16_BMX_ERR_IO */
+        sta x16__bmx_code
+        sta accu
+        jmp bh_end
+
+    bh_hdr:
+        ldx #0                          /* pull in the 16-byte header */
+    bh_get_hdr:
+        jsr 0xffcf                      /* CHRIN */
+        sta x16__bmx_hdr,x
+        inx
+        cpx #16
+        bne bh_get_hdr
+
+        jsr 0xffb7                      /* READST: short header is I/O */
+        beq bh_validate
+        lda #1                          /* X16_BMX_ERR_IO */
+        jmp bh_close_err
+    bh_validate:
+        lda x16__bmx_hdr
+        cmp #0x42                       /* 'B' */
+        bne bh_bad_fmt
+        lda x16__bmx_hdr+1
+        cmp #0x4d                       /* 'M' */
+        bne bh_bad_fmt
+        lda x16__bmx_hdr+2
+        cmp #0x58                       /* 'X' */
+        bne bh_bad_fmt
+        lda x16__bmx_hdr+3
+        cmp #1
+        bne bh_bad_fmt
+        lda x16__bmx_hdr+14
+        beq bh_fmt_ok
+        lda #3                          /* X16_BMX_ERR_PACKED */
+        jmp bh_close_err
+    bh_bad_fmt:
+        lda #2                          /* X16_BMX_ERR_FORMAT */
+    bh_close_err:
+        pha
+        jsr bh_close
+        pla
+        sta x16__bmx_code
+        sta accu
+        jmp bh_end
+
+    bh_fmt_ok:
+        lda x16__bmx_hdr+4              /* publish the header fields */
+        sta x16__bmx+4                  /* bpp */
+        lda x16__bmx_hdr+6
+        sta x16__bmx                    /* width */
+        lda x16__bmx_hdr+7
+        sta x16__bmx+1
+        lda x16__bmx_hdr+8
+        sta x16__bmx+2                  /* height */
+        lda x16__bmx_hdr+9
+        sta x16__bmx+3
+        lda x16__bmx_hdr+11
+        sta x16__bmx+5                  /* palstart */
+        lda x16__bmx_hdr+15
+        sta x16__bmx+8                  /* border */
+        lda #0                          /* zero the high byte BEFORE the */
+        sta x16__bmx+7                  /* load whose Z flag bne tests */
+        lda x16__bmx_hdr+10
+        sta x16__bmx+6                  /* palcount */
+        bne bh_pal_n
+        inc x16__bmx+7                  /* 0 in the file means 256 */
+    bh_pal_n:
+
+        /* --- palette -> the VERA_2 palette (IDX auto-increments) ---- */
+        lda x16__bmx+5                  /* palstart */
+        sta 0x9f66                      /* VERA2_PAL_IDX */
+        lda x16__bmx+6                  /* entries remaining (16-bit) */
+        sta x16__bmx_cnt
+        lda x16__bmx+7
+        sta x16__bmx_cnt+1
+    bh_pal_loop:
+        lda x16__bmx_cnt
+        ora x16__bmx_cnt+1
+        beq bh_pal_done
+        jsr 0xffcf                      /* CHRIN */
+        sta 0x9f67                      /* VERA2_PAL_LO */
+        jsr 0xffcf                      /* CHRIN */
+        sta 0x9f68                      /* VERA2_PAL_HI */
+        jsr bh_dec
+        jmp bh_pal_loop
+    bh_pal_done:
+
+        /* --- skip any gap up to the header's data offset ------------ */
+        lda x16__bmx+6
+        sta x16__bmx_cnt
+        lda x16__bmx+7
+        sta x16__bmx_cnt+1
+        asl x16__bmx_cnt
+        rol x16__bmx_cnt+1
+        clc
+        lda x16__bmx_cnt
+        adc #16
+        sta x16__bmx_cnt
+        lda x16__bmx_cnt+1
+        adc #0
+        sta x16__bmx_cnt+1
+        sec                             /* gap = data offset - position */
+        lda x16__bmx_hdr+12
+        sbc x16__bmx_cnt
+        sta x16__bmx_cnt
+        lda x16__bmx_hdr+13
+        sbc x16__bmx_cnt+1
+        sta x16__bmx_cnt+1
+        bcc bh_data
+    bh_skip:
+        lda x16__bmx_cnt
+        ora x16__bmx_cnt+1
+        beq bh_data
+        jsr 0xffcf                      /* CHRIN */
+        jsr bh_dec
+        jmp bh_skip
+
+    bh_data:
+        jsr 0xffb7                      /* READST */
+        cmp #0
+        beq bh_rows_ahead
+        jmp bh_io_short
+    bh_rows_ahead:
+
+        /* --- pixel rows into VERA_2 SDRAM, 640 apart ---------------- */
+        lda #0                          /* SDRAM byte offset 0 */
+        sta x16__bmx_cur
+        sta x16__bmx_cur+1
+        sta x16__bmx_cur+2
+        jsr bh_row_bytes                /* row = width >> (3 - depth) */
+
+        lda x16__bmx+2                  /* height */
+        sta x16__bmx_rows
+        lda x16__bmx+3
+        sta x16__bmx_rows+1
+    bh_row:
+        lda x16__bmx_rows
+        ora x16__bmx_rows+1
+        beq bh_done
+        lda x16__bmx_cur                /* VERA_2 addr = cur, INC_1 */
+        sta 0x9f62                      /* VERA2_ADDR_L */
+        lda x16__bmx_cur+1
+        sta 0x9f63                      /* VERA2_ADDR_M */
+        lda x16__bmx_cur+2
+        and #0x0f                       /* VERA2_INC_1 code is 0: the */
+        sta 0x9f64                      /* high nibble stays (VERA2_ADDR_H) */
+
+        lda x16__bmx_row
+        sta x16__bmx_cnt
+        lda x16__bmx_row+1
+        sta x16__bmx_cnt+1
+        jsr bh_bulk                     /* the whole row, MACPTR gulps */
+        bcc bh_row_done
+        jmp bh_io_short
+    bh_row_done:
+        clc                             /* cur += 640 (20-bit) */
+        lda x16__bmx_cur
+        adc #0x80                       /* <640 */
+        sta x16__bmx_cur
+        lda x16__bmx_cur+1
+        adc #0x02                       /* >640 */
+        sta x16__bmx_cur+1
+        lda x16__bmx_cur+2
+        adc #0
+        sta x16__bmx_cur+2
+        lda x16__bmx_rows
+        bne bh_dec_rows
+        dec x16__bmx_rows+1
+    bh_dec_rows:
+        dec x16__bmx_rows
+
+        lda x16__bmx_rows               /* ST once per row, exactly as */
+        ora x16__bmx_rows+1             /* bmx_load: between rows any */
+        beq bh_done                     /* status at all is a short file */
+        jsr 0xffb7                      /* READST */
+        cmp #0
+        beq bh_row
+
+    bh_io_short:
+        lda #1                          /* X16_BMX_ERR_IO */
+        jmp bh_close_err
+
+    bh_done:
+        jsr bh_close
+        lda #0
+        sta accu
+        jmp bh_end
+
+        /* --- local helpers ------------------------------------------- */
+    bh_close:
+        jsr 0xffcc                      /* CLRCHN */
+        lda #2
+        jsr 0xffc3                      /* CLOSE */
+        rts
+
+    bh_dec:
+        lda x16__bmx_cnt
+        bne bh_dec_lo
+        dec x16__bmx_cnt+1
+    bh_dec_lo:
+        dec x16__bmx_cnt
+        rts
+
+        /* row = width >> (3 - depth) */
+    bh_row_bytes:
+        lda x16__bmx                    /* width */
+        sta x16__bmx_row
+        lda x16__bmx+1
+        sta x16__bmx_row+1
+        jsr bh_depth
+        eor #0x03                       /* 3 - depth (depth is 0-3) */
+        tax
+        beq bh_rb_done
+    bh_rb_shift:
+        lsr x16__bmx_row+1
+        ror x16__bmx_row
+        dex
+        bne bh_rb_shift
+    bh_rb_done:
+        rts
+
+        /* A = the VERA depth code for bpp (8->3, 4->2, 2->1, 1->0) */
+    bh_depth:
+        lda x16__bmx+4                  /* bpp */
+        cmp #8
+        beq bh_dc8
+        cmp #4
+        beq bh_dc4
+        cmp #2
+        beq bh_dc2
+        lda #0
+        rts
+    bh_dc8:
+        lda #3
+        rts
+    bh_dc4:
+        lda #2
+        rts
+    bh_dc2:
+        lda #1
+        rts
+
+        /* Pull cnt bytes from the open file into VERA2_DATA. The same */
+        /* MACPTR streaming trick as bl_bulk, but the fixed destination */
+        /* is the VERA_2 data register; CHRIN stays as the fallback. */
+    bh_bulk:
+        lda x16__bmx_cnt
+        ora x16__bmx_cnt+1
+        beq bh_br_ok
+        lda x16__bmx_cnt+1
+        beq bh_small
+        lda #255                        /* largest single ask */
+        jmp bh_ask
+    bh_small:
+        lda x16__bmx_cnt                /* the exact remainder */
+    bh_ask:
+        ldx #0x65                       /* <VERA2_DATA */
+        ldy #0x9f                       /* >VERA2_DATA */
+        sec                             /* fixed destination */
+        jsr 0xff44                      /* MACPTR */
+        bcs bh_fallback                 /* device cannot do block reads */
+        txa                             /* X/Y = bytes actually delivered */
+        bne bh_got
+        tya
+        beq bh_br_short
+    bh_got:
+        stx x16__bmx_t                  /* cnt -= bytes read */
+        sec
+        lda x16__bmx_cnt
+        sbc x16__bmx_t
+        sta x16__bmx_cnt
+        sty x16__bmx_t
+        lda x16__bmx_cnt+1
+        sbc x16__bmx_t
+        sta x16__bmx_cnt+1
+        jmp bh_bulk
+    bh_br_ok:
+        clc
+        rts
+    bh_br_short:
+        sec
+        rts
+    bh_fallback:
+        lda x16__bmx_cnt
+        ora x16__bmx_cnt+1
+        beq bh_br_ok
+        jsr 0xffcf                      /* CHRIN */
+        sta 0x9f65                      /* VERA2_DATA */
+        jsr bh_dec
+        jmp bh_fallback
+
+    bh_end:
     };
 }

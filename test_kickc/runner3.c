@@ -636,6 +636,133 @@ void test_bmx_missing(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* the lasterr getters, and the hi-res BMX loader                      */
+/* ------------------------------------------------------------------ */
+
+/* After a failing call the getter re-reads that exact code -- 62, FILE
+** NOT FOUND, not merely "some error" -- and after a succeeding one it
+** re-reads the success code.
+*/
+void test_dos_lasterr(void) {
+    unsigned char code;
+    unsigned char ok;
+
+    code = x16_dos_delete(fs_missing, 10);
+    ok = (code == 62 && x16_dos_lasterr() == code) ? 1 : 0;
+
+    code = x16_dos_status();            /* the 62 was consumed: now OK */
+    ok = (ok && code < X16_DOS_OK_BELOW &&
+          x16_dos_lasterr() == code) ? 1 : 0;
+
+    t_check(ok, "DOS_LASTERR");
+}
+
+/* A file that starts with a load address instead of "BMX" (the
+** bad-format technique above, minimally): the load returns ERR_FORMAT
+** and the getter agrees.
+*/
+const char nb3_name[] = "NOTBMX3.BIN";
+
+void test_bmx_lasterr(void) {
+    unsigned char i;
+    unsigned char code;
+    unsigned char ok;
+
+    for (i = 0; i < 20; i++) {
+        nb_junk[i] = i;
+    }
+    x16_fs_save(nb3_name, 11, X16_DEVICE_SD, nb_junk, nb_junk + 20);
+
+    code = x16_bmx_load(nb3_name, 11, X16_DEVICE_SD, 0x04000);
+    ok = (code == X16_BMX_ERR_FORMAT && x16_bmx_lasterr() == code) ? 1 : 0;
+
+    x16_dos_delete(nb3_name, 11);
+    t_check(ok, "BMX_LASTERR");
+}
+
+/* Write exactly these bytes and nothing else -- x16_fs_save() would
+** prepend a load address. KERNAL open-for-write plus t_chrout, the same
+** channel discipline as the library's own writers.
+*/
+__mem char wr_ok;
+
+void wr_open(const char *name, __mem unsigned char nlen) {
+    asm {
+        lda nlen
+        ldx name
+        ldy name+1
+        jsr $ffbd /*SETNAM*/
+        lda #2
+        ldx #8 /*X16_DEVICE_SD*/
+        ldy #1                          // write
+        jsr $ffba /*SETLFS*/
+        jsr $ffc0 /*OPEN*/
+        bcs wro_bad
+        ldx #2
+        jsr $ffc9 /*CHKOUT*/
+        bcs wro_bad
+        lda #1
+        sta wr_ok
+        jmp wro_end
+    wro_bad:
+        jsr $ffcc /*CLRCHN*/
+        lda #2
+        jsr $ffc3 /*CLOSE*/
+        stz wr_ok
+    wro_end:
+    }
+}
+
+void wr_close(void) {
+    asm {
+        jsr $ffcc /*CLRCHN*/
+        lda #2
+        jsr $ffc3 /*CLOSE*/
+    }
+}
+
+/* On hardware without the VERA_2 layer -- this emulator -- the hi-res
+** loader still parses the header and streams the pixels into open bus.
+** It must come back (no hang, no crash) with a sane code, and the
+** getter must agree. A complete, valid one-row BMX makes success the
+** expected answer.
+*/
+const char hires_name[] = "HIRES.BMX";
+const unsigned char hires_file[22] = {
+    0x42, 0x4D, 0x58, 1,    /* magic "BMX", version                 */
+    8, 3,                   /* bits per pixel, VERA depth code      */
+    4, 0,                   /* width                                */
+    1, 0,                   /* height: one row                      */
+    1, 0,                   /* one palette entry, from index 0      */
+    18, 0,                  /* pixel data offset: 16 + 1*2, no gap  */
+    0, 0,                   /* not compressed, border 0             */
+    0x0F, 0x00,             /* the palette entry                    */
+    1, 2, 3, 4              /* the row                              */
+};
+
+void test_bmx_hires_absent(void) {
+    unsigned char i;
+    unsigned char code;
+    unsigned char ok;
+
+    wr_open(hires_name, 9);
+    if (wr_ok == 0) {
+        t_check(0, "BMX_HIRES_ABSENT");
+        return;
+    }
+    for (i = 0; i < 22; i++) {
+        t_chrout((char)hires_file[i]);
+    }
+    wr_close();
+
+    code = x16_bmx_load_hires(hires_name, X16_DEVICE_SD);
+    ok = (code <= 3 && x16_bmx_lasterr() == code) ? 1 : 0;
+
+    x16_dos_delete(hires_name, 9);
+    t_check(ok, "BMX_HIRES_ABSENT");
+}
+
+/* ------------------------------------------------------------------ */
 /* PCM                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -821,6 +948,10 @@ void main(void) {
     test_bmx_roundtrip();
     test_bmx_bad_format();
     test_bmx_missing();
+
+    test_dos_lasterr();
+    test_bmx_lasterr();
+    test_bmx_hires_absent();
 
     test_pcm_rate_clamp();
     test_pcm_stream();

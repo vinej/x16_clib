@@ -1306,3 +1306,150 @@ void x16_fx_triangle(const x16_point *pa, const x16_point *pb,
     }
     x16_fx_off();
 }
+
+// =====================================================================
+// FX affine helper (Addr1 Mode 3) -- the rotozoom/mode-7 sampler.
+//
+// VERA turns port 1's reads into texture fetches: an 8x8-tile map (one
+// byte per tile, no attributes) defines a square texture, and two
+// fixed-point counters walk a sampling ray across it. Every DATA1 read
+// returns the texel under the ray and steps it. A rotated, scaled
+// scanline is one x16_fx_affine_ray() plus one x16_fx_affine_span(),
+// with the ray's dx/dy per scanline coming from sin8/cos8 and the zoom
+// factor. Tiles are 8 bpp here (64 bytes each, up to 256 tiles).
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// Enter affine mode and describe the texture: tile data and map VRAM
+// addresses (each 2 KB ALIGNED -- the registers hold address bits 16:11
+// only), the map size code (0=2x2, 1=8x8, 2=32x32, 3=128x128 tiles) and
+// the clip flag (bit 0: 1 = outside the map reads tile 0, 0 = wrap).
+// `tmap`, not `map`: KickC's inline assembler owns that word, and the
+// rename stays so all the source ports match.
+// ---------------------------------------------------------------------
+void x16_fx_affine_on(unsigned long tiles, unsigned long tmap,
+                      unsigned char size, unsigned char clip) {
+    __asm {
+        lda 0x9f25                      /* vera_dcsel 2 (VERA_CTRL) */
+        and #0x01
+        ora #0x04
+        sta 0x9f25
+        lda #0x03                       /* VERA_FX_ADDR1_AFFINE */
+        sta 0x9f29                      /* VERA_FX_CTRL */
+
+        /* FX_TILEBASE: bits 7:2 = address 16:11, bit 1 = clip enable */
+        lda tiles+1
+        lsr
+        lsr
+        lsr                             /* address bits 15:11 -> 4:0 */
+        sta x16__fxt_fl                 /* borrow a scratch byte */
+        lda tiles+2
+        and #0x01
+        beq afo_tb_low
+        lda #0x20                       /* address bit 16 -> value bit 5 */
+    afo_tb_low:
+        ora x16__fxt_fl
+        asl
+        asl                             /* the register wants them in 7:2 */
+        sta x16__fxt_fl
+        lda clip
+        and #0x01
+        asl                             /* clip enable is bit 1 */
+        ora x16__fxt_fl
+        sta 0x9f2a                      /* VERA_FX_TILEBASE */
+
+        /* FX_MAPBASE: bits 7:2 = address 16:11, bits 1:0 = map size */
+        lda tmap+1
+        lsr
+        lsr
+        lsr
+        sta x16__fxt_fl
+        lda tmap+2
+        and #0x01
+        beq afo_mb_low
+        lda #0x20
+    afo_mb_low:
+        ora x16__fxt_fl
+        asl
+        asl
+        sta x16__fxt_fl
+        lda size
+        and #0x03
+        ora x16__fxt_fl
+        sta 0x9f2b                      /* VERA_FX_MAPBASE */
+        lda 0x9f25                      /* vera_dcsel 0 */
+        and #0x01
+        sta 0x9f25
+    }
+}
+
+// ---------------------------------------------------------------------
+// Aim the sampler: start at texel (tx, ty) -- 0-1023 each -- stepping
+// (dx, dy) per read. Signed 1/512-texel units (512 = one texel per
+// read; bit 15 = x32, the line/poly encoding). Samples from texel
+// centres: the subpixel part is seeded to 0.5. Requires affine_on
+// first; every DATA1 read afterwards returns a texel and steps the ray.
+// ---------------------------------------------------------------------
+void x16_fx_affine_ray(unsigned int tx, unsigned int ty,
+                       int dx, int dy) {
+    __asm {
+        lda 0x9f25                      /* vera_dcsel 3 */
+        and #0x01
+        ora #0x06
+        sta 0x9f25
+        lda dx
+        sta 0x9f29                      /* VERA_FX_X_INCR_L */
+        lda dx+1
+        sta 0x9f2a                      /* VERA_FX_X_INCR_H */
+        lda dy
+        sta 0x9f2b                      /* VERA_FX_Y_INCR_L */
+        lda dy+1
+        sta 0x9f2c                      /* VERA_FX_Y_INCR_H */
+        lda 0x9f25                      /* vera_dcsel 5 */
+        and #0x01
+        ora #0x0a
+        sta 0x9f25
+        lda #0x80                       /* subpixel 0.5: texel centres */
+        sta 0x9f29                      /* VERA_FX_X_POS_S */
+        sta 0x9f2a                      /* VERA_FX_Y_POS_S */
+        lda 0x9f25                      /* vera_dcsel 4 */
+        and #0x01
+        ora #0x08
+        sta 0x9f25
+        lda tx                          /* positions last: writing them */
+        sta 0x9f29                      /* makes VERA prefetch the texel */
+        lda tx+1                        /* (VERA_FX_X_POS_L just above) */
+        and #0x07
+        sta 0x9f2a                      /* VERA_FX_X_POS_H */
+        lda ty
+        sta 0x9f2b                      /* VERA_FX_Y_POS_L */
+        lda ty+1
+        and #0x07
+        sta 0x9f2c                      /* VERA_FX_Y_POS_H */
+        lda 0x9f25                      /* vera_dcsel 0 */
+        and #0x01
+        sta 0x9f25
+    }
+}
+
+// ---------------------------------------------------------------------
+// Fetch `count` texels (>= 1) along the ray into VRAM: one port 1 read,
+// one port 0 write per texel -- the mode-7 inner loop. Aim the ray
+// first, and point port 0 at the destination yourself.
+// ---------------------------------------------------------------------
+void x16_fx_affine_span(unsigned int count) {
+    __asm {
+        ldx count
+        ldy count+1
+        txa
+        beq afs_span
+        iny
+    afs_span:
+        lda 0x9f24                      /* VERA_DATA1 */
+        sta 0x9f23                      /* VERA_DATA0 */
+        dex
+        bne afs_span
+        dey
+        bne afs_span
+    }
+}

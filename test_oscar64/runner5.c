@@ -430,6 +430,93 @@ void test_g2l_clear(void) {
 /* The VERA_2 SDRAM engines: only where the hardware answers.          */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* The FX affine sampler, and the raw FX register knobs                */
+/* ------------------------------------------------------------------ */
+
+#define TESTVRAM        0x4000U         /* bank 0: clear of the text map */
+
+/* An 8x8 tile whose texel (x,y) holds y*16+x, behind a 2x2 map of tile
+** 0: row 0 reads back 0,1,2..., column 0 reads back 0,16,32... The two
+** rays are deliberately asymmetric -- a shim that swapped dx with dy
+** would hand each ray the other one's walk. Tile data at $10000, map at
+** $10800 (both 2 KB aligned, bank 1, clear of everything above).
+*/
+void test_affine(void) {
+    unsigned char x, y, i, e, ok;
+
+    i = 0;
+    for (y = 0; y < 8; ++y) {           /* tile data, 2 KB aligned */
+        for (x = 0; x < 8; ++x) {
+            t_vpoke(1, i, (unsigned char)(y * 16 + x));
+            ++i;
+        }
+    }
+    for (i = 0; i < 4; ++i) {           /* a 2x2 map, all tile 0 */
+        t_vpoke(1, 0x0800U + i, 0);
+    }
+
+    x16_fx_affine_on(0x10000UL, 0x10800UL, 0, 1);
+
+    /* One texel per read along +x: the tile's row 0. */
+    x16_fx_affine_ray(0, 0, 512, 0);
+    x16_vera_addr0(X16_INC_1, 0x04000UL);
+    x16_fx_affine_span(8);
+    ok = 1;
+    for (i = 0; i < 8; ++i) {
+        if (t_vpeek(0, TESTVRAM + i) != i) ok = 0;
+    }
+    t_check(ok, "AFFINE_SPAN_ROW");
+
+    /* The same walk along +y: column 0, so 0,16,32... */
+    x16_fx_affine_ray(0, 0, 0, 512);
+    x16_vera_addr0(X16_INC_1, 0x04010UL);
+    x16_fx_affine_span(8);
+    ok = 1;
+    e = 0;
+    for (i = 0; i < 8; ++i) {
+        if (t_vpeek(0, TESTVRAM + 16 + i) != e) ok = 0;
+        e += 16;
+    }
+    t_check(ok, "AFFINE_SPAN_COL");
+
+    /* Affine mode deliberately stays on between rays; switching it off
+    ** must hand port 1 -- and ordinary addressing -- back to everyone.
+    */
+    x16_fx_off();
+    t_vpoke(0, TESTVRAM + 32, 0x77);
+    t_check((t_vpeek(0, TESTVRAM + 32) == 0x77) ? 1 : 0,
+            "AFFINE_OFF_CLEAN");
+}
+
+/* Set, OR in, read back, AND out: the ctrl knobs end to end. Bit 2 is
+** the 4-bit flag -- harmless while nothing is being drawn.
+*/
+void test_fxu_ctrl(void) {
+    unsigned char on, off;
+
+    x16_fxu_set_ctrl(0);
+    x16_fxu_ctrl_on(4);
+    on = x16_fxu_get_ctrl();
+    x16_fxu_ctrl_off(4);
+    off = x16_fxu_get_ctrl();
+    x16_fxu_off();
+
+    t_check((on == 4 && off == 0) ? 1 : 0, "FXU_CTRL");
+}
+
+/* The poly-fill readback must return -- its value is only defined
+** mid-polygon, but reading it idle may not hang or derail DCSEL.
+*/
+void test_fxu_poly(void) {
+    unsigned int pf = x16_fxu_get_poly_fill();
+    x16_fxu_off();
+    t_vpoke(0, TESTVRAM + 33, 0x66);
+    t_check((t_vpeek(0, TESTVRAM + 33) == 0x66 &&
+            (pf | 1) != 0) ? 1 : 0,     /* consume pf; always true */
+            "FXU_POLY");
+}
+
 void test_g8h(void) {
     unsigned char has = x16_gfx8h_has();
     t_check((has <= 1) ? 1 : 0, "G8H_HAS_SANE");
@@ -514,6 +601,18 @@ int main(void) {
 
     test_g8h();
     test_g4h();
+
+    if (x16_vera_has_fx()) {
+        test_affine();
+        test_fxu_ctrl();
+        test_fxu_poly();
+    } else {
+        t_skip("AFFINE_SPAN_ROW");
+        t_skip("AFFINE_SPAN_COL");
+        t_skip("AFFINE_OFF_CLEAN");
+        t_skip("FXU_CTRL");
+        t_skip("FXU_POLY");
+    }
 
     t_done();
     return 0;

@@ -18,6 +18,7 @@
 
 __mem volatile char x16__dos_device = 8;
 __mem volatile char x16__dos_t;
+__mem volatile char x16__dos_code;
 __mem char x16__dos_msg[64];
 __mem char x16__dos_buf[80];
 
@@ -98,6 +99,7 @@ unsigned char x16_dos_cmd(const char *cmd, __mem unsigned char len) {
         sbc #$30
         clc
         adc x16__dos_t
+        sta x16__dos_code               // shadow it for x16_dos_lasterr
         sta r
         bra dc_end
 
@@ -107,6 +109,7 @@ unsigned char x16_dos_cmd(const char *cmd, __mem unsigned char len) {
         jsr $ffc3 /*CLOSE*/
         stz x16__dos_msg
         lda #$ff
+        sta x16__dos_code
         sta r
     dc_end:
     }
@@ -117,6 +120,15 @@ unsigned char x16_dos_cmd(const char *cmd, __mem unsigned char len) {
 // power-on returns code 73 (the DOS version banner) by design.
 unsigned char x16_dos_status(void) {
     return x16_dos_cmd(0, 0);
+}
+
+// The status code the last dos_* call came back with (0-19 success,
+// 20-99 error, 255 = no channel), for call sites that could not keep
+// the return value. A command abandoned locally for being too long
+// returns 255 from the call itself but sends nothing, so it does not
+// update this -- as upstream.
+unsigned char x16_dos_lasterr(void) {
+    return x16__dos_code;
 }
 
 // Internal: append `len` bytes of `name` to the command buffer at `at`,
