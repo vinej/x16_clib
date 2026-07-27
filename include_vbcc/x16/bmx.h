@@ -56,4 +56,24 @@ unsigned char x16_bmx_load(__reg("r0/r1") const char *name, __reg("r2") unsigned
 unsigned char x16_bmx_save(__reg("r0/r1") const char *name, __reg("r2") unsigned char len,
                            __reg("r4") unsigned char device, unsigned long vaddr);
 
+/* Load a BMX into the VERA_2 640x480 SDRAM bitmap instead (the gfx8h
+** engine): the palette goes to the VERA_2 palette, the pixel rows land
+** 640 bytes apart from SDRAM offset 0, so a full-width 640x480x8 image
+** is a plain contiguous load. Select the mode first (x16_gfx8h_init()).
+**
+** REQUIRES THE VERA_2 LAYER -- feature-detect with x16_gfx8h_has() from
+** x16/bitmap8h.h first. On stock hardware (and the emulator) the file
+** still parses, but every pixel write goes to open bus.
+**
+** Unlike x16_bmx_load() there is no length argument: `name` is an
+** ordinary NUL-terminated C string. Returns 0 on success, else an
+** X16_BMX_ERR_* code, and publishes the header fields either way. */
+unsigned char x16_bmx_load_hires(__reg("r0/r1") const char *name,
+                                 __reg("r2") unsigned char device);
+
+/* Why the last x16_bmx_* call failed: the X16_BMX_ERR_* it returned, or
+** 0 after a call that worked. For call sites that could not keep the
+** return value. */
+unsigned char x16_bmx_lasterr(void);
+
 #endif /* X16_BMX_H */

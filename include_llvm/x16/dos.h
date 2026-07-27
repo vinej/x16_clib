@@ -48,6 +48,16 @@ const char *x16_dos_msg (void);
 /* Read the drive's pending status line. */
 unsigned char x16_dos_status (void);
 
+/* The status code the last x16_dos_* call came back with: 0-19 success,
+** 20-99 error, X16_DOS_NO_CHANNEL (255) when the command channel would
+** not open. Every routine here already returns its code; this re-reads
+** the last one, for call sites that could not keep it.
+**
+** A command abandoned locally for being too long returns 255 from the
+** call itself but sends nothing, so it does not update this.
+*/
+unsigned char x16_dos_lasterr (void);
+
 /* Send a raw command and fetch the reply. A length of 0 sends nothing
 ** and just reads the pending status, like x16_dos_status().
 */

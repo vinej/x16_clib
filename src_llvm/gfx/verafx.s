@@ -54,6 +54,9 @@
         .globl  x16_fx_copy
         .globl  x16_fx_transp_on
         .globl  x16_fx_transp_off
+        .globl  x16_fx_affine_on
+        .globl  x16_fx_affine_ray
+        .globl  x16_fx_affine_span
 
         .section .text,"ax",@progbits
 
@@ -1323,3 +1326,200 @@ fxd_den:   .zero  2
 fxd_rem:   .zero  2
 
 fxa:       .zero  3
+
+; =====================================================================
+; FX affine helper (Addr1 Mode 3) -- the rotozoom/mode-7 sampler.
+;
+; VERA turns port 1's reads into texture fetches: an 8x8-tile map
+; (one byte per tile, no attributes) defines a square texture, and
+; two fixed-point counters walk a sampling ray across it. Every
+; DATA1 read returns the texel under the ray and steps it. A rotated,
+; scaled scanline is then just:
+;
+;       jsr fx_affine_ray               ; start + direction
+;       vera_addr 0, dest, VERA_INC_1
+;       ... X16_P0/P1 = pixel count ...
+;       jsr fx_affine_span              ; DATA1 -> DATA0, that's mode 7
+;
+; with the ray's dx/dy per scanline coming from sin8/cos8 and the
+; zoom factor. Tiles are 8 bpp here (64 bytes each, up to 256 tiles).
+; =====================================================================
+
+        .section .text,"ax",@progbits   ; the file tail above is BSS
+
+; ---------------------------------------------------------------------
+; void x16_fx_affine_on(unsigned long tiles, unsigned long map,
+;                       unsigned char size, unsigned char clip)
+;
+; No pointers, so the ten bytes run straight through the slots:
+; tiles -> A/X/__rc2/__rc3, map -> __rc4..__rc7, size -> __rc8,
+; clip -> __rc9. Only bit 16 of each long's high half exists.
+; ---------------------------------------------------------------------
+x16_fx_affine_on:
+        sta     X16_P0                  ; tiles bits 0-7
+        stx     X16_P1                  ; tiles bits 8-15
+        lda     __rc2
+        sta     X16_P2                  ; tiles bit 16
+        lda     __rc4
+        sta     X16_P3                  ; map bits 0-7
+        lda     __rc5
+        sta     X16_P4                  ; map bits 8-15
+        lda     __rc6
+        sta     X16_P5                  ; map bit 16
+        lda     __rc8
+        sta     X16_P6                  ; map size code
+        lda     __rc9
+        sta     X16_P7                  ; clip
+        jmp     fx_affine_on
+
+; ---------------------------------------------------------------------
+; void x16_fx_affine_ray(unsigned int x, unsigned int y,
+;                        int dx, int dy)
+; ---------------------------------------------------------------------
+; Four 16-bit integers: x -> A/X, y -> __rc2/__rc3, dx -> __rc4/__rc5,
+; dy -> __rc6/__rc7.
+x16_fx_affine_ray:
+        sta     X16_P0                  ; x lo
+        stx     X16_P1                  ; x hi
+        lda     __rc2
+        sta     X16_P2                  ; y lo
+        lda     __rc3
+        sta     X16_P3                  ; y hi
+        lda     __rc4
+        sta     X16_P4                  ; dx lo
+        lda     __rc5
+        sta     X16_P5                  ; dx hi
+        lda     __rc6
+        sta     X16_P6                  ; dy lo
+        lda     __rc7
+        sta     X16_P7                  ; dy hi
+        jmp     fx_affine_ray
+
+; ---------------------------------------------------------------------
+; void x16_fx_affine_span(unsigned int count)
+; ---------------------------------------------------------------------
+; count -> A/X.
+x16_fx_affine_span:
+        sta     X16_P0
+        stx     X16_P1
+        jmp     fx_affine_span
+
+; ---------------------------------------------------------------------
+; fx_affine_on -- enter affine mode and describe the texture
+;   in:  X16_P0/P1/P2 = tile data VRAM address (2 KB aligned)
+;        X16_P3/P4/P5 = tile map VRAM address (2 KB aligned)
+;        X16_P6 = map size code: 0=2x2, 1=8x8, 2=32x32, 3=128x128 tiles
+;        X16_P7 = bit 0: 1 = clip (outside the map reads tile 0),
+;                        0 = wrap around the map edges
+; ---------------------------------------------------------------------
+fx_affine_on:
+        vera_dcsel 2
+        lda     #VERA_FX_ADDR1_AFFINE
+        sta     VERA_FX_CTRL
+
+        ; FX_TILEBASE: bits 7:2 = address 16:11, bit 1 = clip enable
+        lda     X16_P1
+        lsr
+        lsr
+        lsr                             ; address bits 15:11 -> 4:0
+        sta     X16_T0
+        lda     X16_P2
+        and     #$01
+        beq     .Lfx_affine_on_tb_low
+        lda     #%00100000              ; address bit 16 -> value bit 5
+.Lfx_affine_on_tb_low:
+        ora     X16_T0
+        asl
+        asl                             ; the register wants them in bits 7:2
+        sta     X16_T0
+        lda     X16_P7
+        and     #$01
+        asl                             ; clip enable is bit 1
+        ora     X16_T0
+        sta     VERA_FX_TILEBASE
+
+        ; FX_MAPBASE: bits 7:2 = address 16:11, bits 1:0 = map size
+        lda     X16_P4
+        lsr
+        lsr
+        lsr
+        sta     X16_T0
+        lda     X16_P5
+        and     #$01
+        beq     .Lfx_affine_on_mb_low
+        lda     #%00100000
+.Lfx_affine_on_mb_low:
+        ora     X16_T0
+        asl
+        asl
+        sta     X16_T0
+        lda     X16_P6
+        and     #$03
+        ora     X16_T0
+        sta     VERA_FX_MAPBASE
+        vera_dcsel 0
+        rts
+
+; ---------------------------------------------------------------------
+; fx_affine_ray -- aim the sampler
+;   in:  X16_P0/P1 = starting x texel (0-1023)
+;        X16_P2/P3 = starting y texel
+;        X16_P4/P5 = dx per read, X16_P6/P7 = dy per read
+;                    (signed, 1/512 texel units: 512 = one texel per
+;                    read; bit 15 = x32, the line/poly encoding)
+;
+; Samples from texel centres (the subpixel part starts at 0.5).
+; Requires fx_affine_on first. Every DATA1 read afterwards returns a
+; texel and advances the ray.
+; ---------------------------------------------------------------------
+fx_affine_ray:
+        vera_dcsel 3
+        lda     X16_P4
+        sta     VERA_FX_X_INCR_L
+        lda     X16_P5
+        sta     VERA_FX_X_INCR_H
+        lda     X16_P6
+        sta     VERA_FX_Y_INCR_L
+        lda     X16_P7
+        sta     VERA_FX_Y_INCR_H
+        vera_dcsel 5
+        lda     #$80                    ; subpixel 0.5: sample texel centres
+        sta     VERA_FX_X_POS_S
+        sta     VERA_FX_Y_POS_S
+        vera_dcsel 4
+        lda     X16_P0                  ; positions last: writing them makes
+        sta     VERA_FX_X_POS_L         ; VERA prefetch the first texel
+        lda     X16_P1
+        and     #$07
+        sta     VERA_FX_X_POS_H
+        lda     X16_P2
+        sta     VERA_FX_Y_POS_L
+        lda     X16_P3
+        and     #$07
+        sta     VERA_FX_Y_POS_H
+        vera_dcsel 0
+        rts
+
+; ---------------------------------------------------------------------
+; fx_affine_span -- fetch texels along the ray into VRAM
+;   in:  X16_P0/P1 = texel count (>= 1)
+;   pre: fx_affine_ray aimed; the caller pointed port 0 at the
+;        destination with the increment it wants
+;
+; The mode-7 inner loop: one read, one write per pixel.
+; ---------------------------------------------------------------------
+fx_affine_span:
+        ldx     X16_P0
+        ldy     X16_P1
+        txa
+        beq     .Lfx_affine_span_full
+        iny
+.Lfx_affine_span_full:
+.Lfx_affine_span_span:
+        lda     VERA_DATA1
+        sta     VERA_DATA0
+        dex
+        bne     .Lfx_affine_span_span
+        dey
+        bne     .Lfx_affine_span_span
+        rts

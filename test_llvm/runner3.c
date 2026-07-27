@@ -27,6 +27,7 @@
 #define P2L(x, y)   ((unsigned long)(y) * 80 + ((x) >> 2))
 #define L0_CONFIG   (*(volatile unsigned char *)0x9F2DU)
 #define L0_TILEBASE (*(volatile unsigned char *)0x9F2FU)
+#define TESTVRAM    0x08000UL
 
 static void test_g4l_init(void)
 {
@@ -473,6 +474,191 @@ static void test_g4h(void)
     x16_gfx4h_off();
 }
 
+/* ------------------------------------------------------------------ */
+/* The FX affine sampler, and the raw FX register knobs                */
+/* ------------------------------------------------------------------ */
+
+/* An 8x8 tile whose texel (x,y) holds y*16+x, behind a 2x2 map of tile
+** 0: row 0 reads back 0,1,2..., column 0 reads back 0,16,32... The two
+** rays are deliberately asymmetric -- a shim that swapped dx (P4/P5)
+** with dy (P6/P7) would hand each ray the other one's walk.
+*/
+static void test_affine(void)
+{
+    unsigned char x, y, i, ok;
+
+    i = 0;
+    for (y = 0; y < 8; ++y) {           /* tile data, 2 KB aligned */
+        for (x = 0; x < 8; ++x) {
+            t_vpoke(y * 16 + x, 0x10000UL + i);
+            ++i;
+        }
+    }
+    for (i = 0; i < 4; ++i) {           /* a 2x2 map, all tile 0 */
+        t_vpoke(0, 0x10800UL + i);
+    }
+
+    x16_fx_affine_on(0x10000UL, 0x10800UL, 0, 1);
+
+    /* One texel per read along +x: the tile's row 0. */
+    x16_fx_affine_ray(0, 0, 512, 0);
+    x16_vera_addr0(X16_INC_1, TESTVRAM);
+    x16_fx_affine_span(8);
+    ok = 1;
+    for (i = 0; i < 8; ++i) {
+        if (vpeek(TESTVRAM + i) != i) ok = 0;
+    }
+    t_check(ok, "AFFINE_SPAN_ROW");
+
+    /* The same walk along +y: column 0, so 0,16,32... */
+    x16_fx_affine_ray(0, 0, 0, 512);
+    x16_vera_addr0(X16_INC_1, TESTVRAM + 16);
+    x16_fx_affine_span(8);
+    ok = 1;
+    for (i = 0; i < 8; ++i) {
+        if (vpeek(TESTVRAM + 16 + i) != i * 16) ok = 0;
+    }
+    t_check(ok, "AFFINE_SPAN_COL");
+
+    /* Affine mode deliberately stays on between rays; switching it off
+    ** must hand port 1 -- and ordinary addressing -- back to everyone.
+    */
+    x16_fx_off();
+    t_vpoke(0x77, TESTVRAM + 32);
+    t_check(vpeek(TESTVRAM + 32) == 0x77, "AFFINE_OFF_CLEAN");
+}
+
+/* Set, OR in, read back, AND out: the ctrl knobs end to end. Bit 2 is
+** the 4-bit flag -- harmless while nothing is being drawn.
+*/
+static void test_fxu_ctrl(void)
+{
+    unsigned char on, off;
+
+    x16_fxu_set_ctrl(0);
+    x16_fxu_ctrl_on(4);
+    on = x16_fxu_get_ctrl();
+    x16_fxu_ctrl_off(4);
+    off = x16_fxu_get_ctrl();
+    x16_fxu_off();
+
+    t_check(on == 4 && off == 0, "FXU_CTRL");
+}
+
+/* The poly-fill readback must return -- its value is only defined
+** mid-polygon, but reading it idle may not hang or derail DCSEL.
+*/
+static void test_fxu_poly(void)
+{
+    unsigned int v = x16_fxu_get_poly_fill();
+    (void)v;
+    x16_fxu_off();
+    t_vpoke(0x66, TESTVRAM + 33);
+    t_check(vpeek(TESTVRAM + 33) == 0x66, "FXU_POLY");
+}
+
+/* ------------------------------------------------------------------ */
+/* the lasterr getters, and the hi-res BMX loader                      */
+/* ------------------------------------------------------------------ */
+
+/* After a failing call the getter re-reads that exact code -- 62, FILE
+** NOT FOUND, not merely "some error" -- and after a succeeding one it
+** re-reads the success code.
+*/
+static void test_dos_lasterr(void)
+{
+    static const char name[] = "NOSUCH.BIN";
+    unsigned char code, ok;
+
+    code = x16_dos_delete(name, sizeof name - 1);
+    ok = (code == 62) && (x16_dos_lasterr() == code);
+
+    code = x16_dos_status();            /* the 62 was consumed: now OK */
+    ok = ok && (code < X16_DOS_OK_BELOW) && (x16_dos_lasterr() == code);
+
+    t_check(ok, "DOS_LASTERR");
+}
+
+/* A file that starts with a PRG load address instead of "BMX" (the
+** cc65 suite 2 technique, minimally): the load returns ERR_FORMAT and
+** the getter agrees.
+*/
+static void test_bmx_lasterr(void)
+{
+    static const char name[] = "NOTBMX3.BIN";
+    static unsigned char junk[20];
+    unsigned char i, code, ok;
+
+    for (i = 0; i < sizeof junk; ++i) {
+        junk[i] = i;
+    }
+    x16_fs_save(name, sizeof name - 1, X16_DEVICE_SD,
+                junk, junk + sizeof junk);
+
+    code = x16_bmx_load(name, sizeof name - 1, X16_DEVICE_SD, TESTVRAM);
+    ok = (code == X16_BMX_ERR_FORMAT) && (x16_bmx_lasterr() == code);
+
+    x16_dos_delete(name, sizeof name - 1);
+    t_check(ok, "BMX_LASTERR");
+}
+
+/* Write exactly these bytes and nothing else -- x16_fs_save() would
+** prepend a load address. The SDK's cc65-style cbm_open()/cbm_write()
+** are still `#if 0` in cbm.h, so this drives the cbm_k_* primitives
+** (secondary address 1 = write, as the cc65 suite's write_raw).
+*/
+static unsigned char write_raw3 (const char *name, const unsigned char *data,
+                                 unsigned char len)
+{
+    unsigned char i;
+
+    cbm_k_setnam(name);
+    cbm_k_setlfs(2, X16_DEVICE_SD, 1);
+    if (cbm_k_open() != 0 || cbm_k_chkout(2) != 0) {
+        cbm_k_close(2);
+        return 1;
+    }
+    for (i = 0; i < len; ++i) {
+        cbm_k_chrout(data[i]);
+    }
+    cbm_k_clrch();
+    cbm_k_close(2);
+    return 0;
+}
+
+/* On hardware without the VERA_2 layer -- this emulator -- the hi-res
+** loader still parses the header and streams the pixels into open bus.
+** It must come back (no hang, no crash) with a sane code, and the
+** getter must agree. A complete, valid one-row BMX makes success the
+** expected answer.
+*/
+static void test_bmx_hires_absent(void)
+{
+    static const char name[] = "HIRES.BMX";
+    static const unsigned char file[] = {
+        0x42, 0x4D, 0x58, 1,    /* magic "BMX", version                 */
+        8, 3,                   /* bits per pixel, VERA depth code      */
+        4, 0,                   /* width                                */
+        1, 0,                   /* height: one row                      */
+        1, 0,                   /* one palette entry, from index 0      */
+        18, 0,                  /* pixel data offset: 16 + 1*2, no gap  */
+        0, 0,                   /* not compressed, border 0             */
+        0x0F, 0x00,             /* the palette entry                    */
+        1, 2, 3, 4              /* the row                              */
+    };
+    unsigned char code, ok;
+
+    if (write_raw3(name, file, sizeof file)) {
+        t_check(0, "BMX_HIRES_ABSENT");
+        return;
+    }
+    code = x16_bmx_load_hires(name, X16_DEVICE_SD);
+    ok = (code <= 3) && (x16_bmx_lasterr() == code);
+
+    x16_dos_delete(name, sizeof name - 1);
+    t_check(ok, "BMX_HIRES_ABSENT");
+}
+
 int main(void)
 {
     t_init();
@@ -513,6 +699,22 @@ int main(void)
 
     test_g8h();
     test_g4h();
+
+    if (x16_vera_has_fx()) {
+        test_affine();
+        test_fxu_ctrl();
+        test_fxu_poly();
+    } else {
+        t_skip("AFFINE_SPAN_ROW");
+        t_skip("AFFINE_SPAN_COL");
+        t_skip("AFFINE_OFF_CLEAN");
+        t_skip("FXU_CTRL");
+        t_skip("FXU_POLY");
+    }
+
+    test_dos_lasterr();
+    test_bmx_lasterr();
+    test_bmx_hires_absent();
 
     t_done();
     return 0;

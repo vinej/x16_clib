@@ -49,8 +49,31 @@
 
         global	_x16_bmx_load
         global	_x16_bmx_save
+        global	_x16_bmx_lasterr
         global	_x16_bmx_get_info
         global	_x16_bmx_set_info
+
+; Internals shared with storage/bmx_hires.s -- a separate module, so a
+; program that never loads into VERA_2 SDRAM never links that code. The
+; file-local names stay as they are; the exports carry the module
+; prefix, as alias labels at the definition sites below.
+        global	bmx_open_read
+        global	bmx_close_file
+        global	bmx_row_bytes
+        global	bmx_dec_cnt
+        global	bmx_code
+        global	bmx_hdr
+        global	bmx_cnt
+        global	bmx_cur
+        global	bmx_row
+        global	bmx_rows
+        global	bmx_t
+        global	bmx_width
+        global	bmx_height
+        global	bmx_bpp
+        global	bmx_palstart
+        global	bmx_palcount
+        global	bmx_border
 
 CH_B = $42
 CH_M = $4D
@@ -96,6 +119,14 @@ _x16_bmx_save:
         bcs     .err
         lda     #0
 .err:
+        ldx     #0
+        rts
+
+; ---------------------------------------------------------------------
+; unsigned char x16_bmx_lasterr(void)
+; ---------------------------------------------------------------------
+_x16_bmx_lasterr:
+        jsr     bmx_lasterr
         ldx     #0
         rts
 
@@ -158,15 +189,30 @@ _x16_bmx_set_info:
 ; =====================================================================
 
 ; ---------------------------------------------------------------------
+; bmx_lasterr -- why the last bmx_* call failed
+;   out: A = BMX_ERR_IO / _FORMAT / _PACKED, or 0 after a call that worked
+;
+; These routines answer twice -- the carry says whether, A says why -- and
+; a caller that can only see one of them (a generated binding will not
+; guess a type for a routine documenting both) would otherwise be left
+; unable to tell a missing file from a loaded one.
+; ---------------------------------------------------------------------
+bmx_lasterr:
+        lda     bmx_code
+        rts
+
+; ---------------------------------------------------------------------
 ; bmx_load -- palette into the VERA palette, pixels into VRAM
 ;   in:  X16_P0/P1 = filename, X16_P2 = length, X16_P3 = device
 ;        X16_P4 = VRAM bank (0/1), X16_P5/P6 = VRAM address
 ;   out: carry clear on success, set with A = BMX_ERR_* on failure
 ; ---------------------------------------------------------------------
 bmx_load:
+        stz     bmx_code
         jsr     open_read
         bcc     .hdr
         lda     #BMX_ERR_IO
+        sta     bmx_code
         rts
 .hdr:
         ldx     #0                      ; pull in the 16-byte header
@@ -188,6 +234,7 @@ bmx_load:
         jsr     READST
         beq     .validate
         lda     #BMX_ERR_IO
+        sta     bmx_code
         bra     .close_err
 
 .validate:
@@ -206,9 +253,11 @@ bmx_load:
         lda     bmx_hdr+14
         beq     .fmt_ok
         lda     #BMX_ERR_PACKED
+        sta     bmx_code
         bra     .close_err
 .bad_fmt:
         lda     #BMX_ERR_FORMAT
+        sta     bmx_code
 .close_err:
         pha
         jsr     close_file
@@ -365,6 +414,7 @@ bmx_load:
 
 .io_short:
         lda     #BMX_ERR_IO
+        sta     bmx_code
         jmp     .close_err
 
 .done:
@@ -381,9 +431,11 @@ bmx_load:
 ;   out: carry clear on success, set with A = BMX_ERR_IO on failure
 ; ---------------------------------------------------------------------
 bmx_save:
+        stz     bmx_code
         jsr     open_write
         bcc     .wr_hdr
         lda     #BMX_ERR_IO
+        sta     bmx_code
         rts
 .wr_hdr:
         lda     #CH_B
@@ -523,6 +575,7 @@ bmx_save:
 
 ; --- plumbing ---------------------------------------------------------
 
+bmx_open_read:                          ; the bmx_hires.s alias
 open_read:
         lda     X16_P2
         ldx     X16_P0
@@ -566,6 +619,7 @@ open_bad:
 
 ; The ACME original had two labels, .close_read and .close_write, on this
 ; one routine; reads and writes close the same way.
+bmx_close_file:                         ; the bmx_hires.s alias
 close_file:
         jsr     CLRCHN
         lda     #2
@@ -573,6 +627,7 @@ close_file:
         rts
 
 ; bmx_row = bmx_width >> (3 - depth): the bytes in one row of pixels
+bmx_row_bytes:                          ; the bmx_hires.s alias
 row_bytes:
         lda     bmx_width
         sta     bmx_row
@@ -637,6 +692,7 @@ point_cur1:                             ; port 1 at bmx_cur, INC_1
         trb     VERA_CTRL
         rts
 
+bmx_dec_cnt:                            ; the bmx_hires.s alias
 dec_cnt:
         lda     bmx_cnt
         bne     .dc_lo
@@ -725,6 +781,10 @@ bmx_palstart: byte 0
 bmx_palcount: word 256                 ; 1-256 entries
 bmx_border:   byte 0
 bmx_stride:   word 320                 ; VRAM bytes between row starts
+
+; After the info block, NOT inside it: the eleven bytes above are what
+; x16_bmx_get_info/set_info block-copy.
+bmx_code:     byte 0                   ; the last BMX_ERR_*, for bmx_lasterr
 
         section bss
 
