@@ -64,6 +64,11 @@
 #include <x16/bank.h>           /* banked RAM, and a whole-bank allocator */
 #include <x16/mem.h>            /* KERNAL block ops, incl. LZSA2 depacking */
 #include <x16/load.h>           /* load and save, including into VRAM */
+#include <x16/fileio.h>         /* OPEN/CHKIN/CHRIN: streamed channel I/O */
+#include <x16/iec.h>            /* raw IEC / serial bus control */
+#include <x16/dir.h>            /* walk a device directory */
+#include <x16/ringbuffer.h>     /* an 8 KB FIFO in a HIRAM bank */
+#include <x16/stack.h>          /* an 8 KB LIFO in a HIRAM bank */
 #include <x16/dos.h>            /* the DOS command channel: status, delete */
 #include <x16/bmx.h>            /* the X16's native bitmap file format */
 #include <x16/zx0.h>            /* ZX0 depacking, tighter than LZSA2 */
