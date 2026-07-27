@@ -1,16 +1,16 @@
 // =====================================================================
-// x16clib :: x16/bitmap2.c -- 640x480x4 bitmap drawing (2bpp)
+// x16clib :: x16/bitmap2h.c -- 640x480x4 bitmap drawing (2bpp)
 // =====================================================================
 // The framebuffer is 2bpp at VRAM $00000: 4 pixels per byte packed
 // MSB-first, rows of 160 bytes. A pixel byte is at y*160 + (x>>2).
 //
-// x16_gfx2_pset/read clip. The span/rect/line/blit primitives do NOT:
+// x16_gfx2h_pset/read clip. The span/rect/line/blit primitives do NOT:
 // they assume their arguments are on screen.
 //
-// HOW THIS PORT IS SPLIT (the same rule as x16/bitmap.c). The hot paths
+// HOW THIS PORT IS SPLIT (the same rule as x16/bitmap8l.c). The hot paths
 // -- the y*160+(x>>2) address, the masked read-modify-write, the column
 // and blit loops -- are the same hand-written 6502 as
-// src_ca65/gfx/bitmap2.s, operating on a module operand block. The
+// src_ca65/gfx/bitmap2h.s, operating on a module operand block. The
 // ORCHESTRATION around them is C, mirroring the ca65 control flow
 // statement for statement: inline asm cannot jsr another function, and
 // a 2bpp span is three phases (partial head byte, whole-byte middle
@@ -18,41 +18,37 @@
 // work.
 // =====================================================================
 
-#include <x16/bitmap2.h>
+#include <x16/bitmap2h.h>
 #include <x16/vera.h>
 #include <x16/verafx.h>
 #include <x16/palette.h>
 
 // The operand block (the ca65 build's X16_P0..P7 and g2_* variables).
-__mem volatile unsigned int x16__g2_x;
-__mem volatile unsigned int x16__g2_y;
-__mem volatile char x16__g2_c;          // colour 0-3
-__mem volatile char x16__g2_cb;         // that colour in all four pixels
-__mem volatile char x16__g2_off;        // pset/read's clip verdict
-__mem volatile char x16__g2_phase;      // x & 3
-__mem volatile char x16__g2_msk;        // RMW mask (pixels to KEEP)
-__mem volatile char x16__g2_ink;        // RMW ink (already masked)
+volatile unsigned int x16__g2_x;
+volatile unsigned int x16__g2_y;
+volatile char x16__g2_c;          // colour 0-3
+volatile char x16__g2_cb;         // that colour in all four pixels
+volatile char x16__g2_off;        // pset/read's clip verdict
+volatile char x16__g2_phase;      // x & 3
+volatile char x16__g2_msk;        // RMW mask (pixels to KEEP)
+volatile char x16__g2_ink;        // RMW ink (already masked)
 
-__mem volatile char x16__g2_a0;         // the 17-bit framebuffer address
-__mem volatile char x16__g2_a1;
-__mem volatile char x16__g2_a2;
-__mem volatile char x16__g2_t;
+volatile char x16__g2_a0;         // the 17-bit framebuffer address
+volatile char x16__g2_a1;
+volatile char x16__g2_a2;
+volatile char x16__g2_t;
 
 // Pattern state: 8 rows x 2 bytes, expanded once by pattern_set.
-__mem volatile char x16__g2_pat[16];
-__mem volatile char x16__g2_pfg;
-__mem volatile char x16__g2_pbg;
-__mem volatile char x16__g2_pb0;
-__mem volatile char x16__g2_pb1;
+volatile char x16__g2_pat[16];
+volatile char x16__g2_pfg;
+volatile char x16__g2_pbg;
+volatile char x16__g2_pb0;
+volatile char x16__g2_pb1;
 
-// Blit operands. The source is indirected -- (ptr),y -- so it has to be
-// pinned in zero page: KickC ignores __zp on a global and spills it to
-// main memory, where the indirect assembles to garbage. $78 is the
-// shared pointer slot (see x16/zpsafe.h); no module's slot is live
-// across a call into another, and the blits call nothing.
-__address(0x78) const char* volatile x16__g2_src;
-__mem volatile char x16__g2_n;          // rows / columns counter
-__mem volatile char x16__g2_op;
+// Blit operands. No pinned source pointer here: Oscar64 keeps pointer
+// PARAMETERS in zero page, so the blits below indirect `src` directly
+// -- the KickC build's __address() slot has nothing to do.
+volatile char x16__g2_n;          // rows / columns counter
 
 // The tables the ca65 module carries. Indexed from asm, so they are
 // plain module arrays rather than kickasm data.
@@ -70,8 +66,8 @@ const char x16__g2_defpal[8] = {        // white, light gray, dark gray, black
 // Internal: g2_a = y*160 + (x>>2), the 17-bit byte address.
 // y*160 = t + (t<<2) where t = y<<5, so no multiply is needed.
 // ---------------------------------------------------------------------
-void x16__gfx2_addr(void) {
-    asm {
+void x16__gfx2h_addr(void) {
+    __asm {
         lda x16__g2_y                   // t = y << 5
         sta x16__g2_a0
         lda x16__g2_y+1
@@ -91,7 +87,8 @@ void x16__gfx2_addr(void) {
         sta x16__g2_t
         lda x16__g2_a1
         sta x16__g2_msk                 // borrowed: t<<2 middle byte
-        stz x16__g2_a2
+        lda #0
+        sta x16__g2_a2
         asl x16__g2_t
         rol x16__g2_msk
         rol x16__g2_a2
@@ -133,45 +130,47 @@ void x16__gfx2_addr(void) {
 // Internal: point a data port at g2_a. `port1` selects the read side.
 // `incr` is a VERA increment INDEX, pre-shifted here.
 // ---------------------------------------------------------------------
-void x16__gfx2_aim0(__mem unsigned char incr) {
-    asm {
+void x16__gfx2h_aim0(unsigned char incr) {
+    __asm {
         lda incr
         asl
         asl
         asl
         asl
         sta x16__g2_t
-        lda #1 /*VERA_CTRL_ADDRSEL*/
-        trb $9f25 /*VERA_CTRL*/
+        lda 0x9f25                      // VERA_CTRL
+        and #0xfe                       // ADDRSEL = 0, DCSEL kept
+        sta 0x9f25
         lda x16__g2_a0
-        sta $9f20 /*VERA_ADDR_L*/
+        sta 0x9f20                      // VERA_ADDR_L
         lda x16__g2_a1
-        sta $9f21 /*VERA_ADDR_M*/
+        sta 0x9f21                      // VERA_ADDR_M
         lda x16__g2_a2
-        and #1 /*VERA_ADDR_H_BANK*/
+        and #1                          // VERA_ADDR_H_BANK
         ora x16__g2_t
-        sta $9f22 /*VERA_ADDR_H*/
+        sta 0x9f22                      // VERA_ADDR_H
     }
 }
 
-void x16__gfx2_aim1(__mem unsigned char incr) {
-    asm {
+void x16__gfx2h_aim1(unsigned char incr) {
+    __asm {
         lda incr
         asl
         asl
         asl
         asl
         sta x16__g2_t
-        lda #1 /*VERA_CTRL_ADDRSEL*/
-        tsb $9f25 /*VERA_CTRL*/
+        lda 0x9f25                      // VERA_CTRL
+        ora #0x01                       // ADDRSEL = 1, DCSEL kept
+        sta 0x9f25
         lda x16__g2_a0
-        sta $9f20 /*VERA_ADDR_L*/
+        sta 0x9f20                      // VERA_ADDR_L
         lda x16__g2_a1
-        sta $9f21 /*VERA_ADDR_M*/
+        sta 0x9f21                      // VERA_ADDR_M
         lda x16__g2_a2
-        and #1 /*VERA_ADDR_H_BANK*/
+        and #1                          // VERA_ADDR_H_BANK
         ora x16__g2_t
-        sta $9f22 /*VERA_ADDR_H*/
+        sta 0x9f22                      // VERA_ADDR_H
     }
 }
 
@@ -182,12 +181,12 @@ void x16__gfx2_aim1(__mem unsigned char incr) {
 // and KickC drops it, which leaves any branch to it dangling. Two
 // unsigned compares are not a hot path worth fighting that over.
 // ---------------------------------------------------------------------
-void x16__gfx2_onscreen(void) {
+void x16__gfx2h_onscreen(void) {
     x16__g2_off = 0;
-    if (x16__g2_x >= X16_GFX2_WIDTH) {
+    if (x16__g2_x >= X16_GFX2H_WIDTH) {
         x16__g2_off = 1;
     }
-    if (x16__g2_y >= X16_GFX2_HEIGHT) {
+    if (x16__g2_y >= X16_GFX2H_HEIGHT) {
         x16__g2_off = 1;
     }
 }
@@ -195,7 +194,7 @@ void x16__gfx2_onscreen(void) {
 // ---------------------------------------------------------------------
 // Internal: g2_a += 1, the 17-bit carry chain.
 // ---------------------------------------------------------------------
-void x16__gfx2_ainc(void) {
+void x16__gfx2h_ainc(void) {
     x16__g2_a0++;
     if (x16__g2_a0 == 0) {
         x16__g2_a1++;
@@ -208,7 +207,7 @@ void x16__gfx2_ainc(void) {
 // ---------------------------------------------------------------------
 // Internal: g2_a += n (n is a byte count, not a pixel count).
 // ---------------------------------------------------------------------
-void x16__gfx2_aadd(unsigned int n) {
+void x16__gfx2h_aadd(unsigned int n) {
     unsigned int lo;
 
     lo = (unsigned int)x16__g2_a0 + n;
@@ -222,43 +221,45 @@ void x16__gfx2_aadd(unsigned int n) {
 // Internal: read-modify-write the byte at g2_a through g2_msk, laying
 // in g2_ink. INC_0 keeps the port still, so one aim serves both halves.
 // ---------------------------------------------------------------------
-void x16__gfx2_rmw(void) {
-    x16__gfx2_aim0(X16_INC_0);
-    asm {
+void x16__gfx2h_rmw(void) {
+    x16__gfx2h_aim0(X16_INC_0);
+    __asm {
         lda x16__g2_msk
-        eor #$ff
-        and $9f23 /*VERA_DATA0*/
+        eor #0xff
+        and 0x9f23                      // VERA_DATA0
         sta x16__g2_t
         lda x16__g2_ink
         and x16__g2_msk
         ora x16__g2_t
-        sta $9f23 /*VERA_DATA0*/
+        sta 0x9f23                      // VERA_DATA0
     }
 }
 
 // ---------------------------------------------------------------------
 // Public: program the mode on bare VERA registers.
 // ---------------------------------------------------------------------
-void x16_gfx2_init(void) {
+void x16_gfx2h_init(void) {
     unsigned char i;
 
-    asm {
-        lda $9f25 /*VERA_CTRL*/         // DCSEL = 0, keep ADDRSEL
-        and #1 /*VERA_CTRL_ADDRSEL*/
-        sta $9f25 /*VERA_CTRL*/
-        lda #$80                        // 1:1 scale -> full 640x480
-        sta $9f2a /*VERA_DC_HSCALE*/
-        sta $9f2b /*VERA_DC_VSCALE*/
-        stz $9f2c /*VERA_DC_BORDER*/
+    __asm {
+        lda 0x9f25         // DCSEL = 0, keep ADDRSEL (VERA_CTRL)
+        and #1                          // VERA_CTRL_ADDRSEL
+        sta 0x9f25                      // VERA_CTRL
+        lda #0x80                        // 1:1 scale -> full 640x480
+        sta 0x9f2a                      // VERA_DC_HSCALE
+        sta 0x9f2b                      // VERA_DC_VSCALE
+        lda #0
+        sta 0x9f2c                      // VERA_DC_BORDER
 
-        lda #5 /*BITMAP|BPP_2*/
-        sta $9f2d /*VERA_L0_CONFIG*/
-        lda #1                          // base $00000, 640 wide
-        sta $9f2f /*VERA_L0_TILEBASE*/
-        stz $9f30 /*VERA_L0_HSCROLL_L*/
-        stz $9f31 /*VERA_L0_HSCROLL_H*/
-        stz $9f32 /*VERA_L0_VSCROLL_L*/
-        stz $9f33 /*VERA_L0_VSCROLL_H*/
+        lda #5                          // BITMAP|BPP_2
+        sta 0x9f2d                      // VERA_L0_CONFIG
+        lda #1                          // base 0x00000, 640 wide
+        sta 0x9f2f                      // VERA_L0_TILEBASE
+        lda #0
+        sta 0x9f30                      // VERA_L0_HSCROLL_L
+        sta 0x9f31                      // VERA_L0_HSCROLL_H
+        sta 0x9f32                      // VERA_L0_VSCROLL_L
+        sta 0x9f33                      // VERA_L0_VSCROLL_H
     }
 
     // Palette 0-3. pal_set takes a 16-bit colour, and the default table
@@ -268,11 +269,13 @@ void x16_gfx2_init(void) {
                        ((unsigned int)x16__g2_defpal[i * 2 + 1] << 8));
     }
 
-    asm {
-        lda #$20 /*VIDEO_LAYER1_EN*/    // layer 1 off, layer 0 on
-        trb $9f29 /*VERA_DC_VIDEO*/
-        lda #$10 /*VIDEO_LAYER0_EN*/
-        tsb $9f29 /*VERA_DC_VIDEO*/
+    __asm {
+        lda 0x9f29  /*VERA_DC_VIDEO*/
+        and #0xdf
+        sta 0x9f29
+        lda 0x9f29  /*VERA_DC_VIDEO*/
+        ora #0x10
+        sta 0x9f29
     }
 }
 
@@ -280,7 +283,7 @@ void x16_gfx2_init(void) {
 // Public: fill the whole framebuffer through the FX 32-bit cache.
 // 76,800 bytes does not fit fx_fill's 16-bit count, so two halves.
 // ---------------------------------------------------------------------
-void x16_gfx2_clear(unsigned char color) {
+void x16_gfx2h_clear(unsigned char color) {
     unsigned char cb = x16__g2_colbyte[color & 3];
 
     x16_fx_fill(cb, 38400, 0);
@@ -290,62 +293,62 @@ void x16_gfx2_clear(unsigned char color) {
 // ---------------------------------------------------------------------
 // Public: point data port 0 at the byte holding (x,y); returns x & 3.
 // ---------------------------------------------------------------------
-unsigned char x16_gfx2_setptr(unsigned char inc, unsigned int x,
+unsigned char x16_gfx2h_setptr(unsigned char inc, unsigned int x,
                               unsigned int y) {
     x16__g2_x = x;
     x16__g2_y = y;
-    x16__gfx2_addr();
-    x16__gfx2_aim0(inc);
+    x16__gfx2h_addr();
+    x16__gfx2h_aim0(inc);
     return (unsigned char)(x & 3);
 }
 
 // ---------------------------------------------------------------------
 // Internal: set pixel (g2_x, g2_y) to g2_c, clipped.
 // ---------------------------------------------------------------------
-void x16__gfx2_pset_i(void) {
-    x16__gfx2_onscreen();
+void x16__gfx2h_pset_i(void) {
+    x16__gfx2h_onscreen();
     if (x16__g2_off) {
         return;
     }
-    x16__gfx2_addr();
+    x16__gfx2h_addr();
     x16__g2_ink = x16__g2_colbyte[x16__g2_c & 3];
     x16__g2_msk = x16__g2_pix[(unsigned char)(x16__g2_x & 3)];
-    x16__gfx2_rmw();
+    x16__gfx2h_rmw();
 }
 
 // ---------------------------------------------------------------------
 // Public: one pixel, clipped.
 // ---------------------------------------------------------------------
-void x16_gfx2_pset(unsigned int x, unsigned int y, unsigned char color) {
+void x16_gfx2h_pset(unsigned int x, unsigned int y, unsigned char color) {
     x16__g2_x = x;
     x16__g2_y = y;
     x16__g2_c = color;
-    x16__gfx2_pset_i();
+    x16__gfx2h_pset_i();
 }
 
 // ---------------------------------------------------------------------
 // Public: one pixel back, or $FF off screen.
 // ---------------------------------------------------------------------
-unsigned char x16_gfx2_read(unsigned int x, unsigned int y) {
+unsigned char x16_gfx2h_read(unsigned int x, unsigned int y) {
     x16__g2_x = x;
     x16__g2_y = y;
-    x16__gfx2_onscreen();
+    x16__gfx2h_onscreen();
     if (x16__g2_off) {
         return 0xFF;
     }
-    x16__gfx2_addr();
-    x16__gfx2_aim0(X16_INC_0);
+    x16__gfx2h_addr();
+    x16__gfx2h_aim0(X16_INC_0);
     x16__g2_phase = (unsigned char)(x & 3);
-    asm {
+    __asm {
         ldx x16__g2_phase
-        lda $9f23 /*VERA_DATA0*/
+        lda 0x9f23                      // VERA_DATA0
     g2rd_shift:
         cpx #3                          // pixel 3 is already in bits 1:0
         beq g2rd_done
         lsr
         lsr
         inx
-        bra g2rd_shift
+        jmp g2rd_shift
     g2rd_done:
         and #3
         sta x16__g2_c
@@ -358,14 +361,14 @@ unsigned char x16_gfx2_read(unsigned int x, unsigned int y) {
 // Head and tail partials are read-modify-write; the whole bytes in
 // between are one vera_fill.
 // ---------------------------------------------------------------------
-void x16__gfx2_hline_i(unsigned int len) {
+void x16__gfx2h_hline_i(unsigned int len) {
     unsigned char p, q, head;
     unsigned int m;
 
     if (len == 0) {
         return;
     }
-    x16__gfx2_addr();
+    x16__gfx2h_addr();
     p = (unsigned char)(x16__g2_x & 3);
 
     // A head byte exists when the span starts mid-byte, or is so short
@@ -378,41 +381,41 @@ void x16__gfx2_hline_i(unsigned int len) {
         head = q - p + 1;
         x16__g2_ink = x16__g2_cb;
         x16__g2_msk = x16__g2_from[p] & x16__g2_upto[q];
-        x16__gfx2_rmw();
+        x16__gfx2h_rmw();
         len -= head;
-        x16__gfx2_ainc();
+        x16__gfx2h_ainc();
     }
 
     m = len >> 2;                       // whole bytes
     if (m != 0) {
-        x16__gfx2_aim0(X16_INC_1);
+        x16__gfx2h_aim0(X16_INC_1);
         x16_vera_fill(x16__g2_cb, m);
-        x16__gfx2_aadd(m);
+        x16__gfx2h_aadd(m);
     }
 
     if ((len & 3) != 0) {               // tail: pixels 0..(len&3)-1
         x16__g2_ink = x16__g2_cb;
         x16__g2_msk = x16__g2_upto[(unsigned char)(len & 3) - 1];
-        x16__gfx2_rmw();
+        x16__gfx2h_rmw();
     }
 }
 
 // ---------------------------------------------------------------------
 // Public: horizontal span.
 // ---------------------------------------------------------------------
-void x16_gfx2_hline(unsigned int x, unsigned int y, unsigned int len,
+void x16_gfx2h_hline(unsigned int x, unsigned int y, unsigned int len,
                     unsigned char color) {
     x16__g2_x = x;
     x16__g2_y = y;
     x16__g2_cb = x16__g2_colbyte[color & 3];
-    x16__gfx2_hline_i(len);
+    x16__gfx2h_hline_i(len);
 }
 
 // ---------------------------------------------------------------------
 // Public: vertical span. One column of read-modify-writes, both ports
 // stepping a whole row per access -- no calls, so one asm block.
 // ---------------------------------------------------------------------
-void x16_gfx2_vline(unsigned int x, unsigned int y, unsigned int len,
+void x16_gfx2h_vline(unsigned int x, unsigned int y, unsigned int len,
                     unsigned char color) {
     if (len == 0) {
         return;
@@ -420,16 +423,16 @@ void x16_gfx2_vline(unsigned int x, unsigned int y, unsigned int len,
     x16__g2_x = x;
     x16__g2_y = y;
     x16__g2_cb = x16__g2_colbyte[color & 3];
-    x16__gfx2_addr();
-    x16__gfx2_aim1(X16_INC_160);
-    x16__gfx2_aim0(X16_INC_160);
+    x16__gfx2h_addr();
+    x16__gfx2h_aim1(X16_INC_160);
+    x16__gfx2h_aim0(X16_INC_160);
 
     // ink and keep are loop-invariant: this column's pixel never moves.
     x16__g2_ink = x16__g2_cb & x16__g2_pix[(unsigned char)(x & 3)];
     x16__g2_msk = x16__g2_keep[(unsigned char)(x & 3)];
 
     x16__g2_x = len;                    // borrowed as the 16-bit counter
-    asm {
+    __asm {
         ldx x16__g2_x                   // vera_fill's page-count idiom
         ldy x16__g2_x+1
         txa
@@ -437,10 +440,10 @@ void x16_gfx2_vline(unsigned int x, unsigned int y, unsigned int len,
         iny
     g2v_full:
     g2v_loop:
-        lda $9f24 /*VERA_DATA1*/
+        lda 0x9f24                      // VERA_DATA1
         and x16__g2_msk
         ora x16__g2_ink
-        sta $9f23 /*VERA_DATA0*/
+        sta 0x9f23                      // VERA_DATA0
         dex
         bne g2v_loop
         dey
@@ -451,7 +454,7 @@ void x16_gfx2_vline(unsigned int x, unsigned int y, unsigned int len,
 // ---------------------------------------------------------------------
 // Public: filled rectangle and outline.
 // ---------------------------------------------------------------------
-void x16_gfx2_rect(unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx2h_rect(unsigned int x, unsigned int y, unsigned int w,
                    unsigned int h, unsigned char color) {
     unsigned int i;
 
@@ -459,23 +462,23 @@ void x16_gfx2_rect(unsigned int x, unsigned int y, unsigned int w,
     for (i = 0; i < h; i++) {
         x16__g2_x = x;
         x16__g2_y = y + i;
-        x16__gfx2_hline_i(w);
+        x16__gfx2h_hline_i(w);
     }
 }
 
-void x16_gfx2_frame(unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx2h_frame(unsigned int x, unsigned int y, unsigned int w,
                     unsigned int h, unsigned char color) {
-    x16_gfx2_hline(x, y, w, color);
-    x16_gfx2_hline(x, y + h - 1, w, color);
-    x16_gfx2_vline(x, y, h, color);
-    x16_gfx2_vline(x + w - 1, y, h, color);
+    x16_gfx2h_hline(x, y, w, color);
+    x16_gfx2h_hline(x, y + h - 1, w, color);
+    x16_gfx2h_vline(x, y, h, color);
+    x16_gfx2h_vline(x + w - 1, y, h, color);
 }
 
 // ---------------------------------------------------------------------
-// Public: Bresenham, any direction. C, like x16/bitmap.c's gfx_line --
+// Public: Bresenham, any direction. C, like x16/bitmap8l.c's gfx8l_line --
 // it plots through the clipped pset, so the line clips for free.
 // ---------------------------------------------------------------------
-void x16_gfx2_line(unsigned int x0, unsigned int y0, unsigned int x1,
+void x16_gfx2h_line(unsigned int x0, unsigned int y0, unsigned int x1,
                    unsigned int y1, unsigned char color) {
     int lx0;
     int ly0;
@@ -517,7 +520,7 @@ void x16_gfx2_line(unsigned int x0, unsigned int y0, unsigned int x1,
     for (;;) {
         x16__g2_x = (unsigned int)lx0;
         x16__g2_y = (unsigned int)ly0;
-        x16__gfx2_pset_i();
+        x16__gfx2h_pset_i();
 
         if (lx0 == lx1 && ly0 == ly1) {
             break;
@@ -539,7 +542,7 @@ void x16_gfx2_line(unsigned int x0, unsigned int y0, unsigned int x1,
 // Patterns tile from the screen origin, so each row is two bytes and
 // which one a framebuffer byte uses is the parity of its address.
 // ---------------------------------------------------------------------
-void x16_gfx2_pattern_set(const unsigned char *pattern,
+void x16_gfx2h_pattern_set(const unsigned char *pattern,
                           unsigned char colors) {
     unsigned char row, half, bit, acc, bits;
 
@@ -567,14 +570,14 @@ void x16_gfx2_pattern_set(const unsigned char *pattern,
 // ---------------------------------------------------------------------
 // Internal: one pattern row at (g2_x, g2_y), `len` pixels wide.
 // ---------------------------------------------------------------------
-void x16__gfx2_prow(unsigned int len) {
+void x16__gfx2h_prow(unsigned int len) {
     unsigned char p, q, head, swap;
     unsigned int m;
 
     if (len == 0) {
         return;
     }
-    x16__gfx2_addr();
+    x16__gfx2h_addr();
 
     // The row's two pattern bytes, in address-parity order.
     swap = (unsigned char)(x16__g2_y & 7) * 2;
@@ -595,9 +598,9 @@ void x16__gfx2_prow(unsigned int len) {
         head = q - p + 1;
         x16__g2_ink = x16__g2_pb0;
         x16__g2_msk = x16__g2_from[p] & x16__g2_upto[q];
-        x16__gfx2_rmw();
+        x16__gfx2h_rmw();
         len -= head;
-        x16__gfx2_ainc();
+        x16__gfx2h_ainc();
         swap = x16__g2_pb0;             // the next byte flips parity
         x16__g2_pb0 = x16__g2_pb1;
         x16__g2_pb1 = swap;
@@ -605,9 +608,9 @@ void x16__gfx2_prow(unsigned int len) {
 
     m = len >> 2;
     if (m != 0) {
-        x16__gfx2_aim0(X16_INC_1);
+        x16__gfx2h_aim0(X16_INC_1);
         x16__g2_x = m;                  // borrowed as the counter
-        asm {
+        __asm {
             ldx x16__g2_x
             ldy x16__g2_x+1
             txa
@@ -616,7 +619,7 @@ void x16__gfx2_prow(unsigned int len) {
         g2p_full:
         g2p_loop:
             lda x16__g2_pb0
-            sta $9f23 /*VERA_DATA0*/
+            sta 0x9f23                  // VERA_DATA0
             lda x16__g2_pb0             // swap the parity pair
             ldx x16__g2_pb1
             sta x16__g2_pb1
@@ -628,24 +631,24 @@ void x16__gfx2_prow(unsigned int len) {
             dey
             bne g2p_loop
         }
-        x16__gfx2_aadd(m);
+        x16__gfx2h_aadd(m);
     }
 
     if ((len & 3) != 0) {
         x16__g2_ink = x16__g2_pb0;
         x16__g2_msk = x16__g2_upto[(unsigned char)(len & 3) - 1];
-        x16__gfx2_rmw();
+        x16__gfx2h_rmw();
     }
 }
 
-void x16_gfx2_pattern_rect(unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx2h_pattern_rect(unsigned int x, unsigned int y, unsigned int w,
                            unsigned int h) {
     unsigned int i;
 
     for (i = 0; i < h; i++) {
         x16__g2_x = x;
         x16__g2_y = y + i;
-        x16__gfx2_prow(w);
+        x16__gfx2h_prow(w);
     }
 }
 
@@ -656,66 +659,65 @@ void x16_gfx2_pattern_rect(unsigned int x, unsigned int y, unsigned int w,
 // a block that ended in a shared `done` label would end the procedure
 // on a label, which KickC drops.
 // ---------------------------------------------------------------------
-void x16_gfx2_blit(unsigned int x, unsigned int y, unsigned char wbytes,
+void x16_gfx2h_blit(unsigned int x, unsigned int y, unsigned char wbytes,
                    unsigned char h, const unsigned char *src,
                    unsigned char op) {
     unsigned char row;
 
     x16__g2_x = x;
     x16__g2_y = y;
-    x16__g2_src = src;
     x16__g2_n = wbytes;
-    x16__gfx2_addr();
+    x16__gfx2h_addr();
 
     for (row = 0; row < h; row++) {
-        x16__gfx2_aim1(X16_INC_1);      // ops read port 1...
-        x16__gfx2_aim0(X16_INC_1);      // ...everything writes port 0
+        x16__gfx2h_aim1(X16_INC_1);      // ops read port 1...
+        x16__gfx2h_aim0(X16_INC_1);      // ...everything writes port 0
         if (op == 1) {
-            asm {
+            __asm {
                 ldy #0
             g2b_or:
-                lda $9f24 /*VERA_DATA1*/
-                ora (x16__g2_src),y
-                sta $9f23 /*VERA_DATA0*/
+                lda 0x9f24              // VERA_DATA1
+                ora (src),y
+                sta 0x9f23              // VERA_DATA0
                 iny
                 cpy x16__g2_n
                 bne g2b_or
             }
         } else if (op == 2) {
-            asm {
+            __asm {
                 ldy #0
             g2b_and:
-                lda $9f24 /*VERA_DATA1*/
-                and (x16__g2_src),y
-                sta $9f23 /*VERA_DATA0*/
+                lda 0x9f24              // VERA_DATA1
+                and (src),y
+                sta 0x9f23              // VERA_DATA0
                 iny
                 cpy x16__g2_n
                 bne g2b_and
             }
         } else if (op == 3) {
-            asm {
+            __asm {
                 ldy #0
             g2b_xor:
-                lda $9f24 /*VERA_DATA1*/
-                eor (x16__g2_src),y
-                sta $9f23 /*VERA_DATA0*/
+                lda 0x9f24              // VERA_DATA1
+                eor (src),y
+                sta 0x9f23              // VERA_DATA0
                 iny
                 cpy x16__g2_n
                 bne g2b_xor
             }
         } else {
-            asm {
+            __asm {
                 ldy #0
             g2b_copy:
-                lda (x16__g2_src),y
-                sta $9f23 /*VERA_DATA0*/
+                lda (src),y
+                sta 0x9f23              // VERA_DATA0
                 iny
                 cpy x16__g2_n
                 bne g2b_copy
             }
         }
-        x16__g2_src = x16__g2_src + wbytes;
-        x16__gfx2_aadd(X16_GFX2_STRIDE);    // down one row
+        src = src + wbytes;
+        x16__gfx2h_aadd(X16_GFX2H_STRIDE);    // down one row
     }
 }
 
@@ -723,33 +725,32 @@ void x16_gfx2_blit(unsigned int x, unsigned int y, unsigned char wbytes,
 // Public: masked blit of pre-shifted column-major data. For each of
 // `cols` byte columns, `h` (mask, data) pairs walk down the rows.
 // ---------------------------------------------------------------------
-void x16_gfx2_blitm(unsigned int x, unsigned int y, unsigned char h,
+void x16_gfx2h_blitm(unsigned int x, unsigned int y, unsigned char h,
                     unsigned char cols, const unsigned char *src) {
     unsigned char col;
 
     x16__g2_x = x;
     x16__g2_y = y;
-    x16__g2_src = src;
     x16__g2_n = h;
-    x16__gfx2_addr();
+    x16__gfx2h_addr();
 
     for (col = 0; col < cols; col++) {
-        x16__gfx2_aim1(X16_INC_160);
-        x16__gfx2_aim0(X16_INC_160);
-        asm {
+        x16__gfx2h_aim1(X16_INC_160);
+        x16__gfx2h_aim0(X16_INC_160);
+        __asm {
             ldy #0
             ldx x16__g2_n
         g2m_row:
-            lda $9f24 /*VERA_DATA1*/
-            and (x16__g2_src),y         // mask byte
+            lda 0x9f24                  // VERA_DATA1
+            and (src),y         // mask byte
             iny
-            ora (x16__g2_src),y         // data byte
+            ora (src),y         // data byte
             iny
-            sta $9f23 /*VERA_DATA0*/
+            sta 0x9f23                  // VERA_DATA0
             dex
             bne g2m_row
         }
-        x16__g2_src = x16__g2_src + h + h;      // one column of pairs
-        x16__gfx2_ainc();                       // next byte column
+        src = src + h + h;                      // one column of pairs
+        x16__gfx2h_ainc();                       // next byte column
     }
 }

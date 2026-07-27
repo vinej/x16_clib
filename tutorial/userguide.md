@@ -17,7 +17,7 @@ For background, design notes and hardware pitfalls, see the
 4. [`x16/palette.h` — the VERA palette](#x16paletteh--the-vera-palette)
 5. [`x16/tile.h` — tilemap cells and layers](#x16tileh--tilemap-cells-and-layers)
 6. [`x16/sprite.h` — hardware sprites](#x16spriteh--hardware-sprites)
-7. [`x16/bitmap.h` — 320x240 bitmap drawing](#x16bitmaph--320x240-bitmap-drawing)
+7. [`x16/bitmap8l.h` — 320x240 bitmap drawing](#x16bitmap8lh--320x240-bitmap-drawing)
 8. [`x16/verafx.h` — VERA FX acceleration](#x16verafxh--vera-fx-acceleration)
 9. [`x16/psg.h` — the 16-voice PSG](#x16psgh--the-16-voice-psg)
 10. [`x16/ym.h` — the YM2151 FM chip](#x16ymh--the-ym2151-fm-chip)
@@ -178,7 +178,7 @@ emulator R44+), else 0. Call it before using anything in
 if (x16_vera_has_fx()) {
     x16_fx_clear(320u * 240u, X16_VRAM_BITMAP);
 } else {
-    x16_gfx_clear(0);                   /* software fallback */
+    x16_gfx8l_clear(0);                   /* software fallback */
 }
 ```
 
@@ -536,113 +536,113 @@ x16_sprites_on();
 
 ---
 
-## `x16/bitmap.h` — 320x240 bitmap drawing
+## `x16/bitmap8l.h` — 320x240 bitmap drawing
 
 An 8bpp framebuffer at VRAM $00000: one byte per pixel, rows of
-`X16_GFX_WIDTH` (320), `X16_GFX_HEIGHT` (240) rows. Only
-`x16_gfx_pset()`, the circles and text clip; **lines, rects and frames
+`X16_GFX8L_WIDTH` (320), `X16_GFX8L_HEIGHT` (240) rows. Only
+`x16_gfx8l_pset()`, the circles and text clip; **lines, rects and frames
 do not** — keep their arguments on screen, or pre-clip with
 `x16/clip.h`.
 
-### `unsigned char x16_gfx_init(void)`
+### `unsigned char x16_gfx8l_init(void)`
 
 Switch to 320x240@256c on layer 0 with 40x30 text on layer 1. Returns
 1 on success. Everything below assumes this mode (though the drawing
 routines only touch VRAM, so they also work on an off-screen buffer).
 
 ```c
-if (!x16_gfx_init()) return 1;
+if (!x16_gfx8l_init()) return 1;
 ```
 
-### `void x16_gfx_clear(unsigned char color)`
+### `void x16_gfx8l_clear(unsigned char color)`
 
 Fill the whole framebuffer with one colour.
 
 ```c
-x16_gfx_clear(0);                       /* black */
+x16_gfx8l_clear(0);                       /* black */
 ```
 
-### `void x16_gfx_pset(unsigned int x, unsigned char y, unsigned char color)`
+### `void x16_gfx8l_pset(unsigned int x, unsigned char y, unsigned char color)`
 
 Plot one pixel. Clipped: off-screen coordinates are safely ignored.
 
 ```c
-x16_gfx_pset(160, 120, 2);              /* red dot in the middle */
+x16_gfx8l_pset(160, 120, 2);              /* red dot in the middle */
 ```
 
-### `void x16_gfx_hline(unsigned int x, unsigned char y, unsigned int len, unsigned char color)`
+### `void x16_gfx8l_hline(unsigned int x, unsigned char y, unsigned int len, unsigned char color)`
 
 Horizontal run of `len` pixels starting at (x, y). Unclipped.
 
 ```c
-x16_gfx_hline(0, 120, 320, 1);          /* white line across */
+x16_gfx8l_hline(0, 120, 320, 1);          /* white line across */
 ```
 
-### `void x16_gfx_vline(unsigned int x, unsigned char y, unsigned char len, unsigned char color)`
+### `void x16_gfx8l_vline(unsigned int x, unsigned char y, unsigned char len, unsigned char color)`
 
 Vertical run. `len` is 1–255 (a 240-row screen never needs more).
 Unclipped.
 
 ```c
-x16_gfx_vline(160, 0, 240, 1);          /* white line down */
+x16_gfx8l_vline(160, 0, 240, 1);          /* white line down */
 ```
 
-### `void x16_gfx_rect(unsigned int x, unsigned char y, unsigned int w, unsigned char h, unsigned char color)`
+### `void x16_gfx8l_rect(unsigned int x, unsigned char y, unsigned int w, unsigned char h, unsigned char color)`
 
 Filled rectangle. Unclipped.
 
 ```c
-x16_gfx_rect(100, 80, 120, 80, 6);      /* filled blue box */
+x16_gfx8l_rect(100, 80, 120, 80, 6);      /* filled blue box */
 ```
 
-### `void x16_gfx_frame(unsigned int x, unsigned char y, unsigned int w, unsigned char h, unsigned char color)`
+### `void x16_gfx8l_frame(unsigned int x, unsigned char y, unsigned int w, unsigned char h, unsigned char color)`
 
 Rectangle outline, one pixel thick. Unclipped.
 
 ```c
-x16_gfx_frame(99, 79, 122, 82, 1);      /* white border around it */
+x16_gfx8l_frame(99, 79, 122, 82, 1);      /* white border around it */
 ```
 
-### `void x16_gfx_line(unsigned int x0, unsigned char y0, unsigned int x1, unsigned char y1, unsigned char color)`
+### `void x16_gfx8l_line(unsigned int x0, unsigned char y0, unsigned int x1, unsigned char y1, unsigned char color)`
 
 Bresenham line, any direction. Unclipped — see `x16_clip_line()` for
 endpoints that may leave the screen.
 
 ```c
-x16_gfx_line(0, 0, 319, 239, 5);        /* green diagonal */
+x16_gfx8l_line(0, 0, 319, 239, 5);        /* green diagonal */
 ```
 
-### `void x16_gfx_circle(unsigned int cx, unsigned char cy, unsigned char r, unsigned char color)`
-### `void x16_gfx_disc(unsigned int cx, unsigned char cy, unsigned char r, unsigned char color)`
+### `void x16_gfx8l_circle(unsigned int cx, unsigned char cy, unsigned char r, unsigned char color)`
+### `void x16_gfx8l_disc(unsigned int cx, unsigned char cy, unsigned char r, unsigned char color)`
 
 Circle outline and filled disc. Radius 0–120. These DO clip, at every
 edge.
 
 ```c
-x16_gfx_circle(160, 120, 60, 1);        /* ring */
-x16_gfx_disc(160, 120, 20, 2);          /* solid red centre */
+x16_gfx8l_circle(160, 120, 60, 1);        /* ring */
+x16_gfx8l_disc(160, 120, 20, 2);          /* solid red centre */
 ```
 
-### `void x16_gfx_char(unsigned int x, unsigned char y, unsigned char color, unsigned char code)`
+### `void x16_gfx8l_char(unsigned int x, unsigned char y, unsigned char color, unsigned char code)`
 
 Draw one glyph from the KERNAL's charset at VRAM $1F000. Set bits
 become `color`, clear bits stay transparent. `code` is a **screen
 code**, not PETSCII. Clips.
 
 ```c
-x16_gfx_char(8, 8, 1, 0x01);            /* screen code 1 = 'A' */
+x16_gfx8l_char(8, 8, 1, 0x01);            /* screen code 1 = 'A' */
 ```
 
-### `void x16_gfx_text(unsigned int x, unsigned char y, unsigned char color, const char *s)`
+### `void x16_gfx8l_text(unsigned int x, unsigned char y, unsigned char color, const char *s)`
 
 A NUL-terminated string, 8 pixels per character. ASCII letters convert
 to screen codes for you, so plain strings read as expected. Clips.
 
 ```c
-x16_gfx_text(100, 4, 1, "GAME OVER");
+x16_gfx8l_text(100, 4, 1, "GAME OVER");
 ```
 
-### `unsigned char x16_gfx_flood(unsigned int x, unsigned char y, unsigned char color)`
+### `unsigned char x16_gfx8l_flood(unsigned int x, unsigned char y, unsigned char color)`
 
 Scanline flood fill of the 4-connected region under the seed. Filling
 with the colour already there is a no-op. Returns 1 when the region was
@@ -651,8 +651,8 @@ and the fill is incomplete — only pathological shapes (long thin
 spirals) do that.
 
 ```c
-x16_gfx_circle(160, 120, 60, 1);
-x16_gfx_flood(160, 120, 3);             /* fill the inside cyan */
+x16_gfx8l_circle(160, 120, 60, 1);
+x16_gfx8l_flood(160, 120, 3);             /* fill the inside cyan */
 ```
 
 ---
@@ -729,8 +729,8 @@ x16_fx_transp_off();
 
 ### `void x16_fx_line(unsigned int x0, unsigned char y0, unsigned int x1, unsigned char y1, unsigned char color)`
 
-The same endpoints as `x16_gfx_line()`, but VERA carries the Bresenham
-error: the CPU does one store per pixel. Assumes the `x16_gfx_init()`
+The same endpoints as `x16_gfx8l_line()`, but VERA carries the Bresenham
+error: the CPU does one store per pixel. Assumes the `x16_gfx8l_init()`
 framebuffer. Does **not** clip.
 
 ```c
@@ -1221,7 +1221,7 @@ the pointers.
 ```c
 unsigned int mx, my;
 if (x16_mouse_get(&mx, &my) & X16_MOUSE_LEFT) {
-    x16_gfx_pset(mx >> 1, my >> 1, 1);  /* 640x480 -> 320x240 */
+    x16_gfx8l_pset(mx >> 1, my >> 1, 1);  /* 640x480 -> 320x240 */
 }
 ```
 
@@ -1566,7 +1566,7 @@ Load straight into VRAM at `vaddr`, skipping the PRG header. No cc65
 equivalent exists. Returns 0 on success.
 
 ```c
-x16_gfx_init();
+x16_gfx8l_init();
 x16_fs_vload("TITLE.BIN", 9, X16_DEVICE_SD, X16_VRAM_BITMAP);
 ```
 
@@ -1686,7 +1686,7 @@ bytes apart (320 by default, the full-screen stride) — so a 320-wide
 image loads contiguously and a narrower one lands as a "stamp".
 
 ```c
-x16_gfx_init();
+x16_gfx8l_init();
 if (x16_bmx_load("TITLE.BMX", 9, X16_DEVICE_SD, X16_VRAM_BITMAP)) {
     x16_dos_status();
     x16_screen_puts(x16_dos_msg());     /* the real reason */
@@ -1917,7 +1917,7 @@ outside (in which case `*seg` is unspecified).
 ```c
 x16_line seg = { -50, 120, 400, 130 };  /* both ends off screen */
 if (x16_clip_line(&seg)) {
-    x16_gfx_line(seg.x0, seg.y0, seg.x1, seg.y1, 1);
+    x16_gfx8l_line(seg.x0, seg.y0, seg.x1, seg.y1, 1);
 }
 ```
 

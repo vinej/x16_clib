@@ -7,7 +7,7 @@
 // and each carries its name in a comment.
 //
 // Cross-module note: the ca65 build exported the internal vera_fill for
-// gfx/bitmap.s and sprite/sprite.s to jsr. Here there is no shim for an
+// gfx/bitmap8l.s and sprite/sprite.s to jsr. Here there is no shim for an
 // internal routine to skip, so other modules simply call
 // x16_vera_fill() itself.
 // =====================================================================

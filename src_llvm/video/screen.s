@@ -60,7 +60,7 @@
         .globl  x16_screen_blitfill
         .globl  x16_screen_scroll
 
-; Cross-module: gfx/bitmap.s switches to bitmap mode through this.
+; Cross-module: gfx/bitmap8l.s switches to bitmap mode through this.
         .globl  screen_set_mode
 
         .section .text,"ax",@progbits

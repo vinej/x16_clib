@@ -64,7 +64,7 @@
         global	_x16_screen_blitfill
         global	_x16_screen_scroll
 
-; Cross-module: gfx/bitmap.s switches to bitmap mode through this.
+; Cross-module: gfx/bitmap8l.s switches to bitmap mode through this.
         global	screen_set_mode
 
         section text

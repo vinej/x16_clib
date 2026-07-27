@@ -114,9 +114,9 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/palette.h` | 256 entries of 12-bit colour, single and bulk |
 | `x16/tile.h` | tilemap cells, layer config, 12-bit hardware scroll |
 | `x16/sprite.h` | all 128 hardware sprites |
-| `x16/bitmap.h` | 320x240x256 pset, lines, rects, Bresenham, glyphs and text |
-| `x16/bitmap2.h` | **640x480x4 (2bpp)**: pset, read, spans, rects, Bresenham, screen-anchored patterns, raster-op blits, masked pre-shifted blits |
-| `x16/shapes.h` | **circles, discs, ellipses, flood fill, regular polygons, rounded rectangles, arcs, pie wedges and cubic Beziers for BOTH bitmap modes** from one implementation: `x16_gfx_*` on the 8bpp plane, `x16_gfx2_*` on the 2bpp plane |
+| `x16/bitmap8l.h` | 320x240x256 pset, lines, rects, Bresenham, glyphs and text |
+| `x16/bitmap2h.h` | **640x480x4 (2bpp)**: pset, read, spans, rects, Bresenham, screen-anchored patterns, raster-op blits, masked pre-shifted blits |
+| `x16/shapes.h` | **circles, discs, ellipses, flood fill, regular polygons, rounded rectangles, arcs, pie wedges and cubic Beziers for BOTH bitmap modes** from one implementation: `x16_gfx8l_*` on the 8bpp plane, `x16_gfx2h_*` on the 2bpp plane |
 | `x16/verafx.h` | VERA FX: hardware multiply, 4x fills, **hardware lines, filled triangles, blits, transparency** |
 | `x16/psg.h` | the 16-voice PSG, and **ASR envelopes** |
 | `x16/ym.h` | the YM2151 FM chip |
@@ -503,7 +503,7 @@ when the interrupt fires.
 Several tests exist to pin bugs found and fixed in the assembly library,
 so a regression cannot slip back in: `FS_VLOAD` (the bank must reach
 `LOAD`'s `.A`, not the secondary address), `F_NEG` (`fp_negfac` is not a
-negate), `F_FROM_U8` (`fp_float` is signed), `GFX_CLEAR` (checks the
+negate), `F_FROM_U8` (`fp_float` is signed), `GFX8L_CLEAR` (checks the
 *last* pixel, since a truncated count clears only the top 35 rows),
 `PAL_LOAD_ZERO`, `SPRITE_SIZE_PAL_MASK`, and `IRQ_PRESERVES_IFLAG`.
 
@@ -612,7 +612,7 @@ all, so `src/util/math.s` carries a precomputed 256-byte sine table and a
 
 **A plain label ends the enclosing cheap-local (`@`) scope**, where ACME's
 zone-locals did not. Self-modifying code that needs a named operand — the
-`lda $xxxx` in `pcmstream.s` and `gfx_text` — must therefore use plain
+`lda $xxxx` in `pcmstream.s` and `gfx8l_text` — must therefore use plain
 labels throughout that routine, not a mix.
 
 **`.byte -1` is a range error**; write `$FF`. And a nonzero initialiser
@@ -639,7 +639,7 @@ Four more things that bite:
 **Argument position decides everything.** Integers and pointers draw from
 the same `__rc` space, left to right. `x16_mem_fill(dst, count, value)`
 puts the pointer in `__rc2/__rc3` and so pushes `value` out to `__rc4`;
-`x16_gfx_text(x, y, color, s)` fills `__rc2` and `__rc3` with `y` and
+`x16_gfx8l_text(x, y, color, s)` fills `__rc2` and `__rc3` with `y` and
 `color` first, so the *string* lands in `__rc4/__rc5`. And
 `x16_fs_load(name, len, device, sa, dest, end)` has `sa` take `__rc4`,
 breaking that pair, so `dest` skips to `__rc6/__rc7` and `end` to

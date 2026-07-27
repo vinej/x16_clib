@@ -24,7 +24,7 @@
         global	_x16_vera_copy
         global	_x16_vera_has_fx
 
-; Cross-module: gfx/bitmap.s and sprite/sprite.s stream through vera_fill.
+; Cross-module: gfx/bitmap8l.s and sprite/sprite.s stream through vera_fill.
 ; ACME textually included every module into one assembly, so a bare label
 ; sufficed; separate objects need a real export.
         global	vera_fill

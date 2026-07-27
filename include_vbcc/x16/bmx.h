@@ -4,7 +4,7 @@
  * BMX version 1: a 16-byte header, then the palette in VERA's own
  * layout, then the pixels.
  *
- *      x16_gfx_init();
+ *      x16_gfx8l_init();
  *      if (x16_bmx_load("TITLE.BMX", 9, X16_DEVICE_SD, X16_VRAM_BITMAP)) {
  *          ...error...
  *      }

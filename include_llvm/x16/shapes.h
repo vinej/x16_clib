@@ -4,8 +4,8 @@
  * One shape implementation, bound at call time to the engine each entry
  * point names:
  *
- *   x16_gfx_*   plot on the 8bpp bitmap  (<x16/bitmap.h>,  320x240)
- *   x16_gfx2_*  plot on the 2bpp bitmap  (<x16/bitmap2.h>, 640x480)
+ *   x16_gfx8l_*   plot on the 8bpp bitmap  (<x16/bitmap8l.h>,  320x240)
+ *   x16_gfx2h_*  plot on the 2bpp bitmap  (<x16/bitmap2h.h>, 640x480)
  *
  * The two families differ only in the width of the vertical coordinate,
  * which follows the pset() of the module they draw on: 8bpp y is a byte
@@ -27,19 +27,19 @@
 /* --- 8bpp (320x240) -------------------------------------------------- */
 
 /* Midpoint circle outline / filled disc. Radius 0-120. */
-void x16_gfx_circle (unsigned int cx, unsigned char cy,
+void x16_gfx8l_circle (unsigned int cx, unsigned char cy,
                                   unsigned char r, unsigned char color);
-void x16_gfx_disc (unsigned int cx, unsigned char cy,
+void x16_gfx8l_disc (unsigned int cx, unsigned char cy,
                                 unsigned char r, unsigned char color);
 
 /* Axis-aligned ellipse outline / filled ellipse (the error-form midpoint
 ** walk). rx and ry each 0-255; the outline clips through pset, the fill
 ** does not (keep it on screen).
 */
-void x16_gfx_ellipse (unsigned int cx, unsigned char cy,
+void x16_gfx8l_ellipse (unsigned int cx, unsigned char cy,
                                    unsigned char rx, unsigned char ry,
                                    unsigned char color);
-void x16_gfx_fellipse (unsigned int cx, unsigned char cy,
+void x16_gfx8l_fellipse (unsigned int cx, unsigned char cy,
                                     unsigned char rx, unsigned char ry,
                                     unsigned char color);
 
@@ -48,70 +48,70 @@ void x16_gfx_fellipse (unsigned int cx, unsigned char cy,
 ** complete, 0 when the span stack (96 seeds) overflowed and the fill is
 ** INCOMPLETE -- pathological shapes (long thin spirals) are what overflow.
 */
-unsigned char x16_gfx_flood (unsigned int x, unsigned char y,
+unsigned char x16_gfx8l_flood (unsigned int x, unsigned char y,
                                           unsigned char color);
 
 /* Regular convex N-gon (sides 3-24), outline / filled. rotation is a byte
 ** angle (0=east, 64=south); the first vertex points that way. */
-void x16_gfx_polygon (unsigned int cx, unsigned char cy,
+void x16_gfx8l_polygon (unsigned int cx, unsigned char cy,
                           unsigned char r, unsigned char sides,
                           unsigned char rotation, unsigned char color);
-void x16_gfx_fpolygon (unsigned int cx, unsigned char cy,
+void x16_gfx8l_fpolygon (unsigned int cx, unsigned char cy,
                            unsigned char r, unsigned char sides,
                            unsigned char rotation, unsigned char color);
 /* Rounded rectangle, outline / filled. (x,y)=top-left, w/h=size, r=corner
 ** radius (clamped to min(w,h)/2). Coordinates 16-bit. */
-void x16_gfx_rrect (unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx8l_rrect (unsigned int x, unsigned int y, unsigned int w,
                         unsigned int h, unsigned char r, unsigned char color);
-void x16_gfx_frrect (unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx8l_frrect (unsigned int x, unsigned int y, unsigned int w,
                          unsigned int h, unsigned char r, unsigned char color);
 /* Arc: circle-outline slice a0..a1 (a0==a1 = full circle). pie = filled wedge. */
-void x16_gfx_arc (unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_arc (unsigned int cx, unsigned char cy, unsigned char r,
                           unsigned char a0, unsigned char a1, unsigned char color);
-void x16_gfx_pie (unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_pie (unsigned int cx, unsigned char cy, unsigned char r,
                           unsigned char a0, unsigned char a1, unsigned char color);
 /* Cubic Bezier through four control points. Coordinates 16-bit. */
-void x16_gfx_bezier (const unsigned int *pts, unsigned char color);
+void x16_gfx8l_bezier (const unsigned int *pts, unsigned char color);
 
 
 /* --- 2bpp (640x480) -------------------------------------------------- */
 
-void x16_gfx2_circle (unsigned int cx, unsigned int cy,
+void x16_gfx2h_circle (unsigned int cx, unsigned int cy,
                                    unsigned char r, unsigned char color);
-void x16_gfx2_disc (unsigned int cx, unsigned int cy,
+void x16_gfx2h_disc (unsigned int cx, unsigned int cy,
                                  unsigned char r, unsigned char color);
 
-void x16_gfx2_ellipse (unsigned int cx, unsigned int cy,
+void x16_gfx2h_ellipse (unsigned int cx, unsigned int cy,
                                     unsigned char rx, unsigned char ry,
                                     unsigned char color);
-void x16_gfx2_fellipse (unsigned int cx, unsigned int cy,
+void x16_gfx2h_fellipse (unsigned int cx, unsigned int cy,
                                      unsigned char rx, unsigned char ry,
                                      unsigned char color);
 
-unsigned char x16_gfx2_flood (unsigned int x, unsigned int y,
+unsigned char x16_gfx2h_flood (unsigned int x, unsigned int y,
                                            unsigned char color);
 
 /* Regular convex N-gon (sides 3-24), outline / filled. rotation is a byte
 ** angle (0=east, 64=south); the first vertex points that way. */
-void x16_gfx2_polygon (unsigned int cx, unsigned int cy,
+void x16_gfx2h_polygon (unsigned int cx, unsigned int cy,
                           unsigned char r, unsigned char sides,
                           unsigned char rotation, unsigned char color);
-void x16_gfx2_fpolygon (unsigned int cx, unsigned int cy,
+void x16_gfx2h_fpolygon (unsigned int cx, unsigned int cy,
                            unsigned char r, unsigned char sides,
                            unsigned char rotation, unsigned char color);
 /* Rounded rectangle, outline / filled. (x,y)=top-left, w/h=size, r=corner
 ** radius (clamped to min(w,h)/2). Coordinates 16-bit. */
-void x16_gfx2_rrect (unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx2h_rrect (unsigned int x, unsigned int y, unsigned int w,
                         unsigned int h, unsigned char r, unsigned char color);
-void x16_gfx2_frrect (unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx2h_frrect (unsigned int x, unsigned int y, unsigned int w,
                          unsigned int h, unsigned char r, unsigned char color);
 /* Arc: circle-outline slice a0..a1 (a0==a1 = full circle). pie = filled wedge. */
-void x16_gfx2_arc (unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_arc (unsigned int cx, unsigned int cy, unsigned char r,
                           unsigned char a0, unsigned char a1, unsigned char color);
-void x16_gfx2_pie (unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_pie (unsigned int cx, unsigned int cy, unsigned char r,
                           unsigned char a0, unsigned char a1, unsigned char color);
 /* Cubic Bezier through four control points. Coordinates 16-bit. */
-void x16_gfx2_bezier (const unsigned int *pts, unsigned char color);
+void x16_gfx2h_bezier (const unsigned int *pts, unsigned char color);
 
 
 #endif /* X16_SHAPES_H */

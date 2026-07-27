@@ -54,7 +54,7 @@ void x16_fx_transp_off(void);
  * itself. Both assume the 320x240x256 framebuffer and NEITHER CLIPS.
  * ------------------------------------------------------------------ */
 
-/* The same arguments and endpoints as x16_gfx_line(). (Five args: color
+/* The same arguments and endpoints as x16_gfx8l_line(). (Five args: color
 ** rides the C soft stack.) */
 void x16_fx_line(__reg("r0/r1") unsigned int x0, __reg("r2") unsigned char y0,
                  __reg("r4/r5") unsigned int x1, __reg("r6") unsigned char y1,

@@ -604,24 +604,24 @@ void test_sprite_init_all(void) {
 ** the top 35 rows and stops. So check the LAST pixel ($12BFF: bank 1),
 ** which only a two-half clear reaches.
 */
-void test_gfx_clear(void) {
+void test_gfx8l_clear(void) {
     t_vpoke(0, PX(0, 0), 0x00);
     t_vpoke(0, PX(0, 36), 0x00);        /* just past a truncated fill */
     t_vpoke(1, 0x2BFF, 0x00);           /* the very last pixel */
 
-    x16_gfx_clear(0x77);
+    x16_gfx8l_clear(0x77);
 
     t_check((t_vpeek(0, PX(0, 0)) == 0x77 &&
             t_vpeek(0, PX(0, 36)) == 0x77 &&
             t_vpeek(1, 0x2BFF) == 0x77) ? 1 : 0,
-            "GFX_CLEAR");
+            "GFX8L_CLEAR");
 }
 
-void test_gfx_pset(void) {
+void test_gfx8l_pset(void) {
     t_vpoke(0, PX(10, 5), 0x00);
-    x16_gfx_pset(10, 5, 0x42);
+    x16_gfx8l_pset(10, 5, 0x42);
 
-    t_check((t_vpeek(0, PX(10, 5)) == 0x42) ? 1 : 0, "GFX_PSET");
+    t_check((t_vpeek(0, PX(10, 5)) == 0x42) ? 1 : 0, "GFX8L_PSET");
 }
 
 /* ------------------------------------------------------------------ */
@@ -650,9 +650,9 @@ void test_g8_pattern(void) {
         t_vpoke(0, PX(i + 2, 74), 0x55);
     }
 
-    x16_gfx_pattern_set(g8_pat_half, 0, 5);     /* bg 0, fg 5 */
-    x16_gfx_pattern_rect(0, 70, 8, 1);
-    x16_gfx_pattern_rect(2, 74, 8, 1);
+    x16_gfx8l_pattern_set(g8_pat_half, 0, 5);     /* bg 0, fg 5 */
+    x16_gfx8l_pattern_rect(0, 70, 8, 1);
+    x16_gfx8l_pattern_rect(2, 74, 8, 1);
 
     t_check((t_vpeek(0, PX(0, 70)) == 5 &&
              t_vpeek(0, PX(3, 70)) == 5 &&
@@ -662,7 +662,7 @@ void test_g8_pattern(void) {
              t_vpeek(0, PX(2, 74)) == 5 &&        /* phase 2 */
              t_vpeek(0, PX(4, 74)) == 0 &&
              t_vpeek(0, PX(8, 74)) == 5) ? 1 : 0,
-            "GFX_PATTERN");
+            "GFX8L_PATTERN");
 }
 
 /* A 2x2 image copied in, then XORed with itself to leave zeros. The XOR
@@ -677,17 +677,17 @@ void test_g8_blit(void) {
     t_vpoke(0, PX(8, 81), 0x00);
     t_vpoke(0, PX(9, 81), 0x00);
 
-    x16_gfx_blit(8, 80, 2, 2, g8_img, 0);       /* copy */
+    x16_gfx8l_blit(8, 80, 2, 2, g8_img, 0);       /* copy */
     if (t_vpeek(0, PX(8, 80)) != 0xDE || t_vpeek(0, PX(9, 80)) != 0xAD ||
         t_vpeek(0, PX(8, 81)) != 0xBE || t_vpeek(0, PX(9, 81)) != 0xEF) {
-        t_check(0, "GFX_BLIT");
+        t_check(0, "GFX8L_BLIT");
         return;
     }
 
-    x16_gfx_blit(8, 80, 2, 2, g8_img, 3);       /* XOR it away again */
+    x16_gfx8l_blit(8, 80, 2, 2, g8_img, 3);       /* XOR it away again */
     t_check((t_vpeek(0, PX(8, 80)) == 0x00 &&
              t_vpeek(0, PX(9, 81)) == 0x00) ? 1 : 0,
-            "GFX_BLIT");
+            "GFX8L_BLIT");
 }
 
 /* Masked: a source byte of 0 leaves the screen alone. The transparent
@@ -705,45 +705,45 @@ void test_g8_blitm(void) {
         t_vpoke(0, PX(12 + i, 90), 0xFF);
     }
 
-    x16_gfx_blitm(12, 90, 4, 1, g8_mask);
+    x16_gfx8l_blitm(12, 90, 4, 1, g8_mask);
 
     t_check((t_vpeek(0, PX(12, 90)) == 0xFF &&    /* transparent */
              t_vpeek(0, PX(13, 90)) == 0x07 &&
              t_vpeek(0, PX(14, 90)) == 0xFF &&    /* transparent */
              t_vpeek(0, PX(15, 90)) == 0x09 &&    /* NOT shifted left */
              t_vpeek(0, PX(16, 90)) == 0xFF) ? 1 : 0,   /* past the end */
-            "GFX_BLITM");
+            "GFX8L_BLITM");
 }
 
 /* x >= 320 and y >= 240 are off screen. Unclipped, pset(320,0) would
 ** land on pixel (0,1) and pset(0,240) at offset $12C00 -- so poison
 ** both and check they stayed clean.
 */
-void test_gfx_clip(void) {
+void test_gfx8l_clip(void) {
     t_vpoke(0, PX(0, 1), 0x00);
     t_vpoke(1, 0x2C00, 0x00);           /* 240 * 320 */
 
-    x16_gfx_pset(320, 0, 0x99);
-    x16_gfx_pset(0, 240, 0x99);
+    x16_gfx8l_pset(320, 0, 0x99);
+    x16_gfx8l_pset(0, 240, 0x99);
 
     t_check((t_vpeek(0, PX(0, 1)) == 0x00 &&
             t_vpeek(1, 0x2C00) == 0x00) ? 1 : 0,
-            "GFX_CLIP");
+            "GFX8L_CLIP");
 }
 
-void test_gfx_hline(void) {
+void test_gfx8l_hline(void) {
     t_vpoke(0, PX(20, 8), 0x00);
     t_vpoke(0, PX(25, 8), 0x00);
 
-    x16_gfx_hline(20, 8, 5, 0x33);
+    x16_gfx8l_hline(20, 8, 5, 0x33);
 
     t_check((t_vpeek(0, PX(20, 8)) == 0x33 &&
             t_vpeek(0, PX(24, 8)) == 0x33 &&
             t_vpeek(0, PX(25, 8)) == 0x00) ? 1 : 0, /* one past the end */
-            "GFX_HLINE");
+            "GFX8L_HLINE");
 }
 
-void test_gfx_vline(void) {
+void test_gfx8l_vline(void) {
     unsigned char i;
 
     for (i = 2; i <= 6; i++) {
@@ -751,25 +751,25 @@ void test_gfx_vline(void) {
     }
     t_vpoke(0, PX(4, 2), 0x00);
 
-    x16_gfx_vline(3, 2, 4, 0x55);
+    x16_gfx8l_vline(3, 2, 4, 0x55);
 
     t_check((t_vpeek(0, PX(3, 2)) == 0x55 &&
             t_vpeek(0, PX(3, 5)) == 0x55 &&
             t_vpeek(0, PX(3, 6)) == 0x00 &&     /* one past the end */
             t_vpeek(0, PX(4, 2)) == 0x00) ? 1 : 0, /* not sideways */
-            "GFX_VLINE");
+            "GFX8L_VLINE");
 }
 
-void test_gfx_line(void) {
+void test_gfx8l_line(void) {
     /* Four distinct coordinates: a transposed argument lands elsewhere. */
     t_vpoke(0, PX(3, 7), 0x00);
     t_vpoke(0, PX(11, 5), 0x00);
 
-    x16_gfx_line(3, 7, 11, 5, 0x77);
+    x16_gfx8l_line(3, 7, 11, 5, 0x77);
 
     t_check((t_vpeek(0, PX(3, 7)) == 0x77 &&
             t_vpeek(0, PX(11, 5)) == 0x77) ? 1 : 0,
-            "GFX_LINE");
+            "GFX8L_LINE");
 }
 
 /* Down-right, with literal endpoints. The KickC build hung here: its
@@ -778,24 +778,24 @@ void test_gfx_line(void) {
  * same shape, so the case is worth pinning on every compiler that folds
  * it -- a regression HANGS the suite rather than failing it.
  */
-void test_gfx_line_down(void) {
+void test_gfx8l_line_down(void) {
     t_vpoke(0, PX(3, 5), 0x00);
     t_vpoke(0, PX(11, 13), 0x00);
     t_vpoke(0, PX(7, 9), 0x00);
 
-    x16_gfx_line(3, 5, 11, 13, 0x77);
+    x16_gfx8l_line(3, 5, 11, 13, 0x77);
 
     t_check((t_vpeek(0, PX(3, 5)) == 0x77 &&
             t_vpeek(0, PX(7, 9)) == 0x77 &&     /* the 45-degree midpoint */
             t_vpeek(0, PX(11, 13)) == 0x77) ? 1 : 0,
-            "GFX_LINE_DOWN");
+            "GFX8L_LINE_DOWN");
 }
 
-void test_gfx_circle(void) {
+void test_gfx8l_circle(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 12800);         /* rows 0..39 */
 
-    x16_gfx_circle(50, 20, 10, 0x91);
+    x16_gfx8l_circle(50, 20, 10, 0x91);
 
     t_check((t_vpeek(0, PX(60, 20)) == 0x91 &&  /* east */
             t_vpeek(0, PX(40, 20)) == 0x91 &&   /* west */
@@ -803,14 +803,14 @@ void test_gfx_circle(void) {
             t_vpeek(0, PX(50, 30)) == 0x91 &&   /* south */
             t_vpeek(0, PX(50, 20)) == 0x00 &&   /* hollow */
             t_vpeek(0, PX(61, 20)) == 0x00) ? 1 : 0, /* nothing outside */
-            "GFX_CIRCLE");
+            "GFX8L_CIRCLE");
 }
 
-void test_gfx_ellipse(void) {
+void test_gfx8l_ellipse(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 12800);         /* rows 0..39 */
 
-    x16_gfx_ellipse(50, 20, 15, 8, 0x9A);
+    x16_gfx8l_ellipse(50, 20, 15, 8, 0x9A);
 
     t_check((t_vpeek(0, PX(65, 20)) == 0x9A &&  /* east */
             t_vpeek(0, PX(35, 20)) == 0x9A &&   /* west */
@@ -818,24 +818,24 @@ void test_gfx_ellipse(void) {
             t_vpeek(0, PX(50, 28)) == 0x9A &&   /* south */
             t_vpeek(0, PX(50, 20)) == 0x00 &&   /* hollow */
             t_vpeek(0, PX(66, 20)) == 0x00) ? 1 : 0, /* nothing outside */
-            "GFX_ELLIPSE");
+            "GFX8L_ELLIPSE");
 }
 
-void test_gfx_disc(void) {
+void test_gfx8l_disc(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 12800);
 
-    x16_gfx_disc(50, 20, 10, 0x93);
+    x16_gfx8l_disc(50, 20, 10, 0x93);
 
     t_check((t_vpeek(0, PX(50, 20)) == 0x93 &&  /* centre filled */
             t_vpeek(0, PX(55, 20)) == 0x93 &&
             t_vpeek(0, PX(60, 20)) == 0x93 &&   /* rim */
             t_vpeek(0, PX(61, 20)) == 0x00 &&   /* one past */
             t_vpeek(0, PX(50, 31)) == 0x00) ? 1 : 0,
-            "GFX_DISC");
+            "GFX8L_DISC");
 }
 
-void test_gfx_char(void) {
+void test_gfx8l_char(void) {
     unsigned char i;
     unsigned char j;
     unsigned char nset = 0;
@@ -843,7 +843,7 @@ void test_gfx_char(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 12800);
 
-    x16_gfx_char(40, 8, 0x95, 1);       /* screen code 1 = 'A' */
+    x16_gfx8l_char(40, 8, 0x95, 1);       /* screen code 1 = 'A' */
 
     for (i = 0; i < 8; i++) {
         for (j = 0; j < 8; j++) {
@@ -854,24 +854,24 @@ void test_gfx_char(void) {
     ** the clear bits were left transparent.
     */
     t_check((nset > 4 && nset < 64 && t_vpeek(0, PX(48, 8)) == 0x00) ? 1 : 0,
-            "GFX_CHAR");
+            "GFX8L_CHAR");
 }
 
-void test_gfx_flood(void) {
+void test_gfx8l_flood(void) {
     unsigned char ok;
 
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 12800);
 
-    x16_gfx_frame(200, 4, 20, 20, 0x97);        /* a hollow box */
-    ok = x16_gfx_flood(205, 10, 0x98);          /* seed inside it */
+    x16_gfx8l_frame(200, 4, 20, 20, 0x97);        /* a hollow box */
+    ok = x16_gfx8l_flood(205, 10, 0x98);          /* seed inside it */
 
     t_check((ok == 1 &&
             t_vpeek(0, PX(205, 10)) == 0x98 &&  /* the seed */
             t_vpeek(0, PX(218, 22)) == 0x98 &&  /* the far corner */
             t_vpeek(0, PX(200, 4)) == 0x97 &&   /* the frame survived */
             t_vpeek(0, PX(199, 10)) == 0x00) ? 1 : 0, /* did not leak */
-            "GFX_FLOOD");
+            "GFX8L_FLOOD");
 }
 
 /* ------------------------------------------------------------------ */
@@ -1303,21 +1303,21 @@ int main(void) {
 
     test_irq_hook();
 
-    test_gfx_clear();
-    test_gfx_pset();
+    test_gfx8l_clear();
+    test_gfx8l_pset();
     test_g8_pattern();
     test_g8_blit();
     test_g8_blitm();
-    test_gfx_clip();
-    test_gfx_hline();
-    test_gfx_vline();
-    test_gfx_line();
-    test_gfx_line_down();
-    test_gfx_circle();
-    test_gfx_ellipse();
-    test_gfx_disc();
-    test_gfx_char();
-    test_gfx_flood();
+    test_gfx8l_clip();
+    test_gfx8l_hline();
+    test_gfx8l_vline();
+    test_gfx8l_line();
+    test_gfx8l_line_down();
+    test_gfx8l_circle();
+    test_gfx8l_ellipse();
+    test_gfx8l_disc();
+    test_gfx8l_char();
+    test_gfx8l_flood();
 
     /* On a VERA without the FX register set these would write to
     ** registers that do not exist. Skipping is honest; the capability

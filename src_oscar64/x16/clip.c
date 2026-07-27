@@ -6,7 +6,7 @@
 // jsr'd local labels.
 //
 // One deliberate difference: the ca65 core ended by preloading the
-// X16_P0..P5 operand block "for gfx_line / fx_line", a contract for
+// X16_P0..P5 operand block "for gfx8l_line / fx_line", a contract for
 // assembly callers. No such block exists in this port -- a C
 // caller passes seg's fields to the drawing routine itself.
 // =====================================================================

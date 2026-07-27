@@ -69,11 +69,11 @@ void x16_fx_transp_off (void);
  *
  * VERA carries the Bresenham error itself: the CPU's whole job becomes
  * one store per pixel. Both routines assume the 320x240x256 framebuffer
- * that x16_gfx_init() selects, and NEITHER CLIPS -- keep every coordinate
+ * that x16_gfx8l_init() selects, and NEITHER CLIPS -- keep every coordinate
  * on screen.
  * ------------------------------------------------------------------ */
 
-/* The same arguments and the same endpoints as x16_gfx_line(), drawn by
+/* The same arguments and the same endpoints as x16_gfx8l_line(), drawn by
 ** the hardware helper instead of a software Bresenham.
 */
 void __fastcall__ x16_fx_line (unsigned int x0, unsigned char y0,

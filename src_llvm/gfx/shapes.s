@@ -3,47 +3,47 @@
 ; x16clib :: gfx/shapes.s -- circle / disc / flood for BOTH bitmap modes
 ; =====================================================================
 ; The engine-agnostic shape algorithm (ported from x16_library's
-; gfx/shapes.asm) plus C entry points for the 8bpp module (x16_gfx_*)
-; AND the 2bpp module (x16_gfx2_*). One copy of the algorithm; each entry
+; gfx/shapes.asm) plus C entry points for the 8bpp module (x16_gfx8l_*)
+; AND the 2bpp module (x16_gfx2h_*). One copy of the algorithm; each entry
 ; binds it to its engine at runtime (shp_bind8 / shp_bind2) before calling.
 ;
-;   x16_gfx_circle / _disc  (unsigned int cx, unsigned char cy,
+;   x16_gfx8l_circle / _disc  (unsigned int cx, unsigned char cy,
 ;                            unsigned char r, unsigned char color)
-;   x16_gfx_flood           (unsigned int x, unsigned char y,
+;   x16_gfx8l_flood           (unsigned int x, unsigned char y,
 ;                            unsigned char color) -> 1 if filled completely
-;   x16_gfx2_circle / _disc (unsigned int cx, unsigned int cy,
+;   x16_gfx2h_circle / _disc (unsigned int cx, unsigned int cy,
 ;                            unsigned char r, unsigned char color)
-;   x16_gfx2_flood          (unsigned int x, unsigned int y,
+;   x16_gfx2h_flood          (unsigned int x, unsigned int y,
 ;                            unsigned char color) -> 1 if filled completely
 ; =====================================================================
 
         .include        "macros.inc"
         .include        "x16zp.inc"
 
-        .globl  x16_gfx_circle
-        .globl  x16_gfx_disc
-        .globl  x16_gfx_flood
-        .globl  x16_gfx2_circle
-        .globl  x16_gfx2_disc
-        .globl  x16_gfx2_flood
-        .globl  x16_gfx_ellipse
-        .globl  x16_gfx_fellipse
-        .globl  x16_gfx2_ellipse
-        .globl  x16_gfx2_fellipse
-        .globl  x16_gfx_polygon
-        .globl  x16_gfx_fpolygon
-        .globl  x16_gfx2_polygon
-        .globl  x16_gfx2_fpolygon
-        .globl  x16_gfx_rrect
-        .globl  x16_gfx_frrect
-        .globl  x16_gfx2_rrect
-        .globl  x16_gfx2_frrect
-        .globl  x16_gfx_arc
-        .globl  x16_gfx2_arc
-        .globl  x16_gfx_pie
-        .globl  x16_gfx2_pie
-        .globl  x16_gfx_bezier
-        .globl  x16_gfx2_bezier
+        .globl  x16_gfx8l_circle
+        .globl  x16_gfx8l_disc
+        .globl  x16_gfx8l_flood
+        .globl  x16_gfx2h_circle
+        .globl  x16_gfx2h_disc
+        .globl  x16_gfx2h_flood
+        .globl  x16_gfx8l_ellipse
+        .globl  x16_gfx8l_fellipse
+        .globl  x16_gfx2h_ellipse
+        .globl  x16_gfx2h_fellipse
+        .globl  x16_gfx8l_polygon
+        .globl  x16_gfx8l_fpolygon
+        .globl  x16_gfx2h_polygon
+        .globl  x16_gfx2h_fpolygon
+        .globl  x16_gfx8l_rrect
+        .globl  x16_gfx8l_frrect
+        .globl  x16_gfx2h_rrect
+        .globl  x16_gfx2h_frrect
+        .globl  x16_gfx8l_arc
+        .globl  x16_gfx2h_arc
+        .globl  x16_gfx8l_pie
+        .globl  x16_gfx2h_pie
+        .globl  x16_gfx8l_bezier
+        .globl  x16_gfx2h_bezier
 
         .section .text,"ax",@progbits
 
@@ -55,9 +55,9 @@ shp_do_read:  jmp (shp_readv)
 ; the 8bpp primitives want the colour in X16_P3; the shape code hands it
 ; in A, so bind through these two-byte shims.
 shp_pset8:  sta X16_P3
-            jmp gfx_pset
+            jmp gfx8l_pset
 shp_hline8: sta X16_P3
-            jmp gfx_hline
+            jmp gfx8l_hline
 
 shp_bind8:
         lda #<shp_pset8
@@ -68,9 +68,9 @@ shp_bind8:
         sta shp_hlinev
         lda #>shp_hline8
         sta shp_hlinev+1
-        lda #<gfx_read
+        lda #<gfx8l_read
         sta shp_readv
-        lda #>gfx_read
+        lda #>gfx8l_read
         sta shp_readv+1
         lda #<320
         sta shp_w
@@ -83,17 +83,17 @@ shp_bind8:
         rts
 
 shp_bind2:
-        lda #<gfx2_pset
+        lda #<gfx2h_pset
         sta shp_psetv
-        lda #>gfx2_pset
+        lda #>gfx2h_pset
         sta shp_psetv+1
-        lda #<gfx2_hline
+        lda #<gfx2h_hline
         sta shp_hlinev
-        lda #>gfx2_hline
+        lda #>gfx2h_hline
         sta shp_hlinev+1
-        lda #<gfx2_read
+        lda #<gfx2h_read
         sta shp_readv
-        lda #>gfx2_read
+        lda #>gfx2h_read
         sta shp_readv+1
         lda #<640
         sta shp_w
@@ -106,13 +106,13 @@ shp_bind2:
         rts
 
 ; --- C entry points (llvm-mos: args left-to-right, first int in A/X) ----
-; x16_gfx_circle(cx:int, cy:char, r:char, color:char)
-x16_gfx_circle:
+; x16_gfx8l_circle(cx:int, cy:char, r:char, color:char)
+x16_gfx8l_circle:
         jsr shp_marshal8
         jsr shp_bind8
         lda shp_mcol
         jmp shape_circle
-x16_gfx_disc:
+x16_gfx8l_disc:
         jsr shp_marshal8
         jsr shp_bind8
         lda shp_mcol
@@ -129,13 +129,13 @@ shp_marshal8:                           ; cx->A/X, cy->__rc2, r->__rc3, col->__r
         sta shp_mcol
         rts
 
-; x16_gfx2_circle(cx:int, cy:int, r:char, color:char)
-x16_gfx2_circle:
+; x16_gfx2h_circle(cx:int, cy:int, r:char, color:char)
+x16_gfx2h_circle:
         jsr shp_marshal2
         jsr shp_bind2
         lda shp_mcol
         jmp shape_circle
-x16_gfx2_disc:
+x16_gfx2h_disc:
         jsr shp_marshal2
         jsr shp_bind2
         lda shp_mcol
@@ -153,8 +153,8 @@ shp_marshal2:                           ; cx->A/X, cy->__rc2/3, r->__rc4, col->_
         sta shp_mcol
         rts
 
-; x16_gfx_flood(x:int, y:char, color:char)
-x16_gfx_flood:
+; x16_gfx8l_flood(x:int, y:char, color:char)
+x16_gfx8l_flood:
         sta X16_P0
         stx X16_P1
         lda __rc2
@@ -169,8 +169,8 @@ x16_gfx_flood:
         rol a
         eor #1                          ; report completeness, not overflow
         rts
-; x16_gfx2_flood(x:int, y:int, color:char)
-x16_gfx2_flood:
+; x16_gfx2h_flood(x:int, y:int, color:char)
+x16_gfx2h_flood:
         sta X16_P0
         stx X16_P1
         lda __rc2
@@ -187,13 +187,13 @@ x16_gfx2_flood:
         eor #1                          ; report completeness, not overflow
         rts
 
-; x16_gfx_ellipse(cx:int, cy:char, rx:char, ry:char, color:char)
-x16_gfx_ellipse:
+; x16_gfx8l_ellipse(cx:int, cy:char, rx:char, ry:char, color:char)
+x16_gfx8l_ellipse:
         jsr shp_emarshal8
         jsr shp_bind8
         lda shp_mcol
         jmp shape_ellipse
-x16_gfx_fellipse:
+x16_gfx8l_fellipse:
         jsr shp_emarshal8
         jsr shp_bind8
         lda shp_mcol
@@ -212,13 +212,13 @@ shp_emarshal8:                          ; cx->A/X, cy->__rc2, rx->__rc3, ry->__r
         sta shp_mcol
         rts
 
-; x16_gfx2_ellipse(cx:int, cy:int, rx:char, ry:char, color:char)
-x16_gfx2_ellipse:
+; x16_gfx2h_ellipse(cx:int, cy:int, rx:char, ry:char, color:char)
+x16_gfx2h_ellipse:
         jsr shp_emarshal2
         jsr shp_bind2
         lda shp_mcol
         jmp shape_ellipse
-x16_gfx2_fellipse:
+x16_gfx2h_fellipse:
         jsr shp_emarshal2
         jsr shp_bind2
         lda shp_mcol
@@ -301,72 +301,72 @@ shp_bmcopy:
         bne shp_bmcopy
         rts
 
-x16_gfx_polygon:
+x16_gfx8l_polygon:
         jsr shp_pmarshal8
         jsr shp_bind8
         lda shp_mcol
         jmp shape_polygon
-x16_gfx_fpolygon:
+x16_gfx8l_fpolygon:
         jsr shp_pmarshal8
         jsr shp_bind8
         lda shp_mcol
         jmp shape_fpolygon
-x16_gfx2_polygon:
+x16_gfx2h_polygon:
         jsr shp_pmarshal2
         jsr shp_bind2
         lda shp_mcol
         jmp shape_polygon
-x16_gfx2_fpolygon:
+x16_gfx2h_fpolygon:
         jsr shp_pmarshal2
         jsr shp_bind2
         lda shp_mcol
         jmp shape_fpolygon
-x16_gfx_rrect:
+x16_gfx8l_rrect:
         jsr shp_rmarshal
         jsr shp_bind8
         lda shp_mcol
         jmp shape_rrect
-x16_gfx_frrect:
+x16_gfx8l_frrect:
         jsr shp_rmarshal
         jsr shp_bind8
         lda shp_mcol
         jmp shape_frrect
-x16_gfx2_rrect:
+x16_gfx2h_rrect:
         jsr shp_rmarshal
         jsr shp_bind2
         lda shp_mcol
         jmp shape_rrect
-x16_gfx2_frrect:
+x16_gfx2h_frrect:
         jsr shp_rmarshal
         jsr shp_bind2
         lda shp_mcol
         jmp shape_frrect
-x16_gfx_arc:
+x16_gfx8l_arc:
         jsr shp_pmarshal8
         jsr shp_bind8
         lda shp_mcol
         jmp shape_arc
-x16_gfx2_arc:
+x16_gfx2h_arc:
         jsr shp_pmarshal2
         jsr shp_bind2
         lda shp_mcol
         jmp shape_arc
-x16_gfx_pie:
+x16_gfx8l_pie:
         jsr shp_pmarshal8
         jsr shp_bind8
         lda shp_mcol
         jmp shape_pie
-x16_gfx2_pie:
+x16_gfx2h_pie:
         jsr shp_pmarshal2
         jsr shp_bind2
         lda shp_mcol
         jmp shape_pie
-x16_gfx_bezier:
+x16_gfx8l_bezier:
         jsr shp_bmarshal
         jsr shp_bind8
         lda shp_mcol
         jmp shape_bezier
-x16_gfx2_bezier:
+x16_gfx2h_bezier:
         jsr shp_bmarshal
         jsr shp_bind2
         lda shp_mcol
@@ -1367,7 +1367,7 @@ shp_pg_ojok:
 	rts
 
 ; 16-bit Bresenham from (lx0,ly0) to (lx1,ly1), plotting through shp_do_pset
-; (the gfx2_line algorithm, engine-agnostic and clipping via the binding)
+; (the gfx2h_line algorithm, engine-agnostic and clipping via the binding)
 shp_poly_line:
 	sec                         ; dx = |x1 - x0|, sx = direction
 	lda poly_lx1
@@ -1921,7 +1921,7 @@ poly_prod:  .zero  4
 ; shp_line -- shared 16-bit Bresenham (X16_USE_SHP_LINE)
 ; ---------------------------------------------------------------------
 ; The curve shapes (arc, bezier) sample a handful of points and join
-; them; this is the join. It is the same engine-agnostic gfx2_line walk
+; them; this is the join. It is the same engine-agnostic gfx2h_line walk
 ; the polygon carries privately (shp_poly_line), lifted out so arc and
 ; bezier share ONE copy behind their own gate. A program that wants only
 ; the polygon still pays nothing for this; one that wants an arc pays for

@@ -44,8 +44,8 @@
 #include <x16/palette.h>        /* 256 entries of 12-bit colour */
 #include <x16/tile.h>           /* tilemap cells, layer config, scroll */
 #include <x16/sprite.h>         /* 128 hardware sprites */
-#include <x16/bitmap.h>         /* 320x240x256 drawing */
-#include <x16/bitmap2.h>        /* 640x480x4 drawing (2bpp) */
+#include <x16/bitmap8l.h>         /* 320x240x256 drawing */
+#include <x16/bitmap2h.h>        /* 640x480x4 drawing (2bpp) */
 #include <x16/shapes.h>         /* circle/disc/flood for both bitmaps */
 #include <x16/verafx.h>         /* hardware multiply, fills, lines, triangles */
 #include <x16/irq.h>            /* VSYNC, raster and collision interrupts */

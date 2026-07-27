@@ -60,7 +60,7 @@
         .export         _x16_screen_blitfill
         .export         _x16_screen_scroll
 
-; Cross-module: gfx/bitmap.s switches to bitmap mode through this.
+; Cross-module: gfx/bitmap8l.s switches to bitmap mode through this.
         .export         screen_set_mode
 
         .segment        "CODE"

@@ -208,7 +208,7 @@ _x16_fx_transp_off:
 ;                               unsigned int x1, unsigned char y1,
 ;                               unsigned char color)
 ;
-; Same arguments and endpoints as x16_gfx_line(), drawn by the hardware
+; Same arguments and endpoints as x16_gfx8l_line(), drawn by the hardware
 ; helper: one `sta VERA_DATA1` per pixel instead of a software Bresenham.
 ; ---------------------------------------------------------------------
 ; void x16_fx_line(__reg("r0/r1") unsigned int x0, __reg("r2") unsigned char y0,
@@ -548,7 +548,7 @@ fx_copy:
 ;                X16_P3/P4 = x1, X16_P5 = y1
 ;                X16_P6    = colour
 ;
-; Assumes the 320x240@8bpp framebuffer at VRAM $00000 (gfx_init's mode).
+; Assumes the 320x240@8bpp framebuffer at VRAM $00000 (gfx8l_init's mode).
 ; Does NOT clip; keep both endpoints on screen.
 ; ---------------------------------------------------------------------
 fx_line:

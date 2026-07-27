@@ -1,7 +1,7 @@
 ; =====================================================================
 ; x16clib :: util/clip.s -- Cohen-Sutherland line clipping
 ; =====================================================================
-; gfx_line and fx_line are documented as non-clipping. This removes that
+; gfx8l_line and fx_line are documented as non-clipping. This removes that
 ; sharp edge: give clip_line a segment in 16-bit SIGNED coordinates
 ; (anywhere within +/-4095) and it either rejects it or hands back the
 ; visible part.
@@ -111,7 +111,7 @@ _x16_clip_line:
 ; clip_line -- clip clipl_* against the rectangle
 ;   out: carry set   = entirely outside, draw nothing
 ;        carry clear = clipl_* now hold the visible sub-segment, and
-;                      X16_P0..P5 are loaded for gfx_line / fx_line
+;                      X16_P0..P5 are loaded for gfx8l_line / fx_line
 ; ---------------------------------------------------------------------
 clip_line:
 .loop:

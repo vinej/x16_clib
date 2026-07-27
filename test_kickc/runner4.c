@@ -1,9 +1,9 @@
 /* =====================================================================
  * x16clib :: test_kickc/runner4.c -- the 640x480@2bpp half
  * =====================================================================
- * The fourth PRG of the suite: x16/bitmap2.c. Split from the others for
+ * The fourth PRG of the suite: x16/bitmap2h.c. Split from the others for
  * the same zero-page reason runner2.c documents, and because
- * x16_gfx2_init() reprograms the display and palette entries 0-3 --
+ * x16_gfx2h_init() reprograms the display and palette entries 0-3 --
  * nothing else wants that done to it mid-run.
  *
  * A 2bpp framebuffer byte sits at y*160 + (x>>2), 4 pixels per byte
@@ -57,7 +57,7 @@ const unsigned char mcol[8] = {         /* (mask,data) x 4 rows */
 };
 
 void test_g2_init(void) {
-    x16_gfx2_init();
+    x16_gfx2h_init();
     t_check((*((char *)0x9f2d) == 0x05 &&        /* L0_CONFIG: bitmap|2bpp */
             *((char *)0x9f2f) == 0x01) ? 1 : 0,
             /* L0_TILEBASE: $00000/640 */
@@ -66,7 +66,7 @@ void test_g2_init(void) {
 
 void test_g2_pset(void) {
     t_vpoke(0, ROW(10) + 1, 0x00);
-    x16_gfx2_pset(5, 10, 2);                    /* byte 1, pixel 1 */
+    x16_gfx2h_pset(5, 10, 2);                    /* byte 1, pixel 1 */
     t_check((t_vpeek(0, ROW(10) + 1) == 0x20) ? 1 : 0,
             "G2_PSET");
 }
@@ -75,8 +75,8 @@ void test_g2_pset(void) {
 void test_g2_clip(void) {
     t_vpoke(0, 160, 0x11);
     t_vpoke(1, 0x2C00, 0x22);                   /* 76800 = $12C00 */
-    x16_gfx2_pset(640, 0, 3);
-    x16_gfx2_pset(0, 480, 3);
+    x16_gfx2h_pset(640, 0, 3);
+    x16_gfx2h_pset(0, 480, 3);
     t_check((t_vpeek(0, 160) == 0x11 &&
             t_vpeek(1, 0x2C00) == 0x22) ? 1 : 0,
             "G2_CLIP");
@@ -84,11 +84,11 @@ void test_g2_clip(void) {
 
 void test_g2_read(void) {
     t_vpoke(0, ROW(12), 0x1B);                  /* pixels 0,1,2,3 */
-    t_check((x16_gfx2_read(0, 12) == 0 &&
-            x16_gfx2_read(1, 12) == 1 &&
-            x16_gfx2_read(2, 12) == 2 &&
-            x16_gfx2_read(3, 12) == 3 &&
-            x16_gfx2_read(640, 12) == 0xFF) ? 1 : 0,
+    t_check((x16_gfx2h_read(0, 12) == 0 &&
+            x16_gfx2h_read(1, 12) == 1 &&
+            x16_gfx2h_read(2, 12) == 2 &&
+            x16_gfx2h_read(3, 12) == 3 &&
+            x16_gfx2h_read(640, 12) == 0xFF) ? 1 : 0,
             "G2_READ");
 }
 
@@ -100,7 +100,7 @@ void test_g2_hline(void) {
     for (i = 0; i < 6; i++) {
         t_vpoke(0, ROW(20) + i, 0x00);
     }
-    x16_gfx2_hline(5, 20, 13, 3);
+    x16_gfx2h_hline(5, 20, 13, 3);
     t_check((t_vpeek(0, ROW(20) + 0) == 0x00 &&
             t_vpeek(0, ROW(20) + 1) == 0x3F &&
             t_vpeek(0, ROW(20) + 2) == 0xFF &&
@@ -114,7 +114,7 @@ void test_g2_hline(void) {
 void test_g2_hline_short(void) {
     t_vpoke(0, ROW(21), 0x00);
     t_vpoke(0, ROW(21) + 1, 0x00);
-    x16_gfx2_hline(1, 21, 2, 2);
+    x16_gfx2h_hline(1, 21, 2, 2);
     t_check((t_vpeek(0, ROW(21)) == 0x28 &&      /* pixels 1,2 only */
             t_vpeek(0, ROW(21) + 1) == 0x00) ? 1 : 0,
             "G2_HLINE_SHORT");
@@ -126,7 +126,7 @@ void test_g2_vline(void) {
     for (i = 30; i <= 34; i++) {
         t_vpoke(0, ROW(i) + 1, 0xFF);
     }
-    x16_gfx2_vline(6, 30, 4, 0);                /* byte 1, pixel 2 */
+    x16_gfx2h_vline(6, 30, 4, 0);                /* byte 1, pixel 2 */
     t_check((t_vpeek(0, ROW(30) + 1) == 0xF3 &&
             t_vpeek(0, ROW(33) + 1) == 0xF3 &&
             t_vpeek(0, ROW(34) + 1) == 0xFF) ? 1 : 0,
@@ -141,7 +141,7 @@ void test_g2_rect(void) {
         t_vpoke(0, ROW(41) + i, 0x00);
         t_vpoke(0, ROW(42) + i, 0x00);
     }
-    x16_gfx2_rect(4, 40, 8, 2, 1);
+    x16_gfx2h_rect(4, 40, 8, 2, 1);
     t_check((t_vpeek(0, ROW(40) + 0) == 0x00 &&
             t_vpeek(0, ROW(40) + 1) == 0x55 &&
             t_vpeek(0, ROW(40) + 2) == 0x55 &&
@@ -158,7 +158,7 @@ void test_g2_frame(void) {
         t_vpoke(0, ROW(51) + i, 0x00);
         t_vpoke(0, ROW(52) + i, 0x00);
     }
-    x16_gfx2_frame(0, 50, 16, 3, 3);
+    x16_gfx2h_frame(0, 50, 16, 3, 3);
     t_check((t_vpeek(0, ROW(50) + 0) == 0xFF &&  /* top edge */
             t_vpeek(0, ROW(50) + 3) == 0xFF &&
             t_vpeek(0, ROW(51) + 0) == 0xC0 &&  /* left edge only */
@@ -176,7 +176,7 @@ void test_g2_line(void) {
         t_vpoke(0, ROW(i), 0x00);
         t_vpoke(0, ROW(i) + 1, 0x00);
     }
-    x16_gfx2_line(0, 60, 7, 67, 3);
+    x16_gfx2h_line(0, 60, 7, 67, 3);
     t_check((t_vpeek(0, ROW(60)) == 0xC0 &&
             t_vpeek(0, ROW(63)) == 0x03 &&
             t_vpeek(0, ROW(64) + 1) == 0xC0 &&
@@ -196,9 +196,9 @@ void test_g2_pattern(void) {
     for (i = 0; i < 4; i++) {
         t_vpoke(0, ROW(74) + i, 0x00);
     }
-    x16_gfx2_pattern_set(pat_half, 0x03);       /* bg 0, fg 3 */
-    x16_gfx2_pattern_rect(0, 70, 16, 1);
-    x16_gfx2_pattern_rect(2, 74, 8, 1);
+    x16_gfx2h_pattern_set(pat_half, 0x03);       /* bg 0, fg 3 */
+    x16_gfx2h_pattern_rect(0, 70, 16, 1);
+    x16_gfx2h_pattern_rect(2, 74, 8, 1);
     t_check((t_vpeek(0, ROW(70) + 0) == 0xFF &&
             t_vpeek(0, ROW(70) + 1) == 0x00 &&
             t_vpeek(0, ROW(70) + 2) == 0xFF &&
@@ -217,13 +217,13 @@ void test_g2_blit(void) {
     t_vpoke(0, ROW(80) + 3, 0x00);
     t_vpoke(0, ROW(81) + 2, 0x00);
     t_vpoke(0, ROW(81) + 3, 0x00);
-    x16_gfx2_blit(8, 80, 2, 2, img, 0);         /* copy */
+    x16_gfx2h_blit(8, 80, 2, 2, img, 0);         /* copy */
     if (t_vpeek(0, ROW(80) + 2) != 0xDE || t_vpeek(0, ROW(80) + 3) != 0xAD ||
         t_vpeek(0, ROW(81) + 2) != 0xBE || t_vpeek(0, ROW(81) + 3) != 0xEF) {
         t_check(0, "G2_BLIT");
         return;
     }
-    x16_gfx2_blit(8, 80, 2, 2, img, 3);         /* xor */
+    x16_gfx2h_blit(8, 80, 2, 2, img, 3);         /* xor */
     t_check((t_vpeek(0, ROW(80) + 2) == 0x00 &&
             t_vpeek(0, ROW(81) + 3) == 0x00) ? 1 : 0,
             "G2_BLIT");
@@ -237,7 +237,7 @@ void test_g2_blitm(void) {
     for (i = 90; i <= 94; i++) {
         t_vpoke(0, ROW(i) + 3, 0xFF);
     }
-    x16_gfx2_blitm(12, 90, 4, 1, mcol);
+    x16_gfx2h_blitm(12, 90, 4, 1, mcol);
     t_check((t_vpeek(0, ROW(90) + 3) == 0x5F &&
             t_vpeek(0, ROW(93) + 3) == 0x5F &&
             t_vpeek(0, ROW(94) + 3) == 0xFF) ? 1 : 0,
@@ -250,7 +250,7 @@ void test_g2_blitm(void) {
  */
 void test_g2_clear(void) {
     t_vpoke(1, 0x2C00, 0x77);
-    x16_gfx2_clear(2);
+    x16_gfx2h_clear(2);
     t_check((t_vpeek(0, 0) == 0xAA &&
             t_vpeek(0, 38400) == 0xAA &&        /* the second fill half */
             t_vpeek(1, 0x2BFF) == 0xAA &&       /* the very last byte */
@@ -261,90 +261,90 @@ void test_g2_clear(void) {
 
 /* The shared shape engine bound to the 2bpp module (cy / y are 16-bit
 ** here, so these also exercise the wider path). Verified through the
-** independent x16_gfx2_read(). */
+** independent x16_gfx2h_read(). */
 void test_shapes_disc2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);              /* rows 0..40 */
-    x16_gfx2_disc(40, 30, 8, 3);
-    t_check((x16_gfx2_read(40, 30) == 3 &&
-            x16_gfx2_read(47, 30) == 3 &&
-            x16_gfx2_read(60, 30) == 0) ? 1 : 0,
+    x16_gfx2h_disc(40, 30, 8, 3);
+    t_check((x16_gfx2h_read(40, 30) == 3 &&
+            x16_gfx2h_read(47, 30) == 3 &&
+            x16_gfx2h_read(60, 30) == 0) ? 1 : 0,
             "SHAPES_DISC2");
 }
 
 void test_shapes_flood2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 25);              /* rows 0..24 */
-    x16_gfx2_frame(20, 4, 20, 20, 3);
-    t_check((x16_gfx2_flood(25, 10, 2) == 1 &&
-            x16_gfx2_read(25, 10) == 2 &&
-            x16_gfx2_read(38, 22) == 2 &&       /* far DOWN corner */
-            x16_gfx2_read(20, 4) == 3 &&
-            x16_gfx2_read(19, 10) == 0) ? 1 : 0,
+    x16_gfx2h_frame(20, 4, 20, 20, 3);
+    t_check((x16_gfx2h_flood(25, 10, 2) == 1 &&
+            x16_gfx2h_read(25, 10) == 2 &&
+            x16_gfx2h_read(38, 22) == 2 &&       /* far DOWN corner */
+            x16_gfx2h_read(20, 4) == 3 &&
+            x16_gfx2h_read(19, 10) == 0) ? 1 : 0,
             "SHAPES_FLOOD2");
 }
 
 void test_shapes_fellipse2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);              /* rows 0..40 */
-    x16_gfx2_fellipse(40, 30, 12, 9, 2);
-    t_check((x16_gfx2_read(40, 30) == 2 &&
-            x16_gfx2_read(52, 30) == 2 &&       /* east rim */
-            x16_gfx2_read(53, 30) == 0 &&       /* one past it */
-            x16_gfx2_read(40, 21) == 2 &&       /* north rim */
-            x16_gfx2_read(40, 20) == 0) ? 1 : 0,
+    x16_gfx2h_fellipse(40, 30, 12, 9, 2);
+    t_check((x16_gfx2h_read(40, 30) == 2 &&
+            x16_gfx2h_read(52, 30) == 2 &&       /* east rim */
+            x16_gfx2h_read(53, 30) == 0 &&       /* one past it */
+            x16_gfx2h_read(40, 21) == 2 &&       /* north rim */
+            x16_gfx2h_read(40, 20) == 0) ? 1 : 0,
             "SHAPES_FELLIPSE2");
 }
 
-/* v0.8.0 curve shapes on the 2bpp engine, verified through gfx2_read. */
+/* v0.8.0 curve shapes on the 2bpp engine, verified through gfx2h_read. */
 void test_curve_polygon2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);
-    x16_gfx2_fpolygon(40, 20, 12, 4, 0, 2);         /* filled diamond */
-    t_check((x16_gfx2_read(40, 20) == 2 &&          /* centre */
-            x16_gfx2_read(45, 20) == 2 &&           /* east interior */
-            x16_gfx2_read(35, 20) == 2 &&           /* west interior (neg off) */
-            x16_gfx2_read(40, 15) == 2 &&           /* north interior */
-            x16_gfx2_read(40, 7) == 0) ? 1 : 0, "CURVE_POLYGON2");
+    x16_gfx2h_fpolygon(40, 20, 12, 4, 0, 2);         /* filled diamond */
+    t_check((x16_gfx2h_read(40, 20) == 2 &&          /* centre */
+            x16_gfx2h_read(45, 20) == 2 &&           /* east interior */
+            x16_gfx2h_read(35, 20) == 2 &&           /* west interior (neg off) */
+            x16_gfx2h_read(40, 15) == 2 &&           /* north interior */
+            x16_gfx2h_read(40, 7) == 0) ? 1 : 0, "CURVE_POLYGON2");
 }
 
 void test_curve_rrect2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);
-    x16_gfx2_frrect(20, 4, 40, 30, 8, 2);
-    t_check((x16_gfx2_read(40, 19) == 2 &&
-            x16_gfx2_read(20, 4) == 0) ? 1 : 0, "CURVE_RRECT2");
+    x16_gfx2h_frrect(20, 4, 40, 30, 8, 2);
+    t_check((x16_gfx2h_read(40, 19) == 2 &&
+            x16_gfx2h_read(20, 4) == 0) ? 1 : 0, "CURVE_RRECT2");
 }
 
 void test_curve_arc2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);
-    x16_gfx2_arc(40, 20, 15, 0, 64, 3);             /* east -> south */
+    x16_gfx2h_arc(40, 20, 15, 0, 64, 3);             /* east -> south */
     /* the rim is at radius 14 or 15 (kickc floors the r*sin/cos scale by up
     ** to 1px), so accept either -- what matters is the arc is drawn east and
     ** south and NOT west. */
-    t_check(((x16_gfx2_read(55, 20) == 3 || x16_gfx2_read(54, 20) == 3) &&
-            (x16_gfx2_read(40, 35) == 3 || x16_gfx2_read(40, 34) == 3) &&
-            x16_gfx2_read(25, 20) == 0) ? 1 : 0, "CURVE_ARC2");
+    t_check(((x16_gfx2h_read(55, 20) == 3 || x16_gfx2h_read(54, 20) == 3) &&
+            (x16_gfx2h_read(40, 35) == 3 || x16_gfx2h_read(40, 34) == 3) &&
+            x16_gfx2h_read(25, 20) == 0) ? 1 : 0, "CURVE_ARC2");
 }
 
 void test_curve_pie2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);
-    x16_gfx2_pie(40, 20, 15, 0, 64, 3);
-    t_check((x16_gfx2_read(40, 20) == 3 &&
-            x16_gfx2_read(45, 25) == 3 &&
-            x16_gfx2_read(35, 15) == 0) ? 1 : 0, "CURVE_PIE2");
+    x16_gfx2h_pie(40, 20, 15, 0, 64, 3);
+    t_check((x16_gfx2h_read(40, 20) == 3 &&
+            x16_gfx2h_read(45, 25) == 3 &&
+            x16_gfx2h_read(35, 15) == 0) ? 1 : 0, "CURVE_PIE2");
 }
 
 void test_curve_bezier2(void) {
     static const unsigned int bpts[8] = { 20, 20, 30, 20, 40, 20, 50, 20 };
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);
-    x16_gfx2_bezier(bpts, 3);                        /* collinear -> line */
-    t_check((x16_gfx2_read(20, 20) == 3 &&
-            x16_gfx2_read(50, 20) == 3 &&
-            x16_gfx2_read(35, 20) == 3) ? 1 : 0, "CURVE_BEZIER2");
+    x16_gfx2h_bezier(bpts, 3);                        /* collinear -> line */
+    t_check((x16_gfx2h_read(20, 20) == 3 &&
+            x16_gfx2h_read(50, 20) == 3 &&
+            x16_gfx2h_read(35, 20) == 3) ? 1 : 0, "CURVE_BEZIER2");
 }
 
 int main(void) {

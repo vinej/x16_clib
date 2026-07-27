@@ -17,20 +17,20 @@
         zpage   r6
         zpage   r7
 
-        global  _x16_gfx_polygon
-        global  _x16_gfx_fpolygon
-        global  _x16_gfx2_polygon
-        global  _x16_gfx2_fpolygon
-        global  _x16_gfx_rrect
-        global  _x16_gfx_frrect
-        global  _x16_gfx2_rrect
-        global  _x16_gfx2_frrect
-        global  _x16_gfx_arc
-        global  _x16_gfx2_arc
-        global  _x16_gfx_pie
-        global  _x16_gfx2_pie
-        global  _x16_gfx_bezier
-        global  _x16_gfx2_bezier
+        global  _x16_gfx8l_polygon
+        global  _x16_gfx8l_fpolygon
+        global  _x16_gfx2h_polygon
+        global  _x16_gfx2h_fpolygon
+        global  _x16_gfx8l_rrect
+        global  _x16_gfx8l_frrect
+        global  _x16_gfx2h_rrect
+        global  _x16_gfx2h_frrect
+        global  _x16_gfx8l_arc
+        global  _x16_gfx2h_arc
+        global  _x16_gfx8l_pie
+        global  _x16_gfx2h_pie
+        global  _x16_gfx8l_bezier
+        global  _x16_gfx2h_bezier
 
         section text
 ; --- v0.8.0 curve-shape marshals (vbcc: args 0-3 in r0-r7, 4+ on (sp)) ---
@@ -109,72 +109,72 @@ shp_bmcopy:
         bne     shp_bmcopy
         rts
 
-_x16_gfx_polygon:
+_x16_gfx8l_polygon:
         jsr     shp_pmarshal8
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_polygon
-_x16_gfx_fpolygon:
+_x16_gfx8l_fpolygon:
         jsr     shp_pmarshal8
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_fpolygon
-_x16_gfx2_polygon:
+_x16_gfx2h_polygon:
         jsr     shp_pmarshal2
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_polygon
-_x16_gfx2_fpolygon:
+_x16_gfx2h_fpolygon:
         jsr     shp_pmarshal2
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_fpolygon
-_x16_gfx_rrect:
+_x16_gfx8l_rrect:
         jsr     shp_rmarshal
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_rrect
-_x16_gfx_frrect:
+_x16_gfx8l_frrect:
         jsr     shp_rmarshal
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_frrect
-_x16_gfx2_rrect:
+_x16_gfx2h_rrect:
         jsr     shp_rmarshal
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_rrect
-_x16_gfx2_frrect:
+_x16_gfx2h_frrect:
         jsr     shp_rmarshal
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_frrect
-_x16_gfx_arc:
+_x16_gfx8l_arc:
         jsr     shp_pmarshal8
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_arc
-_x16_gfx2_arc:
+_x16_gfx2h_arc:
         jsr     shp_pmarshal2
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_arc
-_x16_gfx_pie:
+_x16_gfx8l_pie:
         jsr     shp_pmarshal8
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_pie
-_x16_gfx2_pie:
+_x16_gfx2h_pie:
         jsr     shp_pmarshal2
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_pie
-_x16_gfx_bezier:
+_x16_gfx8l_bezier:
         jsr     shp_bmarshal
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_bezier
-_x16_gfx2_bezier:
+_x16_gfx2h_bezier:
         jsr     shp_bmarshal
         jsr     shp_bind2
         lda     shp_mcol
@@ -403,7 +403,7 @@ shp_pg_ojok:
 	rts
 
 ; 16-bit Bresenham from (lx0,ly0) to (lx1,ly1), plotting through shp_do_pset
-; (the gfx2_line algorithm, engine-agnostic and clipping via the binding)
+; (the gfx2h_line algorithm, engine-agnostic and clipping via the binding)
 shp_poly_line:
 	sec                         ; dx = |x1 - x0|, sx = direction
 	lda poly_lx1
@@ -908,7 +908,7 @@ shp_pg_udvno:
 ; shp_line -- shared 16-bit Bresenham (X16_USE_SHP_LINE)
 ; ---------------------------------------------------------------------
 ; The curve shapes (arc, bezier) sample a handful of points and join
-; them; this is the join. It is the same engine-agnostic gfx2_line walk
+; them; this is the join. It is the same engine-agnostic gfx2h_line walk
 ; the polygon carries privately (shp_poly_line), lifted out so arc and
 ; bezier share ONE copy behind their own gate. A program that wants only
 ; the polygon still pays nothing for this; one that wants an arc pays for

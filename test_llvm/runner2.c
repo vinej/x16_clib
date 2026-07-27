@@ -336,11 +336,11 @@ static void test_sprite_image_argorder(void)
 /* the pointer that hides among integers                               */
 /* ------------------------------------------------------------------ */
 
-/* gfx_text(x, y, color, s): `s` is last in the declaration but FIRST in
+/* gfx8l_text(x, y, color, s): `s` is last in the declaration but FIRST in
 ** the __rc space -- it takes __rc2/__rc3, pushing y and color out to
 ** __rc4 and __rc5. This is the single most confusing shim in the port.
 */
-static void test_gfx_text_ptr_last(void)
+static void test_gfx8l_text_ptr_last(void)
 {
     unsigned char i, a = 0, b = 0;
 
@@ -350,7 +350,7 @@ static void test_gfx_text_ptr_last(void)
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 12800);
 
-    x16_gfx_text(100, 8, 0x96, "AB");
+    x16_gfx8l_text(100, 8, 0x96, "AB");
 
     for (i = 0; i < 8; ++i) {
         unsigned char j;
@@ -363,14 +363,14 @@ static void test_gfx_text_ptr_last(void)
     ** y and colour would draw nothing here; one that mixed up the string
     ** pointer would draw garbage identically in both cells.
     */
-    t_check(a > 4 && b > 4 && a != b, "ABI_GFX_TEXT_PTR_LAST");
+    t_check(a > 4 && b > 4 && a != b, "ABI_GFX8L_TEXT_PTR_LAST");
 }
 
 /* ------------------------------------------------------------------ */
 /* the 8bpp pattern and blit shims                                     */
 /* ------------------------------------------------------------------ */
 
-/* x16_gfx_pattern_set() is the only shim in the library that takes a
+/* x16_gfx8l_pattern_set() is the only shim in the library that takes a
 ** pointer FIRST and two plain bytes after it, and the two bytes are not
 ** interchangeable: bg 0 and fg 5 read back differently whichever way
 ** round they land. The x=2 fill then pins the phase, since patterns
@@ -389,9 +389,9 @@ static void test_g8_pattern(void)
         t_vpoke(0x55, PIXEL(i + 2, 74));
     }
 
-    x16_gfx_pattern_set(g8_pat_half, 0, 5);     /* bg 0, fg 5 */
-    x16_gfx_pattern_rect(0, 70, 8, 1);
-    x16_gfx_pattern_rect(2, 74, 8, 1);
+    x16_gfx8l_pattern_set(g8_pat_half, 0, 5);     /* bg 0, fg 5 */
+    x16_gfx8l_pattern_rect(0, 70, 8, 1);
+    x16_gfx8l_pattern_rect(2, 74, 8, 1);
 
     t_check(vpeek(PIXEL(0, 70)) == 5 &&
             vpeek(PIXEL(3, 70)) == 5 &&
@@ -401,7 +401,7 @@ static void test_g8_pattern(void)
             vpeek(PIXEL(2, 74)) == 5 &&         /* phase 2 */
             vpeek(PIXEL(4, 74)) == 0 &&
             vpeek(PIXEL(8, 74)) == 5,
-            "ABI_GFX_PATTERN");
+            "ABI_GFX8L_PATTERN");
 }
 
 /* Six arguments -- two of them a 16-bit pair and a pointer -- which is
@@ -417,17 +417,17 @@ static void test_g8_blit(void)
     t_vpoke(0x00, PIXEL(8, 81));
     t_vpoke(0x00, PIXEL(9, 81));
 
-    x16_gfx_blit(8, 80, 2, 2, g8_img, 0);       /* copy */
+    x16_gfx8l_blit(8, 80, 2, 2, g8_img, 0);       /* copy */
     if (vpeek(PIXEL(8, 80)) != 0xDE || vpeek(PIXEL(9, 80)) != 0xAD ||
         vpeek(PIXEL(8, 81)) != 0xBE || vpeek(PIXEL(9, 81)) != 0xEF) {
-        t_check(0, "ABI_GFX_BLIT");
+        t_check(0, "ABI_GFX8L_BLIT");
         return;
     }
 
-    x16_gfx_blit(8, 80, 2, 2, g8_img, 3);       /* XOR it away again */
+    x16_gfx8l_blit(8, 80, 2, 2, g8_img, 3);       /* XOR it away again */
     t_check(vpeek(PIXEL(8, 80)) == 0x00 &&
             vpeek(PIXEL(9, 81)) == 0x00,
-            "ABI_GFX_BLIT");
+            "ABI_GFX8L_BLIT");
 }
 
 /* The same placement without the trailing op, and the transparent
@@ -444,14 +444,14 @@ static void test_g8_blitm(void)
         t_vpoke(0xFF, PIXEL(12 + i, 90));
     }
 
-    x16_gfx_blitm(12, 90, 4, 1, g8_mask);
+    x16_gfx8l_blitm(12, 90, 4, 1, g8_mask);
 
     t_check(vpeek(PIXEL(12, 90)) == 0xFF &&     /* transparent */
             vpeek(PIXEL(13, 90)) == 0x07 &&
             vpeek(PIXEL(14, 90)) == 0xFF &&     /* transparent */
             vpeek(PIXEL(15, 90)) == 0x09 &&     /* NOT shifted left */
             vpeek(PIXEL(16, 90)) == 0xFF,       /* one past the end */
-            "ABI_GFX_BLITM");
+            "ABI_GFX8L_BLITM");
 }
 
 /* ------------------------------------------------------------------ */
@@ -470,9 +470,9 @@ static void test_fx_triangle_3ptr(void)
     unsigned char inside, outside;
 
     if (!x16_vera_has_fx()) { t_skip("ABI_FX_TRIANGLE_3PTR"); return; }
-    if (!x16_gfx_init())    { t_skip("ABI_FX_TRIANGLE_3PTR"); return; }
+    if (!x16_gfx8l_init())    { t_skip("ABI_FX_TRIANGLE_3PTR"); return; }
 
-    x16_gfx_clear(0);
+    x16_gfx8l_clear(0);
     x16_fx_triangle(&a, &b, &c, 0x2A);
 
     inside  = vpeek(X16_VRAM_BITMAP + 15UL * 320 + 15);   /* well inside  */
@@ -809,7 +809,7 @@ static void test_abi_vpoke_override(void)
 
 /* A 2bpp framebuffer byte sits at y*160 + (x>>2). All values distinct
 ** and nonzero, so any swapped register lands somewhere it can be seen.
-** x16_gfx2_init() reprograms the display and palette 0-3, so this block
+** x16_gfx2h_init() reprograms the display and palette 0-3, so this block
 ** runs last.
 */
 
@@ -818,13 +818,13 @@ static void test_abi_g2_rect(void)
 {
     unsigned char i;
 
-    x16_gfx2_init();
+    x16_gfx2h_init();
     for (i = 0; i < 4; ++i) {
         t_vpoke(0x00, 40UL * 160 + i);
         t_vpoke(0x00, 41UL * 160 + i);
         t_vpoke(0x00, 42UL * 160 + i);
     }
-    x16_gfx2_rect(4, 40, 8, 2, 1);
+    x16_gfx2h_rect(4, 40, 8, 2, 1);
     t_check(vpeek(40UL * 160 + 0) == 0x00 &&
             vpeek(40UL * 160 + 1) == 0x55 &&
             vpeek(40UL * 160 + 2) == 0x55 &&
@@ -844,7 +844,7 @@ static void test_abi_g2_hline(void)
     for (i = 0; i < 6; ++i) {
         t_vpoke(0x00, 20UL * 160 + i);
     }
-    x16_gfx2_hline(5, 20, 13, 3);
+    x16_gfx2h_hline(5, 20, 13, 3);
     t_check(vpeek(20UL * 160 + 0) == 0x00 &&
             vpeek(20UL * 160 + 1) == 0x3F &&
             vpeek(20UL * 160 + 2) == 0xFF &&
@@ -861,11 +861,11 @@ static void test_abi_g2_hline(void)
 static void test_abi_g2_pset_read(void)
 {
     t_vpoke(0x00, 10UL * 160 + 1);
-    x16_gfx2_pset(5, 10, 2);
+    x16_gfx2h_pset(5, 10, 2);
     t_check(vpeek(10UL * 160 + 1) == 0x20 &&
-            x16_gfx2_read(5, 10) == 2 &&
-            x16_gfx2_read(6, 10) == 0 &&
-            x16_gfx2_read(640, 10) == 0xFF,
+            x16_gfx2h_read(5, 10) == 2 &&
+            x16_gfx2h_read(6, 10) == 0 &&
+            x16_gfx2h_read(640, 10) == 0xFF,
             "ABI_G2_PSET_READ");
 }
 
@@ -878,7 +878,7 @@ static void test_abi_g2_setptr(void)
     unsigned char phase;
 
     t_vpoke(0x00, 7UL * 160 + 80);
-    phase = x16_gfx2_setptr(0, 322, 7);     /* byte 80 of row 7, pixel 2 */
+    phase = x16_gfx2h_setptr(0, 322, 7);     /* byte 80 of row 7, pixel 2 */
     VERA.data0 = 0x5A;
     VERA.data0 = 0xA5;                      /* INC_0: same byte again */
     t_check(phase == 2 && vpeek(7UL * 160 + 80) == 0xA5,
@@ -894,7 +894,7 @@ static void test_abi_g2_line(void)
         t_vpoke(0x00, (unsigned long)i * 160);
         t_vpoke(0x00, (unsigned long)i * 160 + 1);
     }
-    x16_gfx2_line(0, 60, 7, 67, 3);
+    x16_gfx2h_line(0, 60, 7, 67, 3);
     t_check(vpeek(60UL * 160) == 0xC0 &&
             vpeek(63UL * 160) == 0x03 &&
             vpeek(64UL * 160 + 1) == 0xC0 &&
@@ -917,8 +917,8 @@ static void test_abi_g2_pattern(void)
     for (i = 0; i < 4; ++i) {
         t_vpoke(0x55, 70UL * 160 + i);
     }
-    x16_gfx2_pattern_set(g2_pat, 0x03);
-    x16_gfx2_pattern_rect(0, 70, 12, 1);
+    x16_gfx2h_pattern_set(g2_pat, 0x03);
+    x16_gfx2h_pattern_rect(0, 70, 12, 1);
     t_check(vpeek(70UL * 160 + 0) == 0xFF &&
             vpeek(70UL * 160 + 1) == 0x00 &&
             vpeek(70UL * 160 + 2) == 0xFF &&
@@ -937,12 +937,12 @@ static void test_abi_g2_blit(void)
     t_vpoke(0x00, 80UL * 160 + 3);
     t_vpoke(0x00, 81UL * 160 + 2);
     t_vpoke(0x00, 81UL * 160 + 3);
-    x16_gfx2_blit(8, 80, 2, 2, g2_img, 0);
+    x16_gfx2h_blit(8, 80, 2, 2, g2_img, 0);
     if (vpeek(80UL * 160 + 2) != 0xDE || vpeek(81UL * 160 + 3) != 0xEF) {
         t_check(0, "ABI_G2_BLIT");
         return;
     }
-    x16_gfx2_blit(8, 80, 2, 2, g2_img, 3);
+    x16_gfx2h_blit(8, 80, 2, 2, g2_img, 3);
     t_check(vpeek(80UL * 160 + 2) == 0x00 &&
             vpeek(81UL * 160 + 3) == 0x00,
             "ABI_G2_BLIT");
@@ -962,7 +962,7 @@ static void test_abi_g2_blitm(void)
     for (i = 90; i <= 94; ++i) {
         t_vpoke(0xFF, (unsigned long)i * 160 + 3);
     }
-    x16_gfx2_blitm(12, 90, 4, 1, g2_mcol);
+    x16_gfx2h_blitm(12, 90, 4, 1, g2_mcol);
     t_check(vpeek(90UL * 160 + 3) == 0x5F &&
             vpeek(93UL * 160 + 3) == 0x5F &&
             vpeek(94UL * 160 + 3) == 0xFF,
@@ -973,7 +973,7 @@ static void test_abi_g2_blitm(void)
 static void test_abi_g2_clear(void)
 {
     t_vpoke(0x77, 76800UL);
-    x16_gfx2_clear(2);
+    x16_gfx2h_clear(2);
     t_check(vpeek(0UL) == 0xAA &&
             vpeek(76799UL) == 0xAA &&
             vpeek(76800UL) == 0x77,
@@ -991,7 +991,7 @@ static void test_shapes_circle8(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 12800);
-    x16_gfx_circle(50, 20, 10, 0x91);
+    x16_gfx8l_circle(50, 20, 10, 0x91);
     t_check(vpeek(PIXEL(60, 20)) == 0x91 &&     /* east / west / north */
             vpeek(PIXEL(40, 20)) == 0x91 &&
             vpeek(PIXEL(50, 10)) == 0x91 &&
@@ -1003,7 +1003,7 @@ static void test_shapes_disc8(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 12800);
-    x16_gfx_disc(50, 20, 10, 0x93);
+    x16_gfx8l_disc(50, 20, 10, 0x93);
     t_check(vpeek(PIXEL(50, 20)) == 0x93 &&     /* centre + rim, empty past */
             vpeek(PIXEL(60, 20)) == 0x93 &&
             vpeek(PIXEL(61, 20)) == 0x00,
@@ -1015,8 +1015,8 @@ static void test_shapes_flood8(void)
     unsigned char ok;
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 12800);
-    x16_gfx_frame(200, 4, 20, 20, 0x97);
-    ok = x16_gfx_flood(205, 10, 0x98);
+    x16_gfx8l_frame(200, 4, 20, 20, 0x97);
+    ok = x16_gfx8l_flood(205, 10, 0x98);
     t_check(ok == 1 &&
             vpeek(PIXEL(205, 10)) == 0x98 &&    /* seed */
             vpeek(PIXEL(218, 22)) == 0x98 &&    /* far DOWN-right corner */
@@ -1030,10 +1030,10 @@ static void test_shapes_disc2(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 160UL * 41);
-    x16_gfx2_disc(40, 30, 8, 3);
-    t_check(x16_gfx2_read(40, 30) == 3 &&
-            x16_gfx2_read(47, 30) == 3 &&
-            x16_gfx2_read(60, 30) == 0,
+    x16_gfx2h_disc(40, 30, 8, 3);
+    t_check(x16_gfx2h_read(40, 30) == 3 &&
+            x16_gfx2h_read(47, 30) == 3 &&
+            x16_gfx2h_read(60, 30) == 0,
             "SHAPES_DISC2");
 }
 
@@ -1041,37 +1041,37 @@ static void test_shapes_flood2(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 160UL * 25);
-    x16_gfx2_frame(20, 4, 20, 20, 3);
-    t_check(x16_gfx2_flood(25, 10, 2) == 1 &&
-            x16_gfx2_read(25, 10) == 2 &&
-            x16_gfx2_read(38, 22) == 2 &&       /* far DOWN corner */
-            x16_gfx2_read(20, 4) == 3 &&
-            x16_gfx2_read(19, 10) == 0,
+    x16_gfx2h_frame(20, 4, 20, 20, 3);
+    t_check(x16_gfx2h_flood(25, 10, 2) == 1 &&
+            x16_gfx2h_read(25, 10) == 2 &&
+            x16_gfx2h_read(38, 22) == 2 &&       /* far DOWN corner */
+            x16_gfx2h_read(20, 4) == 3 &&
+            x16_gfx2h_read(19, 10) == 0,
             "SHAPES_FLOOD2");
 }
 
 /* v0.8.0 curve shapes (2bpp): polygon, rounded rect, arc, pie, cubic
 ** bezier. Each is cleared, drawn, and probed through the independent
-** gfx2_read; one combined check also proves the deep arg slots (bezier
+** gfx2h_read; one combined check also proves the deep arg slots (bezier
 ** passes nine). */
 static void test_shapes_curves2(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
-    x16_gfx2_fpolygon(40, 20, 12, 4, 0, 2);
-    t_check(x16_gfx2_read(40, 20) == 2 && x16_gfx2_read(40, 7) == 0, "CURVE_POLYGON");
+    x16_gfx2h_fpolygon(40, 20, 12, 4, 0, 2);
+    t_check(x16_gfx2h_read(40, 20) == 2 && x16_gfx2h_read(40, 7) == 0, "CURVE_POLYGON");
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
-    x16_gfx2_frrect(20, 4, 40, 30, 8, 2);
-    t_check(x16_gfx2_read(40, 19) == 2 && x16_gfx2_read(20, 4) == 0, "CURVE_RRECT");
+    x16_gfx2h_frrect(20, 4, 40, 30, 8, 2);
+    t_check(x16_gfx2h_read(40, 19) == 2 && x16_gfx2h_read(20, 4) == 0, "CURVE_RRECT");
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
-    x16_gfx2_arc(40, 20, 15, 0, 64, 3);
-    t_check(x16_gfx2_read(55, 20) == 3 && x16_gfx2_read(40, 35) == 3 && x16_gfx2_read(25, 20) == 0, "CURVE_ARC");
+    x16_gfx2h_arc(40, 20, 15, 0, 64, 3);
+    t_check(x16_gfx2h_read(55, 20) == 3 && x16_gfx2h_read(40, 35) == 3 && x16_gfx2h_read(25, 20) == 0, "CURVE_ARC");
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
-    x16_gfx2_pie(40, 20, 15, 0, 64, 3);
-    t_check(x16_gfx2_read(40, 20) == 3 && x16_gfx2_read(45, 25) == 3 && x16_gfx2_read(35, 15) == 0, "CURVE_PIE");
+    x16_gfx2h_pie(40, 20, 15, 0, 64, 3);
+    t_check(x16_gfx2h_read(40, 20) == 3 && x16_gfx2h_read(45, 25) == 3 && x16_gfx2h_read(35, 15) == 0, "CURVE_PIE");
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP); x16_vera_fill(0x00, 160UL * 41);
     { static const unsigned int bpts[8] = {20,20,30,20,40,20,50,20};
-      x16_gfx2_bezier(bpts, 3); }
-    t_check(x16_gfx2_read(20, 20) == 3 && x16_gfx2_read(50, 20) == 3 && x16_gfx2_read(35, 20) == 3, "CURVE_BEZIER");
+      x16_gfx2h_bezier(bpts, 3); }
+    t_check(x16_gfx2h_read(20, 20) == 3 && x16_gfx2h_read(50, 20) == 3 && x16_gfx2h_read(35, 20) == 3, "CURVE_BEZIER");
 }
 
 /* ellipse: 5 arguments, so the 8bpp call proves the deepest char slot
@@ -1080,7 +1080,7 @@ static void test_shapes_ellipse8(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 12800);
-    x16_gfx_ellipse(50, 20, 15, 8, 0x9A);
+    x16_gfx8l_ellipse(50, 20, 15, 8, 0x9A);
     t_check(vpeek(PIXEL(65, 20)) == 0x9A &&     /* east / west / south */
             vpeek(PIXEL(35, 20)) == 0x9A &&
             vpeek(PIXEL(50, 28)) == 0x9A &&
@@ -1092,11 +1092,11 @@ static void test_shapes_fellipse2(void)
 {
     x16_vera_addr0(X16_INC_1, X16_VRAM_BITMAP);
     x16_vera_fill(0x00, 160UL * 41);
-    x16_gfx2_fellipse(40, 30, 12, 9, 2);
-    t_check(x16_gfx2_read(40, 30) == 2 &&       /* centre + east rim */
-            x16_gfx2_read(52, 30) == 2 &&
-            x16_gfx2_read(53, 30) == 0 &&       /* one past the rim */
-            x16_gfx2_read(40, 20) == 0,         /* one past the top rim */
+    x16_gfx2h_fellipse(40, 30, 12, 9, 2);
+    t_check(x16_gfx2h_read(40, 30) == 2 &&       /* centre + east rim */
+            x16_gfx2h_read(52, 30) == 2 &&
+            x16_gfx2h_read(53, 30) == 0 &&       /* one past the rim */
+            x16_gfx2h_read(40, 20) == 0,         /* one past the top rim */
             "SHAPES_FELLIPSE2");
 }
 
@@ -1126,7 +1126,7 @@ int main(void)
     test_sprite_get_pos_both();
     test_sprite_image_argorder();
 
-    test_gfx_text_ptr_last();
+    test_gfx8l_text_ptr_last();
     test_g8_pattern();
     test_g8_blit();
     test_g8_blitm();
@@ -1149,7 +1149,7 @@ int main(void)
 
     test_abi_vpoke_override();
 
-    /* Last: x16_gfx2_init() reprograms the display and palette 0-3. */
+    /* Last: x16_gfx2h_init() reprograms the display and palette 0-3. */
     test_abi_g2_rect();
     test_abi_g2_hline();
     test_abi_g2_pset_read();

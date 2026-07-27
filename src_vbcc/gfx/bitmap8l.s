@@ -1,14 +1,14 @@
 ; =====================================================================
-; x16clib :: gfx/bitmap.s -- 320x240x256 bitmap drawing
+; x16clib :: gfx/bitmap8l.s -- 320x240x256 bitmap drawing
 ; =====================================================================
 ; The framebuffer is 8bpp at VRAM $00000, one byte per pixel, rows of
 ; 320. A pixel is at y*320 + x.
 ;
-; gfx_pset clips. The line/rect primitives do NOT: they assume their
+; gfx8l_pset clips. The line/rect primitives do NOT: they assume their
 ; arguments are on screen. Clipping every span would cost more than it
 ; saves for a caller that already knows its geometry.
 ;
-; Nothing here changes the screen mode. Call x16_gfx_init() once to
+; Nothing here changes the screen mode. Call x16_gfx8l_init() once to
 ; switch the display to bitmap mode; the drawing routines only touch
 ; VRAM, so they also work on an off-screen buffer.
 ;
@@ -23,7 +23,7 @@
 ; (import: vera_fill)
 ; (import: screen_set_mode)
 ; vbcc argument registers, plus the C soft-stack pointer for the fifth
-; argument of gfx_rect/frame/line. The x/cx coordinate is a 16-bit int in
+; argument of gfx8l_rect/frame/line. The x/cx coordinate is a 16-bit int in
 ; r0/r1; y/color and other chars each take an even register (r2, r4, r6);
 ; a 16-bit len/width or a string pointer takes r4/r5 (or r6/r7).
         zpage	r0
@@ -36,28 +36,28 @@
         zpage	r7
         zpage	sp
 
-        global	_x16_gfx_init
-        global	_x16_gfx_clear
-        global	_x16_gfx_pset
-        global	_x16_gfx_hline
-        global	_x16_gfx_vline
-        global	_x16_gfx_rect
-        global	_x16_gfx_frame
-        global	_x16_gfx_line
-        global	_x16_gfx_char
-        global	_x16_gfx_text
-        global	_x16_gfx_pattern_set
-        global	_x16_gfx_pattern_rect
-        global	_x16_gfx_blit
-        global	_x16_gfx_blitm
+        global	_x16_gfx8l_init
+        global	_x16_gfx8l_clear
+        global	_x16_gfx8l_pset
+        global	_x16_gfx8l_hline
+        global	_x16_gfx8l_vline
+        global	_x16_gfx8l_rect
+        global	_x16_gfx8l_frame
+        global	_x16_gfx8l_line
+        global	_x16_gfx8l_char
+        global	_x16_gfx8l_text
+        global	_x16_gfx8l_pattern_set
+        global	_x16_gfx8l_pattern_rect
+        global	_x16_gfx8l_blit
+        global	_x16_gfx8l_blitm
 
         ; primitives the shared shape module (gfx/shapes.s) plots through
-        global	gfx_pset
-        global	gfx_hline
-        global	gfx_read
+        global	gfx8l_pset
+        global	gfx8l_hline
+        global	gfx8l_read
 
-GFX_WIDTH  = 320
-GFX_HEIGHT = 240
+GFX8L_WIDTH  = 320
+GFX8L_HEIGHT = 240
 
         section text
 
@@ -66,12 +66,12 @@ GFX_HEIGHT = 240
 ; =====================================================================
 
 ; ---------------------------------------------------------------------
-; unsigned char x16_gfx_init(void)
+; unsigned char x16_gfx8l_init(void)
 ;   320x240@256c bitmap on layer 0, 40x30 text on layer 1.
 ;   Returns 1 on success, 0 if the mode is unsupported.
 ; ---------------------------------------------------------------------
-_x16_gfx_init:
-        jsr     gfx_init                ; carry set = unsupported
+_x16_gfx8l_init:
+        jsr     gfx8l_init                ; carry set = unsupported
         lda     #0
         ldx     #0
         rol     a
@@ -79,36 +79,36 @@ _x16_gfx_init:
         rts
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_clear(unsigned char color)
+; void __fastcall__ x16_gfx8l_clear(unsigned char color)
 ;   Single argument, already in A: no shim.
 ; ---------------------------------------------------------------------
-_x16_gfx_clear:
-gfx_clear:
+_x16_gfx8l_clear:
+gfx8l_clear:
         ; 320*240 = 76800 = $12C00 bytes does not fit vera_fill's 16-bit
         ; count. Neither ACME nor ca65 complains: `ldy #>$12C00` quietly
         ; takes byte 1, so the count becomes $2C00 and only the top 35
         ; rows clear. Hence two halves; port 0 keeps auto-incrementing
-        ; between the calls. Regression-tested by GFX_CLEAR, which checks
+        ; between the calls. Regression-tested by GFX8L_CLEAR, which checks
         ; the LAST pixel rather than the first.
         pha
         vera_addr 0, VRAM_BITMAP, VERA_INC_1
         pla
         pha
-        ldx     #<(GFX_WIDTH * GFX_HEIGHT / 2)
-        ldy     #>(GFX_WIDTH * GFX_HEIGHT / 2)
+        ldx     #<(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
+        ldy     #>(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
         jsr     vera_fill
         pla
-        ldx     #<(GFX_WIDTH * GFX_HEIGHT / 2)
-        ldy     #>(GFX_WIDTH * GFX_HEIGHT / 2)
+        ldx     #<(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
+        ldy     #>(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
         jmp     vera_fill
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_pset(unsigned int x, unsigned char y,
+; void __fastcall__ x16_gfx8l_pset(unsigned int x, unsigned char y,
 ;                                unsigned char color)
 ; ---------------------------------------------------------------------
-; x16_gfx_pset(__reg("r0/r1") x, __reg("r2") y, __reg("r4") color)
-;   gfx_pset wants P0/P1 = x, P2 = y, P3 = color.
-_x16_gfx_pset:
+; x16_gfx8l_pset(__reg("r0/r1") x, __reg("r2") y, __reg("r4") color)
+;   gfx8l_pset wants P0/P1 = x, P2 = y, P3 = color.
+_x16_gfx8l_pset:
         lda     r0
         sta     X16_P0                  ; x
         lda     r1
@@ -117,15 +117,15 @@ _x16_gfx_pset:
         sta     X16_P2                  ; y
         lda     r4
         sta     X16_P3                  ; color
-        jmp     gfx_pset
+        jmp     gfx8l_pset
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_hline(unsigned int x, unsigned char y,
+; void __fastcall__ x16_gfx8l_hline(unsigned int x, unsigned char y,
 ;                                 unsigned int len, unsigned char color)
 ; ---------------------------------------------------------------------
-; x16_gfx_hline(__reg("r0/r1") x, __reg("r2") y, __reg("r4/r5") len, __reg("r6") color)
-;   gfx_hline wants P0/P1 = x, P2 = y, P4/P5 = len, P3 = color.
-_x16_gfx_hline:
+; x16_gfx8l_hline(__reg("r0/r1") x, __reg("r2") y, __reg("r4/r5") len, __reg("r6") color)
+;   gfx8l_hline wants P0/P1 = x, P2 = y, P4/P5 = len, P3 = color.
+_x16_gfx8l_hline:
         lda     r0
         sta     X16_P0                  ; x
         lda     r1
@@ -138,16 +138,16 @@ _x16_gfx_hline:
         sta     X16_P5
         lda     r6
         sta     X16_P3                  ; color
-        jmp     gfx_hline
+        jmp     gfx8l_hline
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_vline(unsigned int x, unsigned char y,
+; void __fastcall__ x16_gfx8l_vline(unsigned int x, unsigned char y,
 ;                                 unsigned char len, unsigned char color)
 ;   len is 1-255: a column of a 240-row screen never needs more.
 ; ---------------------------------------------------------------------
-; x16_gfx_vline(__reg("r0/r1") x, __reg("r2") y, __reg("r4") len, __reg("r6") color)
-;   gfx_vline wants P0/P1 = x, P2 = y, P4 = len, P3 = color.
-_x16_gfx_vline:
+; x16_gfx8l_vline(__reg("r0/r1") x, __reg("r2") y, __reg("r4") len, __reg("r6") color)
+;   gfx8l_vline wants P0/P1 = x, P2 = y, P4 = len, P3 = color.
+_x16_gfx8l_vline:
         lda     r0
         sta     X16_P0                  ; x
         lda     r1
@@ -158,23 +158,23 @@ _x16_gfx_vline:
         sta     X16_P4                  ; len
         lda     r6
         sta     X16_P3                  ; color
-        jmp     gfx_vline
+        jmp     gfx8l_vline
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_rect(unsigned int x, unsigned char y,
+; void __fastcall__ x16_gfx8l_rect(unsigned int x, unsigned char y,
 ;                                unsigned int w, unsigned char h,
 ;                                unsigned char color)      -- filled
-; void __fastcall__ x16_gfx_frame(... same ...)            -- outline
+; void __fastcall__ x16_gfx8l_frame(... same ...)            -- outline
 ; ---------------------------------------------------------------------
-_x16_gfx_rect:
+_x16_gfx8l_rect:
         jsr     rect_marshal
-        jmp     gfx_rect
+        jmp     gfx8l_rect
 
-_x16_gfx_frame:
+_x16_gfx8l_frame:
         jsr     rect_marshal
-        jmp     gfx_frame
+        jmp     gfx8l_frame
 
-; gfx_rect/frame(x, y, w, h, color): x->r0/r1, y->r2, w->r4/r5, h->r6, and
+; gfx8l_rect/frame(x, y, w, h, color): x->r0/r1, y->r2, w->r4/r5, h->r6, and
 ; color (5th arg) spills to the C soft stack at (sp)+0.
 ; out: P0/P1 = x, P2 = y, P4/P5 = w, P6 = h, P3 = color.
 rect_marshal:
@@ -196,14 +196,14 @@ rect_marshal:
         rts
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_line(unsigned int x0, unsigned char y0,
+; void __fastcall__ x16_gfx8l_line(unsigned int x0, unsigned char y0,
 ;                                unsigned int x1, unsigned char y1,
 ;                                unsigned char color)
 ; ---------------------------------------------------------------------
-; x16_gfx_line(x0, y0, x1, y1, color): x0->r0/r1, y0->r2, x1->r4/r5,
-; y1->r6, color (5th) on the C soft stack. gfx_line wants P0/P1 = x0,
+; x16_gfx8l_line(x0, y0, x1, y1, color): x0->r0/r1, y0->r2, x1->r4/r5,
+; y1->r6, color (5th) on the C soft stack. gfx8l_line wants P0/P1 = x0,
 ; P2 = y0, P3/P4 = x1, P5 = y1, P6 = color.
-_x16_gfx_line:
+_x16_gfx8l_line:
         lda     r0
         sta     X16_P0                  ; x0
         lda     r1
@@ -219,19 +219,19 @@ _x16_gfx_line:
         ldy     #0
         lda     (sp),y
         sta     X16_P6                  ; color (stacked 5th arg)
-        jmp     gfx_line
+        jmp     gfx8l_line
 
 ; circle / disc now live in the engine-agnostic gfx/shapes.s, which
-; plots through the exported gfx_pset / gfx_hline / gfx_read.
+; plots through the exported gfx8l_pset / gfx8l_hline / gfx8l_read.
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_char(unsigned int x, unsigned char y,
+; void __fastcall__ x16_gfx8l_char(unsigned int x, unsigned char y,
 ;                                unsigned char color, unsigned char code)
 ;   `code` is a SCREEN code, not PETSCII.
 ; ---------------------------------------------------------------------
-; x16_gfx_char(x, y, color, code): x->r0/r1, y->r2, color->r4, code->r6.
-;   gfx_char wants P0/P1 = x, P2 = y, P3 = color, A = screen code.
-_x16_gfx_char:
+; x16_gfx8l_char(x, y, color, code): x->r0/r1, y->r2, color->r4, code->r6.
+;   gfx8l_char wants P0/P1 = x, P2 = y, P3 = color, A = screen code.
+_x16_gfx8l_char:
         lda     r0
         sta     X16_P0                  ; x
         lda     r1
@@ -241,16 +241,16 @@ _x16_gfx_char:
         lda     r4
         sta     X16_P3                  ; color
         lda     r6                      ; A = screen code
-        jmp     gfx_char
+        jmp     gfx8l_char
 
 ; ---------------------------------------------------------------------
-; void __fastcall__ x16_gfx_text(unsigned int x, unsigned char y,
+; void __fastcall__ x16_gfx8l_text(unsigned int x, unsigned char y,
 ;                                unsigned char color, const char *s)
 ;   The pointer already arrives as A = low, X = high.
 ; ---------------------------------------------------------------------
-; x16_gfx_text(x, y, color, s): x->r0/r1, y->r2, color->r4, s->r6/r7.
-;   gfx_text wants P0/P1 = x, P2 = y, P3 = color, A/X = string pointer.
-_x16_gfx_text:
+; x16_gfx8l_text(x, y, color, s): x->r0/r1, y->r2, color->r4, s->r6/r7.
+;   gfx8l_text wants P0/P1 = x, P2 = y, P3 = color, A/X = string pointer.
+_x16_gfx8l_text:
         lda     r0
         sta     X16_P0                  ; x
         lda     r1
@@ -261,25 +261,25 @@ _x16_gfx_text:
         sta     X16_P3                  ; color
         lda     r6                      ; A = string low
         ldx     r7                      ; X = string high
-        jmp     gfx_text
+        jmp     gfx8l_text
 
 ; =====================================================================
 ; Internal routines
 ; =====================================================================
 
-gfx_init:
+gfx8l_init:
         lda     #$80
         jmp     screen_set_mode
 
 ; ---------------------------------------------------------------------
-; gfx_setptr -- point data port 0 at pixel (x,y)
+; gfx8l_setptr -- point data port 0 at pixel (x,y)
 ;   in:  A = increment index (VERA_INC_*)
 ;        X16_P0/P1 = x, X16_P2 = y
 ;
 ; y*320 = (y<<8) + (y<<6), so no multiply is needed. Result is 17-bit.
 ; Stepping by VERA_INC_320 then walks straight down a column.
 ; ---------------------------------------------------------------------
-gfx_setptr:
+gfx8l_setptr:
         asl     a
         asl     a
         asl     a
@@ -336,14 +336,14 @@ gfx_setptr:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_ld1 -- point VERA port 1 at the address gfx_setptr just computed
+; gfx8l_ld1 -- point VERA port 1 at the address gfx8l_setptr just computed
 ;
-; gfx_blit's read-modify-write ops read the screen back while writing it,
+; gfx8l_blit's read-modify-write ops read the screen back while writing it,
 ; and DATA1 always reads port 1 whatever ADDRSEL says. T0/T1/T2 and T5
-; still hold gfx_setptr's answer, so this is the same store sequence
+; still hold gfx8l_setptr's answer, so this is the same store sequence
 ; against the other port.
 ; ---------------------------------------------------------------------
-gfx_ld1:
+gfx8l_ld1:
         lda     #VERA_CTRL_ADDRSEL
         tsb     VERA_CTRL
         lda     X16_T0
@@ -357,12 +357,12 @@ gfx_ld1:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_pset -- set one pixel, clipped
+; gfx8l_pset -- set one pixel, clipped
 ;   in:  X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour
 ; ---------------------------------------------------------------------
-gfx_pset:
+gfx8l_pset:
         lda     X16_P2
-        cmp     #GFX_HEIGHT
+        cmp     #GFX8L_HEIGHT
         bcs     .off                    ; y >= 240
 
         lda     X16_P1                  ; x high byte
@@ -370,63 +370,63 @@ gfx_pset:
         cmp     #1
         bne     .off                    ; x >= 512
         lda     X16_P0
-        cmp     #<GFX_WIDTH             ; 320 = $140, so x low must be < $40
+        cmp     #<GFX8L_WIDTH             ; 320 = $140, so x low must be < $40
         bcs     .off
 .on:
         lda     #VERA_INC_0
-        jsr     gfx_setptr
+        jsr     gfx8l_setptr
         lda     X16_P3
         sta     VERA_DATA0
 .off:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_read -- read one pixel (no clip; caller keeps it on screen)
+; gfx8l_read -- read one pixel (no clip; caller keeps it on screen)
 ;   in:  X16_P0/P1 = x, X16_P2 = y   out: A = colour
 ; ---------------------------------------------------------------------
-gfx_read:
+gfx8l_read:
         lda     #VERA_INC_0
-        jsr     gfx_setptr
+        jsr     gfx8l_setptr
         lda     VERA_DATA0
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_hline -- in: X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour,
+; gfx8l_hline -- in: X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour,
 ;                  X16_P4/P5 = length
 ; ---------------------------------------------------------------------
-gfx_hline:
+gfx8l_hline:
         lda     #VERA_INC_1
-        jsr     gfx_setptr
+        jsr     gfx8l_setptr
         lda     X16_P3
         ldx     X16_P4
         ldy     X16_P5
         jmp     vera_fill
 
 ; ---------------------------------------------------------------------
-; gfx_vline -- in: X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour,
+; gfx8l_vline -- in: X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour,
 ;                  X16_P4 = length (1-255)
 ;
 ; VERA_INC_320 is one of the hardware's odd increments, so a vertical
 ; line is the same tight loop as a horizontal one.
 ; ---------------------------------------------------------------------
-gfx_vline:
+gfx8l_vline:
         lda     #VERA_INC_320
-        jsr     gfx_setptr
+        jsr     gfx8l_setptr
         lda     X16_P3
         ldx     X16_P4
         ldy     #0
         jmp     vera_fill
 
 ; ---------------------------------------------------------------------
-; gfx_rect -- filled rectangle
+; gfx8l_rect -- filled rectangle
 ;   in:  X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour,
 ;        X16_P4/P5 = width, X16_P6 = height
 ; ---------------------------------------------------------------------
-gfx_rect:
+gfx8l_rect:
 .row:
         lda     X16_P6
         beq     .done
-        jsr     gfx_hline               ; leaves P0..P5 alone
+        jsr     gfx8l_hline               ; leaves P0..P5 alone
         inc     X16_P2
         dec     X16_P6
         bra     .row
@@ -434,10 +434,10 @@ gfx_rect:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_frame -- rectangle outline, same arguments as gfx_rect
+; gfx8l_frame -- rectangle outline, same arguments as gfx8l_rect
 ; ---------------------------------------------------------------------
-gfx_frame:
-        ; Take a private copy of everything: gfx_vline reuses P4 as its
+gfx8l_frame:
+        ; Take a private copy of everything: gfx8l_vline reuses P4 as its
         ; length, which is where the caller's width lives.
         lda     X16_P0
         sta     gb_x
@@ -455,7 +455,7 @@ gfx_frame:
         sta     gb_h
 
         jsr     restore_span            ; top edge
-        jsr     gfx_hline
+        jsr     gfx8l_hline
 
         jsr     restore_span            ; bottom edge, y + h - 1
         clc
@@ -464,10 +464,10 @@ gfx_frame:
         sec
         sbc     #1
         sta     X16_P2
-        jsr     gfx_hline
+        jsr     gfx8l_hline
 
         jsr     restore_col             ; left edge
-        jsr     gfx_vline
+        jsr     gfx8l_vline
 
         jsr     restore_col             ; right edge, x + w - 1
         clc
@@ -482,11 +482,11 @@ gfx_frame:
         dec     X16_P1
 .no_borrow:
         dec     X16_P0
-        jsr     gfx_vline
+        jsr     gfx8l_vline
 
         rts
 
-; x, y, colour, width -- arguments for gfx_hline
+; x, y, colour, width -- arguments for gfx8l_hline
 restore_span:
         lda     gb_x
         sta     X16_P0
@@ -502,7 +502,7 @@ restore_span:
         sta     X16_P5
         rts
 
-; x, y, colour, height -- arguments for gfx_vline
+; x, y, colour, height -- arguments for gfx8l_vline
 restore_col:
         lda     gb_x
         sta     X16_P0
@@ -517,15 +517,15 @@ restore_col:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_line -- Bresenham, any direction
+; gfx8l_line -- Bresenham, any direction
 ;   in:  X16_P0/P1 = x0, X16_P2 = y0
 ;        X16_P3/P4 = x1, X16_P5 = y1
 ;        X16_P6    = colour
 ;
-; Works entirely from its own variables, because gfx_pset wants the
+; Works entirely from its own variables, because gfx8l_pset wants the
 ; colour in X16_P3 -- which is where x1 lives on entry.
 ; ---------------------------------------------------------------------
-gfx_line:
+gfx8l_line:
         lda     X16_P0
         sta     gl_x0
         lda     X16_P1
@@ -682,20 +682,20 @@ plot:
         sta     X16_P2
         lda     gl_color
         sta     X16_P3
-        jmp     gfx_pset
+        jmp     gfx8l_pset
 
 ; (circle / disc / flood are in gfx/shapes.s)
 
 ; ---------------------------------------------------------------------
-; gfx_char -- draw one glyph from the VRAM charset into the bitmap
+; gfx8l_char -- draw one glyph from the VRAM charset into the bitmap
 ;   in:  A = screen code (0-255)
 ;        X16_P0/P1 = x, X16_P2 = y, X16_P3 = colour
 ;
 ; Reads the 8-byte 1bpp glyph from the charset the KERNAL keeps at VRAM
-; $1F000; set bits become colour pixels through gfx_pset (so text clips),
+; $1F000; set bits become colour pixels through gfx8l_pset (so text clips),
 ; clear bits stay transparent. Preserves X16_P0..P3.
 ; ---------------------------------------------------------------------
-gfx_char:
+gfx8l_char:
         ; glyph address = VRAM_CHARSET + code * 8  (17-bit)
         sta     gt_code
         stz     gt_hi
@@ -753,7 +753,7 @@ gfx_char:
         adc     gt_row
         bcs     .next_col               ; wrapped past 255: off screen
         sta     X16_P2
-        jsr     gfx_pset
+        jsr     gfx8l_pset
 .next_col:
         inc     gt_col
         lda     gt_col
@@ -774,8 +774,8 @@ gfx_char:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_text -- a NUL-terminated string, 8 pixels per character
-;   in:  A = string low, X = string high; X16_P0..P3 as gfx_char.
+; gfx8l_text -- a NUL-terminated string, 8 pixels per character
+;   in:  A = string low, X = string high; X16_P0..P3 as gfx8l_char.
 ;   ASCII letters are converted to screen codes ('A'-'Z' work as
 ;   expected); X16_P0/P1 are left one past the final character.
 ;
@@ -783,7 +783,7 @@ gfx_char:
 ; -- and in ca65 a plain label ends the enclosing cheap-local scope, so
 ; this loop's labels are plain too. ACME's zone-local `.gt_lda` did not.
 ; ---------------------------------------------------------------------
-gfx_text:
+gfx8l_text:
         sta     gt_lda+1                ; the string pointer lives in the lda's
         stx     gt_lda+2                ; own operand (no zero page needed)
 gt_loop:
@@ -795,7 +795,7 @@ gt_lda:
         beq     gt_code_ok
         and     #$1F
 gt_code_ok:
-        jsr     gfx_char
+        jsr     gfx8l_char
         clc                             ; advance the pen 8 pixels
         lda     X16_P0
         adc     #8
@@ -847,27 +847,27 @@ gl_tmp:    reserve 1
         section text                    ; the block above ended in bss
 
 ; ---------------------------------------------------------------------
-; void x16_gfx_pattern_set(__reg("a/x") const unsigned char *pattern,
+; void x16_gfx8l_pattern_set(__reg("a/x") const unsigned char *pattern,
 ;                          __reg("r0") unsigned char bg,
 ;                          __reg("r1") unsigned char fg)
 ;   the body wants A/X = pattern, P4 = bg, P5 = fg.
 ; ---------------------------------------------------------------------
-_x16_gfx_pattern_set:
+_x16_gfx8l_pattern_set:
         pha
         lda     r0
         sta     X16_P4                  ; bg
         lda     r1
         sta     X16_P5                  ; fg
         pla                             ; A/X = pattern again
-        jmp     gfx_pattern_set
+        jmp     gfx8l_pattern_set
 
 ; ---------------------------------------------------------------------
-; void x16_gfx_pattern_rect(__reg("r0/r1") unsigned int x,
+; void x16_gfx8l_pattern_rect(__reg("r0/r1") unsigned int x,
 ;                           __reg("r2") unsigned char y,
 ;                           __reg("r4/r5") unsigned int w,
 ;                           __reg("r6") unsigned char h)
 ; ---------------------------------------------------------------------
-_x16_gfx_pattern_rect:
+_x16_gfx8l_pattern_rect:
         lda     r0
         sta     X16_P0                  ; x
         lda     r1
@@ -880,10 +880,10 @@ _x16_gfx_pattern_rect:
         sta     X16_P5
         lda     r6
         sta     X16_P6                  ; h
-        jmp     gfx_pattern_rect
+        jmp     gfx8l_pattern_rect
 
 ; ---------------------------------------------------------------------
-; void x16_gfx_blit(__reg("r0/r1") unsigned int x,
+; void x16_gfx8l_blit(__reg("r0/r1") unsigned int x,
 ;                   __reg("r2") unsigned char y,
 ;                   __reg("r4") unsigned char w,
 ;                   __reg("r5") unsigned char h,
@@ -892,7 +892,7 @@ _x16_gfx_pattern_rect:
 ;   Six arguments, each pinned to its own register rather than left to
 ;   the even-slot rule, which would spill two onto the C soft stack.
 ; ---------------------------------------------------------------------
-_x16_gfx_blit:
+_x16_gfx8l_blit:
         lda     r0
         sta     X16_P0                  ; x
         lda     r1
@@ -908,16 +908,16 @@ _x16_gfx_blit:
         lda     r7
         sta     X16_P7
         lda     r3                      ; A = op
-        jmp     gfx_blit
+        jmp     gfx8l_blit
 
 ; ---------------------------------------------------------------------
-; void x16_gfx_blitm(__reg("r0/r1") unsigned int x,
+; void x16_gfx8l_blitm(__reg("r0/r1") unsigned int x,
 ;                    __reg("r2") unsigned char y,
 ;                    __reg("r4") unsigned char w,
 ;                    __reg("r5") unsigned char h,
 ;                    __reg("r6/r7") const unsigned char *src)
 ; ---------------------------------------------------------------------
-_x16_gfx_blitm:
+_x16_gfx8l_blitm:
         lda     r0
         sta     X16_P0
         lda     r1
@@ -932,15 +932,15 @@ _x16_gfx_blitm:
         sta     X16_P6
         lda     r7
         sta     X16_P7
-        jmp     gfx_blitm
+        jmp     gfx8l_blitm
 
 ; ---------------------------------------------------------------------
-; gfx_pattern_set -- cache an 8x8 1bpp pattern for gfx_pattern_rect
+; gfx8l_pattern_set -- cache an 8x8 1bpp pattern for gfx8l_pattern_rect
 ;   in:  A = pattern low, X = pattern high (8 row bytes, top first;
 ;            bit 7 is the leftmost pixel)
 ;        X16_P4 = background colour, X16_P5 = foreground colour
 ; ---------------------------------------------------------------------
-gfx_pattern_set:
+gfx8l_pattern_set:
         sta     X16_T0
         stx     X16_T0+1
         ldy     #7
@@ -956,14 +956,14 @@ gp8_cp:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_pattern_rect -- fill a rectangle with the cached pattern
+; gfx8l_pattern_rect -- fill a rectangle with the cached pattern
 ;   in:  X16_P0/P1 = x, X16_P2 = y, X16_P4/P5 = width, X16_P6 = height
 ;   (P2 and P6 are consumed)
 ;
 ; Tiles from the screen origin, like the 2bpp module: the pattern cell
 ; under a pixel depends only on the pixel, not the rectangle.
 ; ---------------------------------------------------------------------
-gfx_pattern_rect:
+gfx8l_pattern_rect:
         lda     X16_P4                  ; zero width or height: draw nothing
         ora     X16_P5
         beq     gp8_done
@@ -974,7 +974,7 @@ gfx_pattern_rect:
         sta     gp8_rot
 gp8_row:
         lda     #VERA_INC_1
-        jsr     gfx_setptr
+        jsr     gfx8l_setptr
         lda     X16_P2                  ; the pattern row: y & 7
         and     #7
         tay
@@ -1020,7 +1020,7 @@ gp8_done:
         rts
 
 ; ---------------------------------------------------------------------
-; gfx_blit -- rows of pixel bytes from RAM to the framebuffer
+; gfx8l_blit -- rows of pixel bytes from RAM to the framebuffer
 ;   in:  A = raster op: 0 copy, 1 OR, 2 AND, 3 XOR
 ;        X16_P0/P1 = x, X16_P2 = y, X16_P4 = width in PIXELS (1-255),
 ;        X16_P5 = height in rows, X16_P6/P7 = source (row-major)
@@ -1029,10 +1029,10 @@ gp8_done:
 ; 2bpp module's own trick. No clipping. P2 and P5 are consumed.
 ;
 ; The three RMW ops share one loop: the opcode of the instruction at
-; gb_opcode is patched from gb_optab (ora/and/eor abs), the gfx_text
+; gb_opcode is patched from gb_optab (ora/and/eor abs), the gfx8l_text
 ; trick one byte earlier.
 ; ---------------------------------------------------------------------
-gfx_blit:
+gfx8l_blit:
         and     #3
         sta     gb_op
         beq     gb_row                  ; copy: no opcode to patch
@@ -1041,10 +1041,10 @@ gfx_blit:
         sta     gb_opcode
 gb_row:
         lda     #VERA_INC_1
-        jsr     gfx_setptr
+        jsr     gfx8l_setptr
         lda     gb_op
         beq     gb_copy
-        jsr     gfx_ld1                 ; the RMW ops read through port 1
+        jsr     gfx8l_ld1                 ; the RMW ops read through port 1
         ldy     #0
 gb_oploop:
         lda     (X16_PTR3),y
@@ -1079,7 +1079,7 @@ gb_nocarry:
 gb_optab: byte $0D, $2D, $4D           ; ora / and / eor absolute
 
 ; ---------------------------------------------------------------------
-; gfx_blitm -- a masked blit: byte $00 is transparent
+; gfx8l_blitm -- a masked blit: byte $00 is transparent
 ;   in:  X16_P0/P1 = x, X16_P2 = y, X16_P4 = width in PIXELS (1-255),
 ;        X16_P5 = height, X16_P6/P7 = source (row-major)
 ;
@@ -1088,10 +1088,10 @@ gb_optab: byte $0D, $2D, $4D           ; ora / and / eor absolute
 ; module needs interleaved mask bytes; one byte per pixel does not.
 ; P2 and P5 are consumed.
 ; ---------------------------------------------------------------------
-gfx_blitm:
+gfx8l_blitm:
 gm_row:
         lda     #VERA_INC_1
-        jsr     gfx_setptr
+        jsr     gfx8l_setptr
         ldy     #0
 gm_px:
         lda     (X16_PTR3),y

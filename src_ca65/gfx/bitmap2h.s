@@ -1,14 +1,14 @@
 ; =====================================================================
-; x16clib :: gfx/bitmap2.s -- 640x480x4 bitmap drawing (2bpp)
+; x16clib :: gfx/bitmap2h.s -- 640x480x4 bitmap drawing (2bpp)
 ; =====================================================================
 ; The framebuffer is 2bpp at VRAM $00000: 4 pixels per byte packed
 ; MSB-first, rows of 160 bytes. A pixel byte is at y*160 + (x>>2).
-; Colours are 0-3; x16_gfx2_init() loads white/gray/gray/black into
+; Colours are 0-3; x16_gfx2h_init() loads white/gray/gray/black into
 ; palette entries 0-3 and programs the mode on bare VERA registers
 ; (no KERNAL screen mode exists for it).
 ;
-; x16_gfx2_pset()/read() clip; the span/rect/line/blit primitives do
-; NOT (the 8bpp module's policy). x16_gfx2_clear() runs through the
+; x16_gfx2h_pset()/read() clip; the span/rect/line/blit primitives do
+; NOT (the 8bpp module's policy). x16_gfx2h_clear() runs through the
 ; VERA FX 32-bit cache and needs an FX-capable VERA (47.0.2+).
 ;
 ; The routine bodies are the x16_library gfx2 module, byte for byte;
@@ -24,23 +24,23 @@
         .import         vera_fill
         .import         fx_fill
 
-        .export         _x16_gfx2_init
-        .export         _x16_gfx2_clear
-        .export         _x16_gfx2_setptr
-        .export         _x16_gfx2_pset
-        .export         _x16_gfx2_read
-        .export         _x16_gfx2_hline
-        .export         _x16_gfx2_vline
-        .export         _x16_gfx2_rect
-        .export         _x16_gfx2_frame
-        .export         _x16_gfx2_line
-        .export         _x16_gfx2_pattern_set
-        .export         _x16_gfx2_pattern_rect
-        .export         _x16_gfx2_blit
-        .export         _x16_gfx2_blitm
+        .export         _x16_gfx2h_init
+        .export         _x16_gfx2h_clear
+        .export         _x16_gfx2h_setptr
+        .export         _x16_gfx2h_pset
+        .export         _x16_gfx2h_read
+        .export         _x16_gfx2h_hline
+        .export         _x16_gfx2h_vline
+        .export         _x16_gfx2h_rect
+        .export         _x16_gfx2h_frame
+        .export         _x16_gfx2h_line
+        .export         _x16_gfx2h_pattern_set
+        .export         _x16_gfx2h_pattern_rect
+        .export         _x16_gfx2h_blit
+        .export         _x16_gfx2h_blitm
 
         ; primitives the shared shape module (gfx/shapes.s) plots through
-        .export         gfx2_pset, gfx2_hline, gfx2_read
+        .export         gfx2h_pset, gfx2h_hline, gfx2h_read
 
         .segment        "CODE"
 
@@ -48,30 +48,30 @@
 ; C entry points
 ; =====================================================================
 
-; void x16_gfx2_init(void)
-_x16_gfx2_init:
-        jmp     gfx2_init
+; void x16_gfx2h_init(void)
+_x16_gfx2h_init:
+        jmp     gfx2h_init
 
-; void __fastcall__ x16_gfx2_clear(unsigned char color)
-_x16_gfx2_clear:
-        jmp     gfx2_clear
+; void __fastcall__ x16_gfx2h_clear(unsigned char color)
+_x16_gfx2h_clear:
+        jmp     gfx2h_clear
 
-; unsigned char __fastcall__ x16_gfx2_setptr(unsigned char inc,
+; unsigned char __fastcall__ x16_gfx2h_setptr(unsigned char inc,
 ;                                unsigned int x, unsigned int y)
-_x16_gfx2_setptr:
+_x16_gfx2h_setptr:
         sta     X16_P2                  ; y
         stx     X16_P3
         jsr     popax
         sta     X16_P0                  ; x
         stx     X16_P1
         jsr     popa                    ; increment index
-        jsr     gfx2_setptr
+        jsr     gfx2h_setptr
         ldx     #0
         rts
 
-; void __fastcall__ x16_gfx2_pset(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_pset(unsigned int x, unsigned int y,
 ;                                 unsigned char color)
-_x16_gfx2_pset:
+_x16_gfx2h_pset:
         sta     g2sh_c
         jsr     popax
         sta     X16_P2                  ; y
@@ -80,25 +80,25 @@ _x16_gfx2_pset:
         sta     X16_P0                  ; x
         stx     X16_P1
         lda     g2sh_c
-        jmp     gfx2_pset
+        jmp     gfx2h_pset
 
-; unsigned char __fastcall__ x16_gfx2_read(unsigned int x, unsigned int y)
+; unsigned char __fastcall__ x16_gfx2h_read(unsigned int x, unsigned int y)
 ;   0-3, or $FF off screen
-_x16_gfx2_read:
+_x16_gfx2h_read:
         sta     X16_P2                  ; y
         stx     X16_P3
         jsr     popax
         sta     X16_P0                  ; x
         stx     X16_P1
-        jsr     gfx2_read
+        jsr     gfx2h_read
         ldx     #0
         bcc     @on
         lda     #$FF
 @on:    rts
 
-; void __fastcall__ x16_gfx2_hline(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_hline(unsigned int x, unsigned int y,
 ;                                  unsigned int len, unsigned char color)
-_x16_gfx2_hline:
+_x16_gfx2h_hline:
         sta     g2sh_c
         jsr     popax
         sta     X16_P4                  ; len
@@ -110,11 +110,11 @@ _x16_gfx2_hline:
         sta     X16_P0                  ; x
         stx     X16_P1
         lda     g2sh_c
-        jmp     gfx2_hline
+        jmp     gfx2h_hline
 
-; void __fastcall__ x16_gfx2_vline(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_vline(unsigned int x, unsigned int y,
 ;                                  unsigned int len, unsigned char color)
-_x16_gfx2_vline:
+_x16_gfx2h_vline:
         sta     g2sh_c
         jsr     popax
         sta     X16_P4                  ; len
@@ -126,12 +126,12 @@ _x16_gfx2_vline:
         sta     X16_P0                  ; x
         stx     X16_P1
         lda     g2sh_c
-        jmp     gfx2_vline
+        jmp     gfx2h_vline
 
-; void __fastcall__ x16_gfx2_rect(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_rect(unsigned int x, unsigned int y,
 ;                                 unsigned int w, unsigned int h,
 ;                                 unsigned char color)
-_x16_gfx2_rect:
+_x16_gfx2h_rect:
         sta     g2sh_c
         jsr     popax
         sta     X16_P6                  ; h
@@ -146,12 +146,12 @@ _x16_gfx2_rect:
         sta     X16_P0                  ; x
         stx     X16_P1
         lda     g2sh_c
-        jmp     gfx2_rect
+        jmp     gfx2h_rect
 
-; void __fastcall__ x16_gfx2_frame(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_frame(unsigned int x, unsigned int y,
 ;                                  unsigned int w, unsigned int h,
 ;                                  unsigned char color)
-_x16_gfx2_frame:
+_x16_gfx2h_frame:
         sta     g2sh_c
         jsr     popax
         sta     X16_P6                  ; h
@@ -166,12 +166,12 @@ _x16_gfx2_frame:
         sta     X16_P0                  ; x
         stx     X16_P1
         lda     g2sh_c
-        jmp     gfx2_frame
+        jmp     gfx2h_frame
 
-; void __fastcall__ x16_gfx2_line(unsigned int x0, unsigned int y0,
+; void __fastcall__ x16_gfx2h_line(unsigned int x0, unsigned int y0,
 ;                                 unsigned int x1, unsigned int y1,
 ;                                 unsigned char color)
-_x16_gfx2_line:
+_x16_gfx2h_line:
         sta     g2sh_c
         jsr     popax
         sta     X16_P6                  ; y1
@@ -186,20 +186,20 @@ _x16_gfx2_line:
         sta     X16_P0                  ; x0
         stx     X16_P1
         lda     g2sh_c
-        jmp     gfx2_line
+        jmp     gfx2h_line
 
-; void __fastcall__ x16_gfx2_pattern_set(const unsigned char *pattern,
+; void __fastcall__ x16_gfx2h_pattern_set(const unsigned char *pattern,
 ;                                        unsigned char colors)
 ;   colors = (background << 2) | foreground
-_x16_gfx2_pattern_set:
+_x16_gfx2h_pattern_set:
         sta     g2sh_c                  ; colors
         jsr     popax                   ; pattern -> A/X
         ldy     g2sh_c
-        jmp     gfx2_pattern_set
+        jmp     gfx2h_pattern_set
 
-; void __fastcall__ x16_gfx2_pattern_rect(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_pattern_rect(unsigned int x, unsigned int y,
 ;                                         unsigned int w, unsigned int h)
-_x16_gfx2_pattern_rect:
+_x16_gfx2h_pattern_rect:
         sta     X16_P6                  ; h
         stx     X16_P7
         jsr     popax
@@ -211,13 +211,13 @@ _x16_gfx2_pattern_rect:
         jsr     popax
         sta     X16_P0                  ; x
         stx     X16_P1
-        jmp     gfx2_pattern_rect
+        jmp     gfx2h_pattern_rect
 
-; void __fastcall__ x16_gfx2_blit(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_blit(unsigned int x, unsigned int y,
 ;                                 unsigned char wbytes, unsigned char h,
 ;                                 const unsigned char *src,
 ;                                 unsigned char op)
-_x16_gfx2_blit:
+_x16_gfx2h_blit:
         sta     g2sh_c                  ; op
         jsr     popax
         sta     X16_P6                  ; src
@@ -233,12 +233,12 @@ _x16_gfx2_blit:
         sta     X16_P0                  ; x
         stx     X16_P1
         lda     g2sh_c
-        jmp     gfx2_blit
+        jmp     gfx2h_blit
 
-; void __fastcall__ x16_gfx2_blitm(unsigned int x, unsigned int y,
+; void __fastcall__ x16_gfx2h_blitm(unsigned int x, unsigned int y,
 ;                                  unsigned char h, unsigned char cols,
 ;                                  const unsigned char *src)
-_x16_gfx2_blitm:
+_x16_gfx2h_blitm:
         sta     X16_P6                  ; src
         stx     X16_P7
         jsr     popa
@@ -251,7 +251,7 @@ _x16_gfx2_blitm:
         jsr     popax
         sta     X16_P0                  ; x
         stx     X16_P1
-        jmp     gfx2_blitm
+        jmp     gfx2h_blitm
 
 g2sh_c: .byte   0
 
@@ -259,19 +259,19 @@ g2sh_c: .byte   0
 ; the x16_library gfx2 module, verbatim
 ; =====================================================================
 
-GFX2_WIDTH  = 640
-GFX2_HEIGHT = 480
-GFX2_STRIDE = 160
+GFX2H_WIDTH  = 640
+GFX2H_HEIGHT = 480
+GFX2H_STRIDE = 160
 
 ; ---------------------------------------------------------------------
-; gfx2_init -- program the 640x480@2bpp mode on bare VERA registers.
+; gfx2h_init -- program the 640x480@2bpp mode on bare VERA registers.
 ;
 ; Layer 0 becomes the bitmap and is enabled; layer 1 (the text screen,
 ; which would overlay garbage) is disabled; sprites are left as the
 ; caller had them. Palette entries 0-3 get the default ramp. The
-; framebuffer contents are NOT cleared -- call gfx2_clear.
+; framebuffer contents are NOT cleared -- call gfx2h_clear.
 ; ---------------------------------------------------------------------
-gfx2_init:
+gfx2h_init:
     vera_dcsel 0
     lda #$80                    ; 1:1 scale -> full 640x480
     sta VERA_DC_HSCALE
@@ -307,13 +307,13 @@ bitmap2_defpal:
     .byte $FF, $0F, $AA, $0A, $55, $05, $00, $00
 
 ; ---------------------------------------------------------------------
-; gfx2_clear -- fill the whole framebuffer with one colour
+; gfx2h_clear -- fill the whole framebuffer with one colour
 ;   in:  A = colour (0-3)
 ;
 ; Uses the FX 32-bit cache write (~4x a CPU byte loop; measured 1.25
 ; frames per full screen against 5.25). Clobbers X16_P0..P4.
 ; ---------------------------------------------------------------------
-gfx2_clear:
+gfx2h_clear:
     and #3
     tax
     lda bitmap2_colbyte,x
@@ -321,17 +321,17 @@ gfx2_clear:
     stz X16_P0                  ; first half: $00000, 38,400 bytes
     stz X16_P1
     stz X16_P2
-    lda #<(GFX2_STRIDE * GFX2_HEIGHT / 2)
+    lda #<(GFX2H_STRIDE * GFX2H_HEIGHT / 2)
     sta X16_P3
-    lda #>(GFX2_STRIDE * GFX2_HEIGHT / 2)
+    lda #>(GFX2H_STRIDE * GFX2H_HEIGHT / 2)
     sta X16_P4
     pla
     pha
     jsr fx_fill
-    lda #<(GFX2_STRIDE * GFX2_HEIGHT / 2)
+    lda #<(GFX2H_STRIDE * GFX2H_HEIGHT / 2)
     sta X16_P0                  ; second half starts at $09600
     sta X16_P3
-    lda #>(GFX2_STRIDE * GFX2_HEIGHT / 2)
+    lda #>(GFX2H_STRIDE * GFX2H_HEIGHT / 2)
     sta X16_P1
     sta X16_P4
     stz X16_P2
@@ -339,7 +339,7 @@ gfx2_clear:
     jmp fx_fill
 
 ; ---------------------------------------------------------------------
-; gfx2_setptr -- point data port 0 at the byte holding pixel (x,y)
+; gfx2h_setptr -- point data port 0 at the byte holding pixel (x,y)
 ;   in:  A = increment index (VERA_INC_*)
 ;        X16_P0/P1 = x, X16_P2/P3 = y
 ;   out: A = x & 3 (the pixel's position within the byte)
@@ -347,7 +347,7 @@ gfx2_clear:
 ; y*160 = (y<<5) + (y<<5)<<2, so no multiply is needed; the result is
 ; 17-bit. Stepping by VERA_INC_160 then walks straight down a column.
 ; ---------------------------------------------------------------------
-gfx2_setptr:
+gfx2h_setptr:
     pha
     jsr bitmap2_addr_calc
     pla
@@ -357,10 +357,10 @@ gfx2_setptr:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_pset -- set one pixel, clipped
+; gfx2h_pset -- set one pixel, clipped
 ;   in:  A = colour (0-3), X16_P0/P1 = x, X16_P2/P3 = y
 ; ---------------------------------------------------------------------
-gfx2_pset:
+gfx2h_pset:
     and #3
     sta g2_c
     jsr bitmap2_onscreen
@@ -385,12 +385,12 @@ gfx2_pset:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_read -- read one pixel
+; gfx2h_read -- read one pixel
 ;   in:  X16_P0/P1 = x, X16_P2/P3 = y
 ;   out: carry clear, A = colour (0-3); carry set if (x,y) is off
 ;        screen (A undefined)
 ; ---------------------------------------------------------------------
-gfx2_read:
+gfx2h_read:
     jsr bitmap2_onscreen
     bcs @roff
 
@@ -416,14 +416,14 @@ gfx2_read:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_hline -- horizontal span (no clipping)
+; gfx2h_hline -- horizontal span (no clipping)
 ;   in:  A = colour (0-3), X16_P0/P1 = x, X16_P2/P3 = y,
 ;        X16_P4/P5 = length in pixels
 ;
 ; Head and tail partials are read-modify-write; the middle whole bytes
 ; are one vera_fill.
 ; ---------------------------------------------------------------------
-gfx2_hline:
+gfx2h_hline:
     and #3
     tax
     lda bitmap2_colbyte,x
@@ -531,14 +531,14 @@ gfx2_hline:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_vline -- vertical span (no clipping)
+; gfx2h_vline -- vertical span (no clipping)
 ;   in:  A = colour (0-3), X16_P0/P1 = x, X16_P2/P3 = y,
 ;        X16_P4/P5 = length in pixels
 ;
 ; One column of read-modify-writes: port 1 reads, port 0 writes, both
 ; stepping a whole row per access.
 ; ---------------------------------------------------------------------
-gfx2_vline:
+gfx2h_vline:
     and #3
     tax
     lda bitmap2_colbyte,x
@@ -585,11 +585,11 @@ gfx2_vline:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_rect -- filled rectangle (no clipping)
+; gfx2h_rect -- filled rectangle (no clipping)
 ;   in:  A = colour (0-3), X16_P0/P1 = x, X16_P2/P3 = y,
 ;        X16_P4/P5 = width, X16_P6/P7 = height
 ; ---------------------------------------------------------------------
-gfx2_rect:
+gfx2h_rect:
     sta g2_rc
     lda X16_P4
     sta g2_rw
@@ -608,7 +608,7 @@ gfx2_rect:
     lda g2_rw+1
     sta X16_P5
     lda g2_rc
-    jsr gfx2_hline              ; leaves P0..P3 alone
+    jsr gfx2h_hline              ; leaves P0..P3 alone
     inc X16_P2                  ; y += 1
     bne @ry_ok
     inc X16_P3
@@ -623,10 +623,10 @@ gfx2_rect:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_frame -- rectangle outline (no clipping)
-;   same arguments as gfx2_rect
+; gfx2h_frame -- rectangle outline (no clipping)
+;   same arguments as gfx2h_rect
 ; ---------------------------------------------------------------------
-gfx2_frame:
+gfx2h_frame:
     sta g2_rc
     lda X16_P0                  ; private copies: the edges reuse the
     sta g2_fx                   ; parameter block as they go
@@ -646,7 +646,7 @@ gfx2_frame:
     sta g2_rh+1
 
     jsr bitmap2_f_span                 ; top edge
-    jsr gfx2_hline
+    jsr gfx2h_hline
 
     jsr bitmap2_f_span                 ; bottom edge: y + h - 1
     clc
@@ -662,10 +662,10 @@ gfx2_frame:
 @f_nb1:
     dec X16_P2
     lda g2_rc
-    jsr gfx2_hline
+    jsr gfx2h_hline
 
     jsr bitmap2_f_col                  ; left edge
-    jsr gfx2_vline
+    jsr gfx2h_vline
 
     jsr bitmap2_f_col                  ; right edge: x + w - 1
     clc
@@ -681,9 +681,9 @@ gfx2_frame:
 @f_nb2:
     dec X16_P0
     lda g2_rc
-    jmp gfx2_vline
+    jmp gfx2h_vline
 
-; x, y, width in the block, colour in A -- arguments for gfx2_hline
+; x, y, width in the block, colour in A -- arguments for gfx2h_hline
 bitmap2_f_span:
     lda g2_fx
     sta X16_P0
@@ -700,7 +700,7 @@ bitmap2_f_span:
     lda g2_rc
     rts
 
-; x, y, height in the block, colour in A -- arguments for gfx2_vline
+; x, y, height in the block, colour in A -- arguments for gfx2h_vline
 bitmap2_f_col:
     lda g2_fx
     sta X16_P0
@@ -718,13 +718,13 @@ bitmap2_f_col:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_line -- Bresenham, any direction; plots through gfx2_pset so
+; gfx2h_line -- Bresenham, any direction; plots through gfx2h_pset so
 ; the line clips at the screen edges
 ;   in:  A = colour (0-3)
 ;        X16_P0/P1 = x0, X16_P2/P3 = y0
 ;        X16_P4/P5 = x1, X16_P6/P7 = y1
 ; ---------------------------------------------------------------------
-gfx2_line:
+gfx2h_line:
     sta g2_lc
     lda X16_P0
     sta g2_lx0
@@ -820,7 +820,7 @@ gfx2_line:
     lda g2_ly0+1
     sta X16_P3
     lda g2_lc
-    jsr gfx2_pset
+    jsr gfx2h_pset
 
     lda g2_lx0                  ; reached the end point?
     cmp g2_lx1
@@ -898,7 +898,7 @@ gfx2_line:
     jmp @loop
 
 ; ---------------------------------------------------------------------
-; gfx2_pattern_set -- expand an 8x8 1bpp pattern for gfx2_pattern_rect
+; gfx2h_pattern_set -- expand an 8x8 1bpp pattern for gfx2h_pattern_rect
 ;   in:  A = pattern low, X = pattern high (8 row bytes, top first;
 ;            bit 7 is the leftmost pixel)
 ;        Y = colours: (background << 2) | foreground
@@ -907,7 +907,7 @@ gfx2_line:
 ; two 2bpp bytes (16 bits); which of the pair a framebuffer byte uses
 ; is the parity of its address. The expansion is cached in g2_pat.
 ; ---------------------------------------------------------------------
-gfx2_pattern_set:
+gfx2h_pattern_set:
     sta X16_T6                  ; T6/T7 = pattern pointer
     stx X16_T7
     tya
@@ -964,11 +964,11 @@ bitmap2_p_half:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_pattern_rect -- fill a rectangle with the current pattern
+; gfx2h_pattern_rect -- fill a rectangle with the current pattern
 ;   in:  X16_P0/P1 = x, X16_P2/P3 = y, X16_P4/P5 = width,
 ;        X16_P6/P7 = height   (no clipping)
 ; ---------------------------------------------------------------------
-gfx2_pattern_rect:
+gfx2h_pattern_rect:
     lda X16_P4
     sta g2_rw
     lda X16_P5
@@ -1140,7 +1140,7 @@ bitmap2_p_row:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_blit -- copy a byte-aligned image from CPU RAM into the bitmap
+; gfx2h_blit -- copy a byte-aligned image from CPU RAM into the bitmap
 ;   in:  A = raster op: 0 copy, 1 OR, 2 AND, 3 XOR
 ;        X16_P0/P1 = x (bits 1:0 ignored: byte-aligned),
 ;        X16_P2/P3 = y, X16_P4 = width in BYTES (4-pixel units),
@@ -1149,7 +1149,7 @@ bitmap2_p_row:
 ; The source pointer is X16_PTR3 -- P6/P7 double as real zero page, so
 ; (PTR3),y addressing costs nothing extra. No clipping.
 ; ---------------------------------------------------------------------
-gfx2_blit:
+gfx2h_blit:
     and #3
     sta g2_op
     jsr bitmap2_addr_calc
@@ -1211,7 +1211,7 @@ gfx2_blit:
     rts
 
 ; ---------------------------------------------------------------------
-; gfx2_blitm -- masked blit of pre-shifted column-major data
+; gfx2h_blitm -- masked blit of pre-shifted column-major data
 ;   in:  X16_P0/P1 = x (any pixel position), X16_P2/P3 = y,
 ;        X16_P4 = height in rows (1-127), X16_P5 = width in COLUMNS
 ;        (framebuffer bytes), X16_P6/P7 = source
@@ -1223,7 +1223,7 @@ gfx2_blit:
 ; glyph this is what makes proportional text affordable (spike-proven;
 ; see the CXGEOS project). No clipping.
 ; ---------------------------------------------------------------------
-gfx2_blitm:
+gfx2h_blitm:
     jsr bitmap2_addr_calc
     lda X16_P5
     sta g2_w
@@ -1263,19 +1263,19 @@ gfx2_blitm:
 ; carry clear if (P0/P1, P2/P3) is on screen
 bitmap2_onscreen:
     lda X16_P1                  ; x < 640?
-    cmp #>GFX2_WIDTH
+    cmp #>GFX2H_WIDTH
     bcc @x_ok
     bne @bad
     lda X16_P0
-    cmp #<GFX2_WIDTH
+    cmp #<GFX2H_WIDTH
     bcs @bad
 @x_ok:
     lda X16_P3                  ; y < 480?
-    cmp #>GFX2_HEIGHT
+    cmp #>GFX2H_HEIGHT
     bcc @ok
     bne @bad
     lda X16_P2
-    cmp #<GFX2_HEIGHT
+    cmp #<GFX2H_HEIGHT
     bcs @bad
 @ok:
     clc
@@ -1419,7 +1419,7 @@ bitmap2_a_inc:
 bitmap2_a_row:
     clc
     lda g2_a0
-    adc #GFX2_STRIDE
+    adc #GFX2H_STRIDE
     sta g2_a0
     lda g2_a1
     adc #0

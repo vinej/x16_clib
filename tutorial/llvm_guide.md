@@ -75,7 +75,7 @@ below are from the library's own shims):
 - `x16_mem_fill(dst, count, value)` — `dst` is a pointer, so it goes to
   `__rc2/__rc3`; `count`, an int, takes the still-free `A/X`; `value`
   lands in `__rc4`.
-- `x16_gfx_text(x, y, color, s)` — `x` (16-bit int, first) takes
+- `x16_gfx8l_text(x, y, color, s)` — `x` (16-bit int, first) takes
   `A/X`, `y` takes `__rc2`, `color` takes `__rc3`, and the string takes
   the next aligned pair, `__rc4/__rc5`.
 - `x16_fs_load(name, len, device, sa, dest, end)` — `sa` lands in

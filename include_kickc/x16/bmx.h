@@ -5,7 +5,7 @@
  * layout, then the pixels. It is the format the community's tools and
  * Prog8 write, and nothing in C could read it before.
  *
- *      x16_gfx_init();
+ *      x16_gfx8l_init();
  *      if (x16_bmx_load("TITLE.BMX", 9, X16_DEVICE_SD, X16_VRAM_BITMAP)) {
  *          ...error...
  *      }

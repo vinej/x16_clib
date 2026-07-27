@@ -1,12 +1,12 @@
 /* =====================================================================
  * x16clib :: x16/clip.h -- Cohen-Sutherland line clipping
  * =====================================================================
- * x16_gfx_line() and x16_fx_line() do not clip: they assume both
+ * x16_gfx8l_line() and x16_fx_line() do not clip: they assume both
  * endpoints are on screen. This removes that sharp edge.
  *
  *      x16_line seg = { -50, 120, 400, 130 };
  *      if (x16_clip_line(&seg)) {
- *          x16_gfx_line(seg.x0, seg.y0, seg.x1, seg.y1, color);
+ *          x16_gfx8l_line(seg.x0, seg.y0, seg.x1, seg.y1, color);
  *      }
  *
  * Coordinates are SIGNED, and may lie anywhere within +/-4095 -- the

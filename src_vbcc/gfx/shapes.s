@@ -2,8 +2,8 @@
 ; x16clib :: gfx/shapes.s -- circle / disc / flood for BOTH bitmap modes
 ; =====================================================================
 ; One engine-agnostic shape algorithm (ported from x16_library's
-; gfx/shapes.asm), bound at call time to the 8bpp module (x16_gfx_*) or
-; the 2bpp module (x16_gfx2_*) by shp_bind8 / shp_bind2.
+; gfx/shapes.asm), bound at call time to the 8bpp module (x16_gfx8l_*) or
+; the 2bpp module (x16_gfx2h_*) by shp_bind8 / shp_bind2.
 ; =====================================================================
 
         include        "macros.inc"
@@ -16,16 +16,16 @@
         zpage   r4
         zpage   r6
 
-        global  _x16_gfx_circle
-        global  _x16_gfx_disc
-        global  _x16_gfx_flood
-        global  _x16_gfx2_circle
-        global  _x16_gfx2_disc
-        global  _x16_gfx2_flood
-        global  _x16_gfx_ellipse
-        global  _x16_gfx_fellipse
-        global  _x16_gfx2_ellipse
-        global  _x16_gfx2_fellipse
+        global  _x16_gfx8l_circle
+        global  _x16_gfx8l_disc
+        global  _x16_gfx8l_flood
+        global  _x16_gfx2h_circle
+        global  _x16_gfx2h_disc
+        global  _x16_gfx2h_flood
+        global  _x16_gfx8l_ellipse
+        global  _x16_gfx8l_fellipse
+        global  _x16_gfx2h_ellipse
+        global  _x16_gfx2h_fellipse
         global  shp_do_pset
         global  shp_do_hline
         global  shp_do_read
@@ -46,10 +46,10 @@ shp_do_read:
 
 shp_pset8:
         sta     X16_P3
-        jmp     gfx_pset
+        jmp     gfx8l_pset
 shp_hline8:
         sta     X16_P3
-        jmp     gfx_hline
+        jmp     gfx8l_hline
 
 shp_bind8:
         lda     #<shp_pset8
@@ -60,9 +60,9 @@ shp_bind8:
         sta     shp_hlinev
         lda     #>shp_hline8
         sta     shp_hlinev+1
-        lda     #<gfx_read
+        lda     #<gfx8l_read
         sta     shp_readv
-        lda     #>gfx_read
+        lda     #>gfx8l_read
         sta     shp_readv+1
         lda     #<320
         sta     shp_w
@@ -75,17 +75,17 @@ shp_bind8:
         rts
 
 shp_bind2:
-        lda     #<gfx2_pset
+        lda     #<gfx2h_pset
         sta     shp_psetv
-        lda     #>gfx2_pset
+        lda     #>gfx2h_pset
         sta     shp_psetv+1
-        lda     #<gfx2_hline
+        lda     #<gfx2h_hline
         sta     shp_hlinev
-        lda     #>gfx2_hline
+        lda     #>gfx2h_hline
         sta     shp_hlinev+1
-        lda     #<gfx2_read
+        lda     #<gfx2h_read
         sta     shp_readv
-        lda     #>gfx2_read
+        lda     #>gfx2h_read
         sta     shp_readv+1
         lda     #<640
         sta     shp_w
@@ -98,13 +98,13 @@ shp_bind2:
         rts
 
 ; --- C entry points (vbcc: cx/x int in r0/r1; chars in r2/r4/r6) --------
-; gfx_circle/disc(cx:int, cy:char, r:char, color:char)
-_x16_gfx_circle:
+; gfx8l_circle/disc(cx:int, cy:char, r:char, color:char)
+_x16_gfx8l_circle:
         jsr     shp_marshal8
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_circle
-_x16_gfx_disc:
+_x16_gfx8l_disc:
         jsr     shp_marshal8
         jsr     shp_bind8
         lda     shp_mcol
@@ -123,13 +123,13 @@ shp_marshal8:                           ; cx->r0/r1, cy->r2, r->r4, col->r6
         sta     shp_mcol
         rts
 
-; gfx2_circle/disc(cx:int, cy:int, r:char, color:char)
-_x16_gfx2_circle:
+; gfx2h_circle/disc(cx:int, cy:int, r:char, color:char)
+_x16_gfx2h_circle:
         jsr     shp_marshal2
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_circle
-_x16_gfx2_disc:
+_x16_gfx2h_disc:
         jsr     shp_marshal2
         jsr     shp_bind2
         lda     shp_mcol
@@ -149,8 +149,8 @@ shp_marshal2:                           ; cx->r0/r1, cy->r2/r3, r->r4, col->r6
         sta     shp_mcol
         rts
 
-; gfx_flood(x:int, y:char, color:char)
-_x16_gfx_flood:
+; gfx8l_flood(x:int, y:char, color:char)
+_x16_gfx8l_flood:
         lda     r0
         sta     X16_P0
         lda     r1
@@ -167,8 +167,8 @@ _x16_gfx_flood:
         rol     a
         eor     #1                      ; report completeness, not overflow
         rts
-; gfx2_flood(x:int, y:int, color:char)
-_x16_gfx2_flood:
+; gfx2h_flood(x:int, y:int, color:char)
+_x16_gfx2h_flood:
         lda     r0
         sta     X16_P0
         lda     r1
@@ -187,14 +187,14 @@ _x16_gfx2_flood:
         eor     #1                      ; report completeness, not overflow
         rts
 
-; gfx_ellipse/fellipse(cx:int, cy:char, rx:char, ry:char, color:char)
+; gfx8l_ellipse/fellipse(cx:int, cy:char, rx:char, ry:char, color:char)
 ; color (the 5th argument) rides the C soft stack, like rect/frame/line.
-_x16_gfx_ellipse:
+_x16_gfx8l_ellipse:
         jsr     shp_emarshal8
         jsr     shp_bind8
         lda     shp_mcol
         jmp     shape_ellipse
-_x16_gfx_fellipse:
+_x16_gfx8l_fellipse:
         jsr     shp_emarshal8
         jsr     shp_bind8
         lda     shp_mcol
@@ -216,13 +216,13 @@ shp_emarshal8:                          ; cx->r0/r1, cy->r2, rx->r4, ry->r6
         sta     shp_mcol                ; color (stacked 5th arg)
         rts
 
-; gfx2_ellipse/fellipse(cx:int, cy:int, rx:char, ry:char, color:char)
-_x16_gfx2_ellipse:
+; gfx2h_ellipse/fellipse(cx:int, cy:int, rx:char, ry:char, color:char)
+_x16_gfx2h_ellipse:
         jsr     shp_emarshal2
         jsr     shp_bind2
         lda     shp_mcol
         jmp     shape_ellipse
-_x16_gfx2_fellipse:
+_x16_gfx2h_fellipse:
         jsr     shp_emarshal2
         jsr     shp_bind2
         lda     shp_mcol

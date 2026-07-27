@@ -2,23 +2,23 @@
 // x16clib :: x16/shapes.c -- circle / disc / flood for BOTH bitmap modes
 // =====================================================================
 // One engine-agnostic shape algorithm, bound at call time to the 8bpp
-// module (x16_gfx_*) or the 2bpp module (x16_gfx2_*) by a runtime engine
+// module (x16_gfx8l_*) or the 2bpp module (x16_gfx2h_*) by a runtime engine
 // flag. The circle outline plots through the clipping pset; the disc fill
 // clamps its spans to the canvas; the flood is bounds-checked so it never
 // reads or writes off screen.
 //
-//   x16_gfx_circle / _disc  (unsigned int cx, unsigned char cy,
+//   x16_gfx8l_circle / _disc  (unsigned int cx, unsigned char cy,
 //                            unsigned char r, unsigned char color)
-//   x16_gfx_flood           (unsigned int x, unsigned char y,
+//   x16_gfx8l_flood           (unsigned int x, unsigned char y,
 //                            unsigned char color) -> 1 if filled completely
-//   x16_gfx2_circle / _disc (unsigned int cx, unsigned int cy,
+//   x16_gfx2h_circle / _disc (unsigned int cx, unsigned int cy,
 //                            unsigned char r, unsigned char color)
-//   x16_gfx2_flood          (unsigned int x, unsigned int y,
+//   x16_gfx2h_flood          (unsigned int x, unsigned int y,
 //                            unsigned char color) -> 1 if filled completely
 // =====================================================================
 
-#include <x16/bitmap.h>
-#include <x16/bitmap2.h>
+#include <x16/bitmap8l.h>
+#include <x16/bitmap2h.h>
 #include <x16/shapes.h>
 #include <x16/math.h>
 #include <x16/fixed.h>
@@ -35,26 +35,26 @@ __mem volatile unsigned char x16__sc_col;
 // --- engine-flag dispatchers -----------------------------------------
 void x16__shp_pset(unsigned int x, unsigned int y, unsigned char c) {
     if (x16__shp2) {
-        x16_gfx2_pset(x, y, c);
+        x16_gfx2h_pset(x, y, c);
     } else {
-        x16_gfx_pset(x, (unsigned char)y, c);
+        x16_gfx8l_pset(x, (unsigned char)y, c);
     }
 }
 
 void x16__shp_hline(unsigned int x, unsigned int y, unsigned int len,
                     unsigned char c) {
     if (x16__shp2) {
-        x16_gfx2_hline(x, y, len, c);
+        x16_gfx2h_hline(x, y, len, c);
     } else {
-        x16_gfx_hline(x, (unsigned char)y, len, c);
+        x16_gfx8l_hline(x, (unsigned char)y, len, c);
     }
 }
 
 unsigned char x16__shp_read(unsigned int x, unsigned int y) {
     if (x16__shp2) {
-        return x16_gfx2_read(x, y);
+        return x16_gfx2h_read(x, y);
     }
-    return x16__gfx_read8(x, (unsigned char)y);
+    return x16__gfx8l_read8(x, (unsigned char)y);
 }
 
 // --- circle / disc ---------------------------------------------------
@@ -523,7 +523,7 @@ const unsigned int x16__pstep[25] = {
 // signed Bresenham line through the bound pset. dx is kept as |dx| and dy
 // as -|dy|, both formed by SUBTRACTION not `0 - d`: kickc folds `0 - d`
 // away, which would leave err = dx+|dy| and the walk would never end (the
-// same trap x16_gfx2_line documents).
+// same trap x16_gfx2h_line documents).
 void x16__shp_line(int x0, int y0, int x1, int y1) {
     int dx, dy, sx, sy, err, e2;
     dx = x1 - x0;
@@ -779,7 +779,7 @@ void x16__bezier(void) {
 }
 
 // --- public entry points ---------------------------------------------
-void x16_gfx_circle(unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_circle(unsigned int cx, unsigned char cy, unsigned char r,
                     unsigned char color) {
     x16__shp2 = 0;
     x16__shp_w = 320;
@@ -790,7 +790,7 @@ void x16_gfx_circle(unsigned int cx, unsigned char cy, unsigned char r,
     x16__shp_walk((unsigned int)r, 0);
 }
 
-void x16_gfx_disc(unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_disc(unsigned int cx, unsigned char cy, unsigned char r,
                   unsigned char color) {
     x16__shp2 = 0;
     x16__shp_w = 320;
@@ -801,7 +801,7 @@ void x16_gfx_disc(unsigned int cx, unsigned char cy, unsigned char r,
     x16__shp_walk((unsigned int)r, 1);
 }
 
-void x16_gfx_ellipse(unsigned int cx, unsigned char cy, unsigned char rx,
+void x16_gfx8l_ellipse(unsigned int cx, unsigned char cy, unsigned char rx,
                      unsigned char ry, unsigned char color) {
     x16__shp2 = 0;
     x16__shp_w = 320;
@@ -812,7 +812,7 @@ void x16_gfx_ellipse(unsigned int cx, unsigned char cy, unsigned char rx,
     x16__shp_ewalk(rx, ry, 0);
 }
 
-void x16_gfx_fellipse(unsigned int cx, unsigned char cy, unsigned char rx,
+void x16_gfx8l_fellipse(unsigned int cx, unsigned char cy, unsigned char rx,
                       unsigned char ry, unsigned char color) {
     x16__shp2 = 0;
     x16__shp_w = 320;
@@ -823,7 +823,7 @@ void x16_gfx_fellipse(unsigned int cx, unsigned char cy, unsigned char rx,
     x16__shp_ewalk(rx, ry, 1);
 }
 
-unsigned char x16_gfx_flood(unsigned int x, unsigned char y,
+unsigned char x16_gfx8l_flood(unsigned int x, unsigned char y,
                             unsigned char color) {
     x16__shp2 = 0;
     x16__shp_w = 320;
@@ -831,7 +831,7 @@ unsigned char x16_gfx_flood(unsigned int x, unsigned char y,
     return x16__shp_flood(x, (unsigned int)y, color);
 }
 
-void x16_gfx2_circle(unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_circle(unsigned int cx, unsigned int cy, unsigned char r,
                      unsigned char color) {
     x16__shp2 = 1;
     x16__shp_w = 640;
@@ -842,7 +842,7 @@ void x16_gfx2_circle(unsigned int cx, unsigned int cy, unsigned char r,
     x16__shp_walk((unsigned int)r, 0);
 }
 
-void x16_gfx2_disc(unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_disc(unsigned int cx, unsigned int cy, unsigned char r,
                    unsigned char color) {
     x16__shp2 = 1;
     x16__shp_w = 640;
@@ -853,7 +853,7 @@ void x16_gfx2_disc(unsigned int cx, unsigned int cy, unsigned char r,
     x16__shp_walk((unsigned int)r, 1);
 }
 
-void x16_gfx2_ellipse(unsigned int cx, unsigned int cy, unsigned char rx,
+void x16_gfx2h_ellipse(unsigned int cx, unsigned int cy, unsigned char rx,
                       unsigned char ry, unsigned char color) {
     x16__shp2 = 1;
     x16__shp_w = 640;
@@ -864,7 +864,7 @@ void x16_gfx2_ellipse(unsigned int cx, unsigned int cy, unsigned char rx,
     x16__shp_ewalk(rx, ry, 0);
 }
 
-void x16_gfx2_fellipse(unsigned int cx, unsigned int cy, unsigned char rx,
+void x16_gfx2h_fellipse(unsigned int cx, unsigned int cy, unsigned char rx,
                        unsigned char ry, unsigned char color) {
     x16__shp2 = 1;
     x16__shp_w = 640;
@@ -875,7 +875,7 @@ void x16_gfx2_fellipse(unsigned int cx, unsigned int cy, unsigned char rx,
     x16__shp_ewalk(rx, ry, 1);
 }
 
-unsigned char x16_gfx2_flood(unsigned int x, unsigned int y,
+unsigned char x16_gfx2h_flood(unsigned int x, unsigned int y,
                              unsigned char color) {
     x16__shp2 = 1;
     x16__shp_w = 640;
@@ -884,7 +884,7 @@ unsigned char x16_gfx2_flood(unsigned int x, unsigned int y,
 }
 
 // --- curve shapes: 8bpp (320x240) ------------------------------------
-void x16_gfx_polygon(unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_polygon(unsigned int cx, unsigned char cy, unsigned char r,
                      unsigned char sides, unsigned char rotation,
                      unsigned char color) {
     x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
@@ -892,7 +892,7 @@ void x16_gfx_polygon(unsigned int cx, unsigned char cy, unsigned char r,
     x16__polygon(r, sides, rotation, 0);
 }
 
-void x16_gfx_fpolygon(unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_fpolygon(unsigned int cx, unsigned char cy, unsigned char r,
                       unsigned char sides, unsigned char rotation,
                       unsigned char color) {
     x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
@@ -900,33 +900,33 @@ void x16_gfx_fpolygon(unsigned int cx, unsigned char cy, unsigned char r,
     x16__polygon(r, sides, rotation, 1);
 }
 
-void x16_gfx_rrect(unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx8l_rrect(unsigned int x, unsigned int y, unsigned int w,
                    unsigned int h, unsigned char r, unsigned char color) {
     x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240; x16__sc_col = color;
     x16__rrect((int)x, (int)y, (int)w, (int)h, r, 0);
 }
 
-void x16_gfx_frrect(unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx8l_frrect(unsigned int x, unsigned int y, unsigned int w,
                     unsigned int h, unsigned char r, unsigned char color) {
     x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240; x16__sc_col = color;
     x16__rrect((int)x, (int)y, (int)w, (int)h, r, 1);
 }
 
-void x16_gfx_arc(unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_arc(unsigned int cx, unsigned char cy, unsigned char r,
                  unsigned char a0, unsigned char a1, unsigned char color) {
     x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
     x16__sc_cx = cx; x16__sc_cy = (unsigned int)cy; x16__sc_col = color;
     x16__arc(r, a0, a1, 0);
 }
 
-void x16_gfx_pie(unsigned int cx, unsigned char cy, unsigned char r,
+void x16_gfx8l_pie(unsigned int cx, unsigned char cy, unsigned char r,
                  unsigned char a0, unsigned char a1, unsigned char color) {
     x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240;
     x16__sc_cx = cx; x16__sc_cy = (unsigned int)cy; x16__sc_col = color;
     x16__arc(r, a0, a1, 1);
 }
 
-void x16_gfx_bezier(const unsigned int *pts, unsigned char color) {
+void x16_gfx8l_bezier(const unsigned int *pts, unsigned char color) {
     x16__shp2 = 0; x16__shp_w = 320; x16__shp_h = 240; x16__sc_col = color;
     x16__bx[0] = (int)pts[0]; x16__by[0] = (int)pts[1];
     x16__bx[1] = (int)pts[2]; x16__by[1] = (int)pts[3];
@@ -936,7 +936,7 @@ void x16_gfx_bezier(const unsigned int *pts, unsigned char color) {
 }
 
 // --- curve shapes: 2bpp (640x480) ------------------------------------
-void x16_gfx2_polygon(unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_polygon(unsigned int cx, unsigned int cy, unsigned char r,
                       unsigned char sides, unsigned char rotation,
                       unsigned char color) {
     x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
@@ -944,7 +944,7 @@ void x16_gfx2_polygon(unsigned int cx, unsigned int cy, unsigned char r,
     x16__polygon(r, sides, rotation, 0);
 }
 
-void x16_gfx2_fpolygon(unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_fpolygon(unsigned int cx, unsigned int cy, unsigned char r,
                        unsigned char sides, unsigned char rotation,
                        unsigned char color) {
     x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
@@ -952,33 +952,33 @@ void x16_gfx2_fpolygon(unsigned int cx, unsigned int cy, unsigned char r,
     x16__polygon(r, sides, rotation, 1);
 }
 
-void x16_gfx2_rrect(unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx2h_rrect(unsigned int x, unsigned int y, unsigned int w,
                     unsigned int h, unsigned char r, unsigned char color) {
     x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480; x16__sc_col = color;
     x16__rrect((int)x, (int)y, (int)w, (int)h, r, 0);
 }
 
-void x16_gfx2_frrect(unsigned int x, unsigned int y, unsigned int w,
+void x16_gfx2h_frrect(unsigned int x, unsigned int y, unsigned int w,
                      unsigned int h, unsigned char r, unsigned char color) {
     x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480; x16__sc_col = color;
     x16__rrect((int)x, (int)y, (int)w, (int)h, r, 1);
 }
 
-void x16_gfx2_arc(unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_arc(unsigned int cx, unsigned int cy, unsigned char r,
                   unsigned char a0, unsigned char a1, unsigned char color) {
     x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
     x16__sc_cx = cx; x16__sc_cy = cy; x16__sc_col = color;
     x16__arc(r, a0, a1, 0);
 }
 
-void x16_gfx2_pie(unsigned int cx, unsigned int cy, unsigned char r,
+void x16_gfx2h_pie(unsigned int cx, unsigned int cy, unsigned char r,
                   unsigned char a0, unsigned char a1, unsigned char color) {
     x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480;
     x16__sc_cx = cx; x16__sc_cy = cy; x16__sc_col = color;
     x16__arc(r, a0, a1, 1);
 }
 
-void x16_gfx2_bezier(const unsigned int *pts, unsigned char color) {
+void x16_gfx2h_bezier(const unsigned int *pts, unsigned char color) {
     x16__shp2 = 1; x16__shp_w = 640; x16__shp_h = 480; x16__sc_col = color;
     x16__bx[0] = (int)pts[0]; x16__by[0] = (int)pts[1];
     x16__bx[1] = (int)pts[2]; x16__by[1] = (int)pts[3];
