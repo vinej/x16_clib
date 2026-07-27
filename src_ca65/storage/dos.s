@@ -39,6 +39,7 @@ CH_ZERO  = $30                          ; '0'
         .export         _x16_dos_msg
         .export         _x16_dos_cmd
         .export         _x16_dos_status
+        .export         _x16_dos_lasterr
         .export         _x16_dos_delete
         .export         _x16_dos_mkdir
         .export         _x16_dos_rmdir
@@ -89,6 +90,14 @@ _x16_dos_cmd:
 ; ---------------------------------------------------------------------
 _x16_dos_status:
         jsr     dos_status
+        ldx     #0
+        rts
+
+; ---------------------------------------------------------------------
+; unsigned char x16_dos_lasterr(void)
+; ---------------------------------------------------------------------
+_x16_dos_lasterr:
+        jsr     dos_lasterr
         ldx     #0
         rts
 
@@ -219,6 +228,7 @@ dos_cmd:
         sbc     #CH_ZERO
         clc
         adc     X16_T0
+        sta     dos_code
         cmp     #20                     ; carry set = error class
         rts
 
@@ -228,6 +238,8 @@ dos_cmd:
         jsr     CLOSE
         stz     dos_msg
         ldy     #0
+        lda     #$FF
+        sta     dos_code
         lda     #$FF
         sec
         rts
@@ -242,6 +254,19 @@ dos_status:
         tax
         tay
         jmp     dos_cmd
+
+; ---------------------------------------------------------------------
+; dos_lasterr -- the status code the last dos_* call came back with
+;   out: A = the code (0-19 success, 20-99 error, 255 = no channel)
+;
+; Every routine here reports twice: the carry says pass or fail, and A
+; says why. A caller that can only see one of those -- a generated
+; high-level binding, say, which will not guess a type for a routine
+; that documents both -- can call this afterwards and get the code.
+; ---------------------------------------------------------------------
+dos_lasterr:
+        lda     dos_code
+        rts
 
 ; ---------------------------------------------------------------------
 ; One-call wrappers. Each takes A = name low, X = name high, Y = name
@@ -361,6 +386,8 @@ too_long:
         .segment        "DATA"
 
 dos_device: .byte 8
+dos_code:   .byte 0             ; the code from the last command, for
+                                ; dos_lasterr -- see its header above
 
         .segment        "BSS"
 

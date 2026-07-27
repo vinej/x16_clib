@@ -55,6 +55,7 @@
 #include <x16/bitmap8h.h>         /* VERA_2 640x480x256 drawing */
 #include <x16/shapes.h>         /* circle/disc/flood for both bitmaps */
 #include <x16/verafx.h>         /* hardware multiply, fills, lines, triangles */
+#include <x16/verafx_utils.h>   /* the raw FX register knobs, one at a time */
 #include <x16/psg.h>            /* 16-voice PSG */
 #include <x16/ym.h>             /* YM2151 FM */
 #include <x16/pcm.h>            /* PCM FIFO, and AFLOW streaming */
