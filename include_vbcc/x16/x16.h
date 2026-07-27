@@ -54,6 +54,10 @@
 #include <x16/sprite.h>         /* 128 hardware sprites */
 #include <x16/bitmap8l.h>         /* 320x240x256 drawing */
 #include <x16/bitmap2h.h>        /* 640x480x4 drawing (2bpp) */
+#include <x16/bitmap2l.h>        /* 320x240@2bpp drawing */
+#include <x16/bitmap4l.h>        /* 320x240x16 drawing */
+#include <x16/bitmap4h.h>        /* VERA_2 640x480x16 drawing */
+#include <x16/bitmap8h.h>        /* VERA_2 640x480x256 drawing */
 #include <x16/shapes.h>         /* circle/disc/flood for both bitmaps */
 #include <x16/verafx.h>         /* hardware multiply, fills, lines, triangles */
 #include <x16/psg.h>            /* 16-voice PSG */

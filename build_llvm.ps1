@@ -142,11 +142,12 @@ function Build-Prg([string]$srcRel) {
     return $prg
 }
 
-# -Test with no explicit -Source runs both halves of the suite. runner.c
+# -Test with no explicit -Source runs every slice of the suite. runner.c
 # covers the modules; runner2.c covers the C entry points, where llvm-mos
-# and cc65 differ and where a wrong register is silent.
+# and cc65 differ and where a wrong register is silent; runner3.c covers
+# the four bitmap engines that would not fit in RUNNER2.PRG.
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test_llvm\runner.c', 'test_llvm\runner2.c')
+    $suites = @('test_llvm\runner.c', 'test_llvm\runner2.c', 'test_llvm\runner3.c')
 } else {
     $suites = @($Source)
 }
