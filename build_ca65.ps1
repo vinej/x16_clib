@@ -145,10 +145,10 @@ function Build-Prg([string]$srcRel) {
     return $prg
 }
 
-# -Test with no explicit -Source runs both halves of the suite.
+# -Test with no explicit -Source runs every slice of the suite.
 $suites = @()
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test_ca65\runner.c', 'test_ca65\runner2.c')
+    $suites = @('test_ca65\runner.c', 'test_ca65\runner2.c', 'test_ca65\runner3.c')
 } else {
     $suites = @($Source)
 }

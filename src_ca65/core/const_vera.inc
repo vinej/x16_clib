@@ -102,6 +102,25 @@ VERA_SPI_CTRL     = VERA_BASE + $1F
 YM_REG            = $9F40
 YM_DATA           = $9F41
 
+; VERA_2 MiSTer SDRAM bitmap layer. This is a core-specific extension
+; in the I/O expansion area, not part of stock VERA VRAM.
+VERA2_CTRL        = $9F60
+VERA2_ID          = $9F61
+VERA2_ADDR_L      = $9F62
+VERA2_ADDR_M      = $9F63
+VERA2_ADDR_H      = $9F64
+VERA2_DATA        = $9F65
+VERA2_PAL_IDX     = $9F66
+VERA2_PAL_LO      = $9F67
+VERA2_PAL_HI      = $9F68
+VERA2_BLIT_DST_L  = $9F69
+VERA2_BLIT_DST_M  = $9F6A
+VERA2_BLIT_DST_H  = $9F6B
+VERA2_BLIT_LEN_L  = $9F6C
+VERA2_BLIT_LEN_M  = $9F6D
+VERA2_BLIT_LEN_H  = $9F6E
+VERA2_BLIT_CTRL   = $9F6F
+
 ; ---------------------------------------------------------------------
 ; CTRL bitfields.  DCSEL is SIX bits at 6:1, ADDRSEL is bit 0.
 ; Writing DCSEL naively clobbers ADDRSEL -- always use vera_dcsel.
@@ -163,6 +182,40 @@ VERA_IRQ_LINE     = %00000010
 VERA_IRQ_SPRCOL   = %00000100
 VERA_IRQ_AFLOW    = %00001000
 VERA_ISR_COLLISION = %11110000
+
+; ---------------------------------------------------------------------
+; SPI_CTRL bitfields.
+; ---------------------------------------------------------------------
+VERA_SPI_SELECT   = %00000001   ; 1 asserts chip-select, 0 releases it
+VERA_SPI_SLOWCLK  = %00000010   ; 1 = ~390 kHz, 0 = ~12.5 MHz
+VERA_SPI_AUTOTX   = %00000100   ; reading SPI_DATA starts a $FF transfer
+VERA_SPI_BUSY     = %10000000   ; read-only
+
+; ---------------------------------------------------------------------
+; VERA_2 MiSTer SDRAM bitmap layer bitfields.
+; ---------------------------------------------------------------------
+VERA2_ID_MAGIC        = $B5
+VERA2_CTRL_ENABLE     = %00000001
+VERA2_CTRL_MODE_8BPP  = %00000010
+VERA2_CTRL_MODE_4BPP  = %00000100
+VERA2_CTRL_PASSTHRU   = %00001000
+
+VERA2_INC_1      = $0
+VERA2_INC_0      = $1
+VERA2_INC_2      = $2
+VERA2_INC_4      = $3
+VERA2_INC_8      = $4
+VERA2_INC_16     = $5
+VERA2_INC_32     = $6
+VERA2_INC_64     = $7
+VERA2_INC_128    = $8
+VERA2_INC_256    = $9
+VERA2_INC_320    = $A
+VERA2_INC_640    = $B
+VERA2_INC_NEG1   = $C
+VERA2_INC_NEG2   = $D
+VERA2_INC_NEG320 = $E
+VERA2_INC_NEG640 = $F
 
 ; ---------------------------------------------------------------------
 ; FX_CTRL (DCSEL=2) bitfields.
