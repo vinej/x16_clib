@@ -79,6 +79,12 @@
 #include <x16/clip.h>           /* Cohen-Sutherland line clipping */
 #include <x16/buffers.h>        /* a ring buffer and a stack */
 #include <x16/float.h>          /* the ROM's floating point library */
+#include <x16/string.h>         /* NUL-terminated strings: copy, case, find, slice, sort */
+#include <x16/sort.h>           /* in-place insertion sorts, typed + comparator */
+#include <x16/bcd.h>            /* packed-BCD add/sub, 8/16/32-bit */
+#include <x16/bits.h>           /* masked bit set/clr/put/test, nibble helpers */
+#include <x16/number.h>         /* dec/hex/bin formatting and decimal parsing */
+#include <x16/tscrunch.h>       /* TSCrunch depacking, faster than ZX0 */
 
 /* Diagnostic: the address the linker gave the scratch block. Nothing
 ** depends on the value; it moves as vbcc's own zero-page footprint does.

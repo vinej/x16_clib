@@ -150,7 +150,8 @@ function Build-Prg([string]$srcRel) {
 # here with no file behind it fails the build with "missing source",
 # which is what runner2.c and runner3.c did to a bare -Test.
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test_vbcc\runner.c', 'test_vbcc\runner2.c', 'test_vbcc\runner3.c')
+    $suites = @('test_vbcc\runner.c', 'test_vbcc\runner2.c', 'test_vbcc\runner3.c',
+                'test_vbcc\runner4.c', 'test_vbcc\runner5.c')
 } else {
     $suites = @($Source)
 }

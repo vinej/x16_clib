@@ -147,7 +147,8 @@ function Build-Prg([string]$srcRel) {
 # and cc65 differ and where a wrong register is silent; runner3.c covers
 # the four bitmap engines that would not fit in RUNNER2.PRG.
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
-    $suites = @('test_llvm\runner.c', 'test_llvm\runner2.c', 'test_llvm\runner3.c')
+    $suites = @('test_llvm\runner.c', 'test_llvm\runner2.c', 'test_llvm\runner3.c',
+                'test_llvm\runner4.c', 'test_llvm\runner5.c')
 } else {
     $suites = @($Source)
 }

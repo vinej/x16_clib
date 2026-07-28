@@ -112,7 +112,8 @@ function Build-Prg([string]$srcRel) {
 $suites = @()
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
     $suites = @('test_kickc\runner.c', 'test_kickc\runner2.c', 'test_kickc\runner3.c',
-                'test_kickc\runner4.c', 'test_kickc\runner5.c')
+                'test_kickc\runner4.c', 'test_kickc\runner5.c', 'test_kickc\runner6.c',
+                'test_kickc\runner7.c')
 } else {
     $suites = @($Source)
 }
