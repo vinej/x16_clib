@@ -93,6 +93,13 @@
 #include <x16/ym.h>             /* YM2151 FM */
 #include <x16/pcm.h>            /* PCM FIFO, and AFLOW streaming */
 #include <x16/input.h>          /* joystick, mouse, keyboard */
+#include <x16/keyboard.h>       /* kbd buffer injection, modifiers, keymap */
+#include <x16/mouse.h>          /* raw MOUSE_CONFIG, scan, wheel */
+#include <x16/clock.h>          /* jiffy timer, RTC date/time */
+#include <x16/i2c.h>            /* the I2C bus: SMC, RTC NVRAM */
+#include <x16/graph.h>          /* KERNAL GRAPH: lines, rects, ovals, text */
+#include <x16/fb.h>             /* KERNAL framebuffer driver: pixel cursor */
+#include <x16/console.h>        /* KERNAL console: wrap, paging, line input */
 #include <x16/irq.h>            /* VSYNC, raster and collision interrupts */
 #include <x16/bank.h>           /* banked RAM, and a whole-bank allocator */
 #include <x16/mem.h>            /* KERNAL block ops, incl. LZSA2 depacking */
