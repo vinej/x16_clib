@@ -12,9 +12,14 @@ that say what the hardware actually does.
 
 ## Five toolchains
 
-The same modules and the same API build under **cc65**, under
-**llvm-mos**, under **KickC**, under **Oscar64** and under **vbcc**. Pick
-any; they share no object code.
+The same API builds under **cc65**, under **llvm-mos**, under **KickC**,
+under **Oscar64** and under **vbcc**. Pick any; they share no object code.
+
+**The cc65 tree is the reference and currently runs ahead.** The most
+recent resync landed 23 more modules there than the other four carry:
+everything marked *cc65 only* in the table below. The other four trees
+are identical to each other, and their shared API is a strict subset of
+cc65's -- so code written against them compiles everywhere.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      539 tests
@@ -146,29 +151,29 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/bits.h` | masked bit set/clear/put/test, nibble helpers |
 | `x16/number.h` | **decimal, hex and binary rendering, and decimal parsing** |
 | `x16/tscrunch.h` | **TSCrunch depacking, faster than ZX0** |
-| `x16/fileio.h` | **the KERNAL channel verbs: OPEN through CLOSE, plus named-open conveniences** |
-| `x16/iec.h` | **raw IEC bus control: LISTEN/TALK, channels, and the block movers** |
-| `x16/dir.h` | **walk a device directory entry by entry** |
-| `x16/ringbuffer.h` | **an 8 KB FIFO living in a HIRAM bank** |
-| `x16/stack.h` | **an 8 KB LIFO living in a HIRAM bank** |
-| `x16/keyboard.h` | **keyboard buffer injection, modifiers, keymap get/set** |
-| `x16/mouse.h` | **raw mouse config, scan, and the wheel** |
-| `x16/clock.h` | **the jiffy timer and the RTC's date and time** |
-| `x16/i2c.h` | **the I2C bus: the SMC and the RTC's NVRAM** |
-| `x16/graph.h` | **the KERNAL GRAPH API: lines, rects, ovals, images, fonts** |
-| `x16/fb.h` | **the KERNAL framebuffer driver: pixel cursor, spans, filters** |
-| `x16/console.h` | **the KERNAL console: wrapping, paging, line input** |
-| `x16/spi.h` | **the VERA SPI master: select, clock, byte exchange, block moves** |
-| `x16/serial.h` | **the serial / WiFi card's 16C550 UARTs, polled** |
-| `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** |
-| `x16/int16.h` | 16-bit helpers: divmod with remainder, integer sqrt, sign-correct compares |
-| `x16/int32.h` | the same at 32 bits |
-| `x16/double.h` | **software IEEE-754 float64**: arithmetic, compares, transcendentals, string I/O |
-| `x16/audiorom.h` | **the AUDIO ROM: FM and PSG notes, play strings, four pitch spaces** |
-| `x16/wavfile.h` | **RIFF/WAV header parsing**, feeding the PCM streamer |
-| `x16/zsm.h` | **ZSM music streams** |
-| `x16/vdc.h` | **VERA's display composer**: scale, layers, border, active window |
-| `x16/filepick.h` | **a full-screen file browser**, bankable |
+| `x16/fileio.h` | **the KERNAL channel verbs: OPEN through CLOSE, plus named-open conveniences** *(cc65 only)* |
+| `x16/iec.h` | **raw IEC bus control: LISTEN/TALK, channels, and the block movers** *(cc65 only)* |
+| `x16/dir.h` | **walk a device directory entry by entry** *(cc65 only)* |
+| `x16/ringbuffer.h` | **an 8 KB FIFO living in a HIRAM bank** *(cc65 only)* |
+| `x16/stack.h` | **an 8 KB LIFO living in a HIRAM bank** *(cc65 only)* |
+| `x16/keyboard.h` | **keyboard buffer injection, modifiers, keymap get/set** *(cc65 only)* |
+| `x16/mouse.h` | **raw mouse config, scan, and the wheel** *(cc65 only)* |
+| `x16/clock.h` | **the jiffy timer and the RTC's date and time** *(cc65 only)* |
+| `x16/i2c.h` | **the I2C bus: the SMC and the RTC's NVRAM** *(cc65 only)* |
+| `x16/graph.h` | **the KERNAL GRAPH API: lines, rects, ovals, images, fonts** *(cc65 only)* |
+| `x16/fb.h` | **the KERNAL framebuffer driver: pixel cursor, spans, filters** *(cc65 only)* |
+| `x16/console.h` | **the KERNAL console: wrapping, paging, line input** *(cc65 only)* |
+| `x16/spi.h` | **the VERA SPI master: select, clock, byte exchange, block moves** *(cc65 only)* |
+| `x16/serial.h` | **the serial / WiFi card's 16C550 UARTs, polled** *(cc65 only)* |
+| `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** *(cc65 only)* |
+| `x16/int16.h` | 16-bit helpers: divmod with remainder, integer sqrt, sign-correct compares *(cc65 only)* |
+| `x16/int32.h` | the same at 32 bits *(cc65 only)* |
+| `x16/double.h` | **software IEEE-754 float64**: arithmetic, compares, transcendentals, string I/O *(cc65 only)* |
+| `x16/audiorom.h` | **the AUDIO ROM: FM and PSG notes, play strings, four pitch spaces** *(cc65 only)* |
+| `x16/wavfile.h` | **RIFF/WAV header parsing**, feeding the PCM streamer *(cc65 only)* |
+| `x16/zsm.h` | **ZSM music streams** *(cc65 only)* |
+| `x16/vdc.h` | **VERA's display composer**: scale, layers, border, active window *(cc65 only)* |
+| `x16/filepick.h` | **a full-screen file browser**, bankable *(cc65 only)* |
 | `x16/verafx_utils.h` | the raw VERA FX register knobs |
 
 Several of those are things the machine can do that nothing else exposes
