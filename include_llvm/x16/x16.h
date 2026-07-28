@@ -113,6 +113,9 @@
 #include <x16/bits.h>           /* masked bit set/clr/put/test, nibble helpers */
 #include <x16/number.h>         /* dec/hex/bin formatting and decimal parsing */
 #include <x16/tscrunch.h>       /* TSCrunch depacking, faster than ZX0 */
+#include <x16/int16.h>          /* 16-bit helpers and composites */
+#include <x16/int32.h>          /* the same at 32 bits */
+#include <x16/double.h>         /* software 64-bit floating point */
 
 /* Diagnostic: the address the linker gave the scratch block. Nothing
 ** depends on the value; it moves as cc65's own zero-page footprint does.

@@ -148,7 +148,8 @@ function Build-Prg([string]$srcRel) {
 # the four bitmap engines that would not fit in RUNNER2.PRG.
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
     $suites = @('test_llvm\runner.c', 'test_llvm\runner2.c', 'test_llvm\runner3.c',
-                'test_llvm\runner4.c', 'test_llvm\runner5.c')
+                'test_llvm\runner4.c', 'test_llvm\runner5.c',
+                'test_llvm\runner6.c')
 } else {
     $suites = @($Source)
 }
