@@ -55,7 +55,7 @@ x16_i2c_write_byte:
         phx                             ; offset: X -> Y
         ply
         tax                             ; X = device (A held it)
-        lda     __rc2                   ; A = value
+        lda     mos8(__rc2)             ; A = value
         jsr     I2C_WRITE_BYTE
         lda     #0
         ldx     #0
@@ -78,9 +78,9 @@ x16_i2c_write_byte:
 ; ---------------------------------------------------------------------
 x16_i2c_batch_read:
         pha                             ; park the device
-        lda     __rc5                   ; fixed, read before r1H buries it
+        lda     mos8(__rc5)             ; fixed, read before r1H buries it
         pha
-        lda     __rc4                   ; count high -- __rc4 IS r1L, so
+        lda     mos8(__rc4)             ; count high -- __rc4 IS r1L, so
         sta     r1H                     ; this must move before the low
         stx     r1L                     ; byte (in X) overwrites it
         pla                             ; buf already sits in r0: __rc2/3
@@ -105,7 +105,7 @@ x16_i2c_batch_read:
 ; ---------------------------------------------------------------------
 x16_i2c_batch_write:
         tay                             ; park the device
-        lda     __rc4                   ; count high first: __rc4 IS r1L
+        lda     mos8(__rc4)             ; count high first: __rc4 IS r1L
         sta     r1H
         stx     r1L                     ; then the low byte, from X
         tya

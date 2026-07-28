@@ -107,10 +107,10 @@ x16_ser_uart1:
 ;   which frees A/X for the popped base -- exactly what ser_init wants.
 ; ---------------------------------------------------------------------
 x16_ser_init:
-        ldy     __rc2                   ; divisor, moved through Y so the
-        sty     X16_P0                  ; base stays put in A/X, which is
-        ldy     __rc3                   ; where the internal routine wants
-        sty     X16_P1                  ; it
+        ldy     mos8(__rc2)             ; divisor, moved through Y so the
+        sty     mos8(X16_P0)            ; base stays put in A/X, which is
+        ldy     mos8(__rc3)             ; where the internal routine wants
+        sty     mos8(X16_P1)            ; it
         jmp     ser_init
 
 ; ---------------------------------------------------------------------
@@ -154,14 +154,14 @@ x16_ser_put:
         jmp     ser_put
 
 x16_ser_puts:
-        lda     __rc2                   ; a lone pointer never lands in
-        ldx     __rc3                   ; A/X -- it takes an __rc pair,
+        lda     mos8(__rc2)             ; a lone pointer never lands in
+        ldx     mos8(__rc3)             ; A/X -- it takes an __rc pair,
                                         ; and the routine below wants A/X
         jmp     ser_puts
 
 x16_ser_discard_until:
-        lda     __rc2                   ; a lone pointer never lands in
-        ldx     __rc3                   ; A/X -- it takes an __rc pair,
+        lda     mos8(__rc2)             ; a lone pointer never lands in
+        ldx     mos8(__rc3)             ; A/X -- it takes an __rc pair,
                                         ; and the routine below wants A/X
         jmp     ser_discard_until
 
@@ -172,8 +172,8 @@ x16_ser_discard_until:
 ; ---------------------------------------------------------------------
 x16_ser_write:
         tay                             ; Y = len (it arrives in A)
-        lda     __rc2                   ; A/X = data
-        ldx     __rc3
+        lda     mos8(__rc2)             ; A/X = data
+        ldx     mos8(__rc3)
         jmp     ser_write
 
 ; ---------------------------------------------------------------------
@@ -182,17 +182,17 @@ x16_ser_write:
 ;   Returns the byte count actually stored, the needle included.
 ; ---------------------------------------------------------------------
 x16_ser_read_until:
-        sta     X16_P2                  ; max, straight from A/X
-        stx     X16_P3
-        lda     __rc2                   ; buf
-        sta     X16_P0
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; match, into A/X for the call
-        ldx     __rc5
+        sta     mos8(X16_P2)            ; max, straight from A/X
+        stx     mos8(X16_P3)
+        lda     mos8(__rc2)             ; buf
+        sta     mos8(X16_P0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; match, into A/X for the call
+        ldx     mos8(__rc5)
         jsr     ser_read_until
-        lda     X16_P4                  ; bytes actually stored
-        ldx     X16_P5
+        lda     mos8(X16_P4)            ; bytes actually stored
+        ldx     mos8(X16_P5)
         rts
 
 ; =====================================================================
@@ -220,9 +220,9 @@ ser_detect:
         stz     ser_u1
         stz     ser_u1+1
         lda     #<SER_SCAN_FIRST        ; X16_TPTR1 walks the candidate bases
-        sta     X16_T2
+        sta     mos8(X16_T2)
         lda     #>SER_SCAN_FIRST
-        sta     X16_T3
+        sta     mos8(X16_T3)
         php
         sei
 .Lser_detect_scan:
@@ -231,30 +231,30 @@ ser_detect:
         lda     ser_u0+1                ; first slot still empty?
         ora     ser_u0
         bne     .Lser_detect_have_first
-        lda     X16_T2                  ; store as UART 0
+        lda     mos8(X16_T2)            ; store as UART 0
         sta     ser_u0
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     ser_u0+1
         bra     .Lser_detect_next
 .Lser_detect_have_first:
-        lda     X16_T2                  ; store as UART 1 and stop
+        lda     mos8(X16_T2)            ; store as UART 1 and stop
         sta     ser_u1
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     ser_u1+1
         bra     .Lser_detect_done
 .Lser_detect_next:
         clc                             ; advance the base by SER_SCAN_STEP
-        lda     X16_T2
+        lda     mos8(X16_T2)
         adc     #SER_SCAN_STEP
-        sta     X16_T2
+        sta     mos8(X16_T2)
         bcc     .Lser_detect_nohi
-        inc     X16_T3
+        inc     mos8(X16_T3)
 .Lser_detect_nohi:
-        lda     X16_T3                  ; past SER_SCAN_LAST?
+        lda     mos8(X16_T3)            ; past SER_SCAN_LAST?
         cmp     #>SER_SCAN_LAST
         bcc     .Lser_detect_scan
         bne     .Lser_detect_done
-        lda     X16_T2
+        lda     mos8(X16_T2)
         cmp     #<SER_SCAN_LAST
         bcc     .Lser_detect_scan
         beq     .Lser_detect_scan                   ; include SER_SCAN_LAST itself
@@ -334,10 +334,10 @@ ser_init:
         lda     #$80
         sta     (X16_T0),y
         ldy     #SER_RHR                ; DLL
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     (X16_T0),y
         ldy     #SER_IER                ; DLM
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     (X16_T0),y
         ldy     #SER_LCR                ; 8 bits, no parity, 1 stop, DLAB = 0
         lda     #$03
@@ -426,8 +426,8 @@ ser_put:
 ;   in:  A = string low, X = string high
 ; ---------------------------------------------------------------------
 ser_puts:
-        sta     X16_P2
-        stx     X16_P3
+        sta     mos8(X16_P2)
+        stx     mos8(X16_P3)
         ldy     #0
 .Lser_puts_loop:
         lda     (X16_P2),y
@@ -445,9 +445,9 @@ ser_puts:
 ;   in:  A = data low, X = data high, Y = length (1..255; 0 = 256)
 ; ---------------------------------------------------------------------
 ser_write:
-        sta     X16_P2
-        stx     X16_P3
-        sty     X16_P4                  ; remaining count
+        sta     mos8(X16_P2)
+        stx     mos8(X16_P3)
+        sty     mos8(X16_P4)            ; remaining count
         ldy     #0
 .Lser_write_loop:
         phy
@@ -455,7 +455,7 @@ ser_write:
         jsr     ser_put
         ply
         iny
-        dec     X16_P4
+        dec     mos8(X16_P4)
         bne     .Lser_write_loop
         rts
 
@@ -469,48 +469,48 @@ ser_write:
 ; max bytes. Blocks on the UART between bytes -- for real hardware.
 ; ---------------------------------------------------------------------
 ser_read_until:
-        sta     X16_T4                  ; X16_TPTR2 = match base (needle start)
-        stx     X16_T5
-        lda     X16_T4                  ; X16_P6/P7 = the moving needle cursor
-        sta     X16_P6
-        lda     X16_T5
-        sta     X16_P7
-        stz     X16_P4                  ; stored count = 0
-        stz     X16_P5
+        sta     mos8(X16_T4)            ; X16_TPTR2 = match base (needle start)
+        stx     mos8(X16_T5)
+        lda     mos8(X16_T4)            ; X16_P6/P7 = the moving needle cursor
+        sta     mos8(X16_P6)
+        lda     mos8(X16_T5)
+        sta     mos8(X16_P7)
+        stz     mos8(X16_P4)            ; stored count = 0
+        stz     mos8(X16_P5)
 .Lser_read_until_loop:
-        lda     X16_P5                  ; stored >= max ?  (16-bit compare)
-        cmp     X16_P3
+        lda     mos8(X16_P5)            ; stored >= max ?  (16-bit compare)
+        cmp     mos8(X16_P3)
         bcc     .Lser_read_until_room
         bne     .Lser_read_until_done
-        lda     X16_P4
-        cmp     X16_P2
+        lda     mos8(X16_P4)
+        cmp     mos8(X16_P2)
         bcs     .Lser_read_until_done
 .Lser_read_until_room:
         jsr     ser_get_wait            ; A = next byte
         ldy     #0
         sta     (X16_P0),y              ; store it
-        inc     X16_P0
+        inc     mos8(X16_P0)
         bne     .Lser_read_until_nostorehi
-        inc     X16_P1
+        inc     mos8(X16_P1)
 .Lser_read_until_nostorehi:
-        inc     X16_P4                  ; ++stored (16-bit)
+        inc     mos8(X16_P4)            ; ++stored (16-bit)
         bne     .Lser_read_until_cmp
-        inc     X16_P5
+        inc     mos8(X16_P5)
 .Lser_read_until_cmp:
         cmp     (X16_P6)                ; does it continue the needle?
         bne     .Lser_read_until_reset
-        inc     X16_P6                  ; advance the needle cursor
+        inc     mos8(X16_P6)            ; advance the needle cursor
         bne     .Lser_read_until_noneedlehi
-        inc     X16_P7
+        inc     mos8(X16_P7)
 .Lser_read_until_noneedlehi:
         lda     (X16_P6)                ; needle fully matched (next char NUL)?
         beq     .Lser_read_until_done
         bra     .Lser_read_until_loop
 .Lser_read_until_reset:
-        lda     X16_T4                  ; mismatch: rewind the needle cursor
-        sta     X16_P6
-        lda     X16_T5
-        sta     X16_P7
+        lda     mos8(X16_T4)            ; mismatch: rewind the needle cursor
+        sta     mos8(X16_P6)
+        lda     mos8(X16_T5)
+        sta     mos8(X16_P7)
         bra     .Lser_read_until_loop
 .Lser_read_until_done:
         rts
@@ -521,28 +521,28 @@ ser_read_until:
 ; The matched needle is discarded too. Blocks on the UART -- hardware.
 ; ---------------------------------------------------------------------
 ser_discard_until:
-        sta     X16_T4                  ; needle base
-        stx     X16_T5
-        lda     X16_T4                  ; moving cursor in X16_P6/P7
-        sta     X16_P6
-        lda     X16_T5
-        sta     X16_P7
+        sta     mos8(X16_T4)            ; needle base
+        stx     mos8(X16_T5)
+        lda     mos8(X16_T4)            ; moving cursor in X16_P6/P7
+        sta     mos8(X16_P6)
+        lda     mos8(X16_T5)
+        sta     mos8(X16_P7)
 .Lser_discard_until_loop:
         jsr     ser_get_wait
         cmp     (X16_P6)
         bne     .Lser_discard_until_reset
-        inc     X16_P6
+        inc     mos8(X16_P6)
         bne     .Lser_discard_until_nohi
-        inc     X16_P7
+        inc     mos8(X16_P7)
 .Lser_discard_until_nohi:
         lda     (X16_P6)
         beq     .Lser_discard_until_done                   ; hit the NUL: whole needle matched
         bra     .Lser_discard_until_loop
 .Lser_discard_until_reset:
-        lda     X16_T4
-        sta     X16_P6
-        lda     X16_T5
-        sta     X16_P7
+        lda     mos8(X16_T4)
+        sta     mos8(X16_P6)
+        lda     mos8(X16_T5)
+        sta     mos8(X16_P7)
         bra     .Lser_discard_until_loop
 .Lser_discard_until_done:
         rts
@@ -550,9 +550,9 @@ ser_discard_until:
 ; copy the current UART base into X16_TPTR0 for (zp),y register access
 serial_load_ptr:
         lda     ser_base
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     ser_base+1
-        sta     X16_T0+1
+        sta     mos8(X16_T0+1)
         rts
 
 ; ---------------------------------------------------------------------

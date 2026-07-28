@@ -98,8 +98,8 @@ x16_iec_readst:
 ;   transfers (fall back to acptr/ciout one byte at a time).
 ; ---------------------------------------------------------------------
 x16_iec_macptr:
-        ldx     __rc2                   ; dest: the pointer pair
-        ldy     __rc3                   ; (A already holds count)
+        ldx     mos8(__rc2)             ; dest: the pointer pair
+        ldy     mos8(__rc3)             ; (A already holds count)
         clc                             ; C in = 0: ADVANCE the pointer. Set,
                                         ; it pins the address for port I/O --
                                         ; and it arrives here as stack litter.
@@ -115,8 +115,8 @@ x16_iec_macptr:
         rts
 
 x16_iec_mciout:
-        ldx     __rc2                   ; src: the pointer pair
-        ldy     __rc3                   ; (A already holds count)
+        ldx     mos8(__rc2)             ; src: the pointer pair
+        ldy     mos8(__rc3)             ; (A already holds count)
         clc                             ; C in = 0: advance (see macptr above)
         jsr     MCIOUT                  ; out: X = low, Y = high, C = error
         bcs     .Lx16_iec_mciout_bad

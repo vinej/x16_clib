@@ -87,8 +87,8 @@ c_src = X16_TPTR2                       ; T4/T5
 ; these two instructions. (cc65 received the pointer in A/X and only had
 ; to phx/ply.)
 .macro  ptr_ax_to_ay
-        lda     __rc2
-        ldy     __rc3
+        lda     mos8(__rc2)
+        ldy     mos8(__rc3)
 .endm
 
 ; A holds a signed byte; give X its sign extension so the value survives
@@ -300,17 +300,17 @@ x16_f_cmp:
 ; ---------------------------------------------------------------------
 ; buf is a pointer -> __rc2/__rc3.
 x16_f_to_str:
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     c_dst
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     c_dst+1
         jsr     f_to_str                ; A/X = the ROM's buffer
         jmp     copy_asciiz
 
 x16_f_to_str_trim:
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     c_dst
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     c_dst+1
         jsr     f_to_str
         sta     c_src
@@ -361,7 +361,7 @@ f_to_str:
 ; ---------------------------------------------------------------------
 ; s is a pointer -> __rc2/__rc3; len is the only integer -> A.
 x16_f_from_str:
-        ldx     __rc2                   ; X = address low
-        ldy     __rc3                   ; Y = address high
+        ldx     mos8(__rc2)             ; X = address low
+        ldy     mos8(__rc3)             ; Y = address high
         jsrfar  fp_val, BANK_BASIC      ; A is already the length
         rts

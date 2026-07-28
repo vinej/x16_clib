@@ -123,9 +123,9 @@ x16_i16_mul:
 i16_stage_ab:
         sta     i16_a
         stx     i16_a+1
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     i16_b
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     i16_b+1
         rts
 
@@ -215,9 +215,9 @@ x16_i16_divmod_s:
 
 i16_stage_abp:
         jsr     i16_stage_ab
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     X16_PTR0
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     X16_PTR0+1
         rts
 
@@ -259,8 +259,8 @@ x16_i16_to_dec_s:
 
 ; The internal converters leave the buffer address in A/X.
 i16_ret_ptr:
-        sta     __rc2
-        stx     __rc3
+        sta     mos8(__rc2)
+        stx     mos8(__rc3)
         rts
 
 ; =====================================================================
@@ -592,9 +592,9 @@ i16_sqrt:
 ; ---------------------------------------------------------------------
 i16_to_dec:
         lda     i16_a
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     i16_a+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
         jmp     i16_u16_to_dec
 
 i16_to_dec_s:
@@ -606,16 +606,16 @@ i16_to_dec_s:
         sec
         lda     #0
         sbc     i16_a
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     #0
         sbc     i16_a+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
         bra     .Li16_to_dec_s_convert
 .Li16_to_dec_s_positive:
         lda     i16_a
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     i16_a+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
 .Li16_to_dec_s_convert:
         jsr     i16_u16_to_dec          ; digits land in i16_nbuf
 
@@ -652,49 +652,49 @@ i16_to_dec_s:
 ; -t cx16 target remaps character literals to PETSCII.
 ; ---------------------------------------------------------------------
 i16_u16_to_dec:
-        stz     X16_T2                  ; have we emitted a significant digit yet?
-        stz     X16_T4                  ; output length
+        stz     mos8(X16_T2)            ; have we emitted a significant digit yet?
+        stz     mos8(X16_T4)            ; output length
 
         ldx     #0                      ; index into the power-of-ten table
 .Li16_u16_to_dec_digit:
         lda     #$30                    ; '0' (ASCII)
-        sta     X16_T3                  ; digit accumulator
+        sta     mos8(X16_T3)            ; digit accumulator
 .Li16_u16_to_dec_subtract:
         sec
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sbc     i16_pow10_lo,x
-        sta     X16_T0                  ; tentative low byte
-        lda     X16_P1
+        sta     mos8(X16_T0)            ; tentative low byte
+        lda     mos8(X16_P1)
         sbc     i16_pow10_hi,x
         bcc     .Li16_u16_to_dec_next_digit             ; would go negative: this digit is done
-        sta     X16_P1
-        lda     X16_T0
-        sta     X16_P0
-        inc     X16_T3
+        sta     mos8(X16_P1)
+        lda     mos8(X16_T0)
+        sta     mos8(X16_P0)
+        inc     mos8(X16_T3)
         bra     .Li16_u16_to_dec_subtract
 
 .Li16_u16_to_dec_next_digit:
-        lda     X16_T3
+        lda     mos8(X16_T3)
         cmp     #$30                    ; '0'
         bne     .Li16_u16_to_dec_emit                   ; a non-zero digit always prints
-        lda     X16_T2
+        lda     mos8(X16_T2)
         bne     .Li16_u16_to_dec_emit                   ; already past the leading zeros
         cpx     #4
         beq     .Li16_u16_to_dec_emit                   ; the units digit always prints
         bra     .Li16_u16_to_dec_skip
 .Li16_u16_to_dec_emit:
-        inc     X16_T2
-        ldy     X16_T4
-        lda     X16_T3
+        inc     mos8(X16_T2)
+        ldy     mos8(X16_T4)
+        lda     mos8(X16_T3)
         sta     i16_nbuf,y
         iny
-        sty     X16_T4
+        sty     mos8(X16_T4)
 .Li16_u16_to_dec_skip:
         inx
         cpx     #5
         bne     .Li16_u16_to_dec_digit
 
-        ldy     X16_T4
+        ldy     mos8(X16_T4)
         lda     #0
         sta     i16_nbuf,y              ; NUL terminator; Y is now the length
 

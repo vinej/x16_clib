@@ -76,9 +76,9 @@ x16_dos_set_device:
 ; usually a plausible-looking address.
 x16_dos_msg:
         lda     #<dos_msg
-        sta     __rc2
+        sta     mos8(__rc2)
         lda     #>dos_msg
-        sta     __rc3
+        sta     mos8(__rc3)
         rts
 
 ; ---------------------------------------------------------------------
@@ -90,8 +90,8 @@ x16_dos_msg:
 ; dos_cmd wants A/X = cmd, Y = len.
 x16_dos_cmd:
         tay                             ; Y = len
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jmp     dos_cmd                 ; status comes back in A
 
 ; ---------------------------------------------------------------------
@@ -130,8 +130,8 @@ x16_dos_chdir:
 ; out: A/X = name, Y = len
 name_marshal:
         tay                             ; Y = len
-        lda     __rc2
-        ldx     __rc3                   ; A/X = name
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)             ; A/X = name
         rts
 
 ; ---------------------------------------------------------------------
@@ -145,15 +145,15 @@ name_marshal:
 ; oldlen -> A, newlen -> X (the integers). dos_rename wants
 ; X16_P0/P1 = oldname, X16_P2 = oldlen, A/X = newname, Y = newlen.
 x16_dos_rename:
-        sta     X16_P2                  ; oldlen
+        sta     mos8(X16_P2)            ; oldlen
         txa
         tay                             ; Y = newlen
-        lda     __rc2
-        sta     X16_P0                  ; oldname
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; A/X = newname
-        ldx     __rc5
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; oldname
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; A/X = newname
+        ldx     mos8(__rc5)
         jmp     dos_rename
 
 ; =====================================================================
@@ -169,11 +169,11 @@ x16_dos_rename:
 ;        dos_msg = the full reply, NUL-terminated; Y = its length
 ; ---------------------------------------------------------------------
 dos_cmd:
-        sta     X16_T0
-        stx     X16_T1
+        sta     mos8(X16_T0)
+        stx     mos8(X16_T1)
         tya                             ; SETNAM wants A = length, X/Y = address
-        ldx     X16_T0
-        ldy     X16_T1
+        ldx     mos8(X16_T0)
+        ldy     mos8(X16_T1)
         jsr     SETNAM
 
         lda     #15
@@ -212,17 +212,17 @@ dos_cmd:
         lda     dos_msg
         sec
         sbc     #CH_ZERO
-        sta     X16_T0
+        sta     mos8(X16_T0)
         asl     a                       ; *10 = *8 + *2
         asl     a
-        adc     X16_T0
+        adc     mos8(X16_T0)
         asl     a
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     dos_msg+1
         sec
         sbc     #CH_ZERO
         clc
-        adc     X16_T0
+        adc     mos8(X16_T0)
         sta     dos_code
         cmp     #20                     ; carry set = error class
         rts
@@ -320,7 +320,7 @@ dos_rename:
         inx
         ldy     #0                      ; append the OLD name from X16_P0..P2
 .Ldos_rename_old:
-        cpy     X16_P2
+        cpy     mos8(X16_P2)
         beq     .Ldos_rename_send
         cpx     #DOS_CMD_MAX
         bcs     too_long
@@ -334,9 +334,9 @@ dos_rename:
 
 ; park A/X/Y (name pointer + length) in T0/T1/T2
 stash_name:
-        sta     X16_T0
-        stx     X16_T1
-        sty     X16_T2
+        sta     mos8(X16_T0)
+        stx     mos8(X16_T1)
+        sty     mos8(X16_T2)
         rts
 
 ; copy the stashed name into dos_cmdbuf at X, then send; X advances
@@ -353,7 +353,7 @@ send:
 append:
         ldy     #0
 .Lappend_cp:
-        cpy     X16_T2
+        cpy     mos8(X16_T2)
         beq     .Lappend_done
         cpx     #DOS_CMD_MAX
         bcs     .Lappend_too_long

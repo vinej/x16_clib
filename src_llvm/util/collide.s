@@ -29,20 +29,20 @@
 ; Eight byte arguments, so they fill A, X, then __rc2 through __rc7, in
 ; declaration order. The cc65 build had to pop seven of them.
 x16_collide8:
-        sta     X16_P0                  ; ax
-        stx     X16_P1                  ; ay
-        lda     __rc2
-        sta     X16_P2                  ; aw
-        lda     __rc3
-        sta     X16_P3                  ; ah
-        lda     __rc4
-        sta     X16_P4                  ; bx
-        lda     __rc5
-        sta     X16_P5                  ; by
-        lda     __rc6
-        sta     X16_P6                  ; bw
-        lda     __rc7
-        sta     X16_P7                  ; bh
+        sta     mos8(X16_P0)            ; ax
+        stx     mos8(X16_P1)            ; ay
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; aw
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; ah
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; bx
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; by
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; bw
+        lda     mos8(__rc7)
+        sta     mos8(X16_P7)            ; bh
 
         jsr     collide8                ; carry = overlap
         lda     #0
@@ -66,14 +66,14 @@ x16_collide8:
 ; runtime ptr1/ptr2 to indirect through; here T0/T1 and T2/T3 serve, and
 ; collide16 reads cl_* rather than the P block, so nothing collides.
 x16_collide16:
-        lda     __rc2
-        sta     X16_T0                  ; a
-        lda     __rc3
-        sta     X16_T1
-        lda     __rc4
-        sta     X16_T2                  ; b
-        lda     __rc5
-        sta     X16_T3
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)            ; a
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_T2)            ; b
+        lda     mos8(__rc5)
+        sta     mos8(X16_T3)
 
         ldy     #7
 .Lx16_collide16_copy:
@@ -112,37 +112,37 @@ x16_collide16:
 ; ---------------------------------------------------------------------
 collide8:
         ; --- x axis ---
-        lda     X16_P4
+        lda     mos8(X16_P4)
         clc
-        adc     X16_P6                  ; bx + bw
+        adc     mos8(X16_P6)            ; bx + bw
         bcs     .Lcollide8_ax_lt                  ; past 255, so ax is certainly less
-        cmp     X16_P0                  ; carry set if (bx+bw) >= ax
+        cmp     mos8(X16_P0)            ; carry set if (bx+bw) >= ax
         bcc     .Lcollide8_apart
         beq     .Lcollide8_apart                  ; equal means touching, not overlapping
 .Lcollide8_ax_lt:
-        lda     X16_P0
+        lda     mos8(X16_P0)
         clc
-        adc     X16_P2                  ; ax + aw
+        adc     mos8(X16_P2)            ; ax + aw
         bcs     .Lcollide8_bx_lt
-        cmp     X16_P4
+        cmp     mos8(X16_P4)
         bcc     .Lcollide8_apart
         beq     .Lcollide8_apart
 .Lcollide8_bx_lt:
 
         ; --- y axis ---
-        lda     X16_P5
+        lda     mos8(X16_P5)
         clc
-        adc     X16_P7                  ; by + bh
+        adc     mos8(X16_P7)            ; by + bh
         bcs     .Lcollide8_ay_lt
-        cmp     X16_P1
+        cmp     mos8(X16_P1)
         bcc     .Lcollide8_apart
         beq     .Lcollide8_apart
 .Lcollide8_ay_lt:
-        lda     X16_P1
+        lda     mos8(X16_P1)
         clc
-        adc     X16_P3                  ; ay + ah
+        adc     mos8(X16_P3)            ; ay + ah
         bcs     .Lcollide8_by_lt
-        cmp     X16_P5
+        cmp     mos8(X16_P5)
         bcc     .Lcollide8_apart
         beq     .Lcollide8_apart
 .Lcollide8_by_lt:

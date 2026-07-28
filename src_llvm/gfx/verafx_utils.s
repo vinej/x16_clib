@@ -148,12 +148,12 @@ x16_fxu_accumulate:
 ;                        unsigned char h, unsigned char u)
 ; l -> A, m -> X, h -> __rc2, u -> __rc3. The body wants P0..P3.
 x16_fxu_set_cache:
-        sta     X16_P0                  ; l
-        stx     X16_P1                  ; m
-        lda     __rc2
-        sta     X16_P2                  ; h
-        lda     __rc3
-        sta     X16_P3                  ; u
+        sta     mos8(X16_P0)            ; l
+        stx     mos8(X16_P1)            ; m
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; h
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; u
         jmp     fxu_set_cache
 
 ; unsigned char x16_fxu_cache_fill0(void) / x16_fxu_cache_fill1(void)
@@ -175,22 +175,22 @@ x16_fxu_cache_write1:
 ; void x16_fxu_set_incr(unsigned int xi, unsigned int yi)
 ; xi -> A/X, yi -> __rc2/__rc3. The body wants P0/P1 = xi, P2/P3 = yi.
 x16_fxu_set_incr:
-        sta     X16_P0                  ; xi lo
-        stx     X16_P1                  ; xi hi
-        lda     __rc2
-        sta     X16_P2                  ; yi lo
-        lda     __rc3
-        sta     X16_P3                  ; yi hi
+        sta     mos8(X16_P0)            ; xi lo
+        stx     mos8(X16_P1)            ; xi hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; yi lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; yi hi
         jmp     fxu_set_incr
 
 ; void x16_fxu_set_pos(unsigned int x, unsigned int y)
 x16_fxu_set_pos:
-        sta     X16_P0                  ; x lo
-        stx     X16_P1                  ; x hi
-        lda     __rc2
-        sta     X16_P2                  ; y lo
-        lda     __rc3
-        sta     X16_P3                  ; y hi
+        sta     mos8(X16_P0)            ; x lo
+        stx     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; y lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; y hi
         jmp     fxu_set_pos
 
 ; void x16_fxu_set_subpos(unsigned char xs, unsigned char ys)
@@ -223,9 +223,9 @@ fxu_off:
 fxu_get_ctrl:
     vera_dcsel 2
     lda VERA_FX_CTRL
-    sta X16_T0
+    sta mos8(X16_T0)
     vera_dcsel 0
-    lda X16_T0
+    lda mos8(X16_T0)
     rts
 
 fxu_set_ctrl:
@@ -256,11 +256,11 @@ fxu_ctrl_off:
 ;   in: A = VERA_FX_ADDR1_* value
 fxu_addr1_mode:
     and #%00000011
-    sta X16_T0
+    sta mos8(X16_T0)
     vera_dcsel 2
     lda VERA_FX_CTRL
     and #%11111100
-    ora X16_T0
+    ora mos8(X16_T0)
     sta VERA_FX_CTRL
     vera_dcsel 0
     rts
@@ -328,13 +328,13 @@ fxu_set_mult:
 ;   in: X16_P0..P3 = cache L, M, H, U
 fxu_set_cache:
     vera_dcsel 6
-    lda X16_P0
+    lda mos8(X16_P0)
     sta VERA_FX_CACHE_L
-    lda X16_P1
+    lda mos8(X16_P1)
     sta VERA_FX_CACHE_M
-    lda X16_P2
+    lda mos8(X16_P2)
     sta VERA_FX_CACHE_H
-    lda X16_P3
+    lda mos8(X16_P3)
     sta VERA_FX_CACHE_U
     vera_dcsel 0
     rts
@@ -380,13 +380,13 @@ fxu_cache_write1:
 ;   in: X16_P0/P1 = X increment, X16_P2/P3 = Y increment
 fxu_set_incr:
     vera_dcsel 3
-    lda X16_P0
+    lda mos8(X16_P0)
     sta VERA_FX_X_INCR_L
-    lda X16_P1
+    lda mos8(X16_P1)
     sta VERA_FX_X_INCR_H
-    lda X16_P2
+    lda mos8(X16_P2)
     sta VERA_FX_Y_INCR_L
-    lda X16_P3
+    lda mos8(X16_P3)
     sta VERA_FX_Y_INCR_H
     vera_dcsel 0
     rts
@@ -395,13 +395,13 @@ fxu_set_incr:
 ;   in: X16_P0/P1 = X position, X16_P2/P3 = Y position
 fxu_set_pos:
     vera_dcsel 4
-    lda X16_P0
+    lda mos8(X16_P0)
     sta VERA_FX_X_POS_L
-    lda X16_P1
+    lda mos8(X16_P1)
     sta VERA_FX_X_POS_H
-    lda X16_P2
+    lda mos8(X16_P2)
     sta VERA_FX_Y_POS_L
-    lda X16_P3
+    lda mos8(X16_P3)
     sta VERA_FX_Y_POS_H
     vera_dcsel 0
     rts
@@ -409,12 +409,12 @@ fxu_set_pos:
 ; fxu_set_subpos -- set X/Y subpixel registers
 ;   in: A = X subpixel, X = Y subpixel
 fxu_set_subpos:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     vera_dcsel 5
-    lda X16_T0
+    lda mos8(X16_T0)
     sta VERA_FX_X_POS_S
-    lda X16_T1
+    lda mos8(X16_T1)
     sta VERA_FX_Y_POS_S
     vera_dcsel 0
     rts
@@ -424,12 +424,12 @@ fxu_set_subpos:
 fxu_get_poly_fill:
     vera_dcsel 5
     lda VERA_FX_POLY_FILL_L
-    sta X16_T0
+    sta mos8(X16_T0)
     lda VERA_FX_POLY_FILL_H
-    sta X16_T1
+    sta mos8(X16_T1)
     vera_dcsel 0
-    lda X16_T0
-    ldx X16_T1
+    lda mos8(X16_T0)
+    ldx mos8(X16_T1)
     rts
 
 ; fxu_set_tilebase / fxu_set_mapbase -- raw affine base register writes

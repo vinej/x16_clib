@@ -113,9 +113,9 @@ x16_layer_scroll_y:
 ; out: X = layer, X16_P0/P1 = value
 scroll_marshal:
         pha                             ; layer
-        stx     X16_P0                  ; value lo
-        lda     __rc2
-        sta     X16_P1                  ; value hi
+        stx     mos8(X16_P0)            ; value lo
+        lda     mos8(__rc2)
+        sta     mos8(X16_P1)            ; value hi
         plx                             ; X = layer
         rts
 
@@ -140,10 +140,10 @@ x16_tile_setptr:
 x16_tile_put:
         pha                             ; col
         phx                             ; row
-        lda     __rc2
-        sta     X16_P0                  ; code
-        lda     __rc3
-        sta     X16_P1                  ; attr
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; code
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)            ; attr
         ply                             ; Y = row
         plx                             ; X = col
         jmp     tile_put
@@ -216,18 +216,18 @@ layer_set_tilebase:
 ; ---------------------------------------------------------------------
 layer_scroll_x:
         jsr     layer_index
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_L0_HSCROLL_L,x
-        lda     X16_P1
+        lda     mos8(X16_P1)
         and     #$0F
         sta     VERA_L0_HSCROLL_H,x
         rts
 
 layer_scroll_y:
         jsr     layer_index
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_L0_VSCROLL_L,x
-        lda     X16_P1
+        lda     mos8(X16_P1)
         and     #$0F
         sta     VERA_L0_VSCROLL_H,x
         rts
@@ -243,8 +243,8 @@ layer_scroll_y:
 ; product needs 17 bits, hence the three-byte shift.
 ; ---------------------------------------------------------------------
 tile_setptr:
-        stx     X16_T4                  ; column
-        sty     X16_T5                  ; row
+        stx     mos8(X16_T4)            ; column
+        sty     mos8(X16_T5)            ; row
 
         lda     VERA_L1_CONFIG
         lsr     a
@@ -256,59 +256,59 @@ tile_setptr:
         adc     #6
         tax                             ; shift count 6..9
 
-        stz     X16_T1
-        stz     X16_T2
-        lda     X16_T5
-        sta     X16_T0
+        stz     mos8(X16_T1)
+        stz     mos8(X16_T2)
+        lda     mos8(X16_T5)
+        sta     mos8(X16_T0)
 .Ltile_setptr_shift:
-        asl     X16_T0
-        rol     X16_T1
-        rol     X16_T2
+        asl     mos8(X16_T0)
+        rol     mos8(X16_T1)
+        rol     mos8(X16_T2)
         dex
         bne     .Ltile_setptr_shift
 
         ; + column * 2  (up to 9 bits)
-        lda     X16_T4
+        lda     mos8(X16_T4)
         asl     a
-        sta     X16_T6
+        sta     mos8(X16_T6)
         lda     #0
         rol     a
-        sta     X16_T7
+        sta     mos8(X16_T7)
 
         clc
-        lda     X16_T0
-        adc     X16_T6
-        sta     X16_T0
-        lda     X16_T1
-        adc     X16_T7
-        sta     X16_T1
-        lda     X16_T2
+        lda     mos8(X16_T0)
+        adc     mos8(X16_T6)
+        sta     mos8(X16_T0)
+        lda     mos8(X16_T1)
+        adc     mos8(X16_T7)
+        sta     mos8(X16_T1)
+        lda     mos8(X16_T2)
         adc     #0
-        sta     X16_T2
+        sta     mos8(X16_T2)
 
         ; + mapbase, which is (register << 9): low byte is always zero.
         lda     VERA_L1_MAPBASE
         asl     a                       ; carry = VRAM address bit 16
-        sta     X16_T6
+        sta     mos8(X16_T6)
         lda     #0
         rol     a
-        sta     X16_T7
+        sta     mos8(X16_T7)
 
         clc
-        lda     X16_T1
-        adc     X16_T6
-        sta     X16_T1
-        lda     X16_T2
-        adc     X16_T7
-        sta     X16_T2
+        lda     mos8(X16_T1)
+        adc     mos8(X16_T6)
+        sta     mos8(X16_T1)
+        lda     mos8(X16_T2)
+        adc     mos8(X16_T7)
+        sta     mos8(X16_T2)
 
         lda     #VERA_CTRL_ADDRSEL
         trb     VERA_CTRL               ; ADDRSEL = 0, DCSEL untouched
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     VERA_ADDR_L
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     VERA_ADDR_M
-        lda     X16_T2
+        lda     mos8(X16_T2)
         and     #VERA_ADDR_H_BANK
         ora     #(VERA_INC_1 << 4)
         sta     VERA_ADDR_H
@@ -320,9 +320,9 @@ tile_setptr:
 ; ---------------------------------------------------------------------
 tile_put:
         jsr     tile_setptr
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_DATA0
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     VERA_DATA0
         rts
 

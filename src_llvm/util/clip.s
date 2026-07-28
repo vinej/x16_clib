@@ -48,17 +48,17 @@ CLIP_BOTTOM = %1000
 x16_clip_set:
         sta     clip_xmin               ; xmin lo
         stx     clip_xmin+1             ; xmin hi
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     clip_ymin
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     clip_ymin+1
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     clip_xmax
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     clip_xmax+1
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     clip_ymax
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     clip_ymax+1
         rts
 
@@ -75,10 +75,10 @@ x16_clip_set:
 ; needs a zero-page pair of our own: clip.s touches no T bytes at all, so
 ; T0/T1 is free.
 x16_clip_line:
-        lda     __rc2
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
 
         ldy     #7
 .Lx16_clip_line_in:
@@ -216,17 +216,17 @@ clip_line:
 
 .Lclip_line_accept:
         lda     clipl_x0                ; load the drawers' parameter block
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     clipl_x0+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
         lda     clipl_y0
-        sta     X16_P2
+        sta     mos8(X16_P2)
         lda     clipl_x1
-        sta     X16_P3
+        sta     mos8(X16_P3)
         lda     clipl_x1+1
-        sta     X16_P4
+        sta     mos8(X16_P4)
         lda     clipl_y1
-        sta     X16_P5
+        sta     mos8(X16_P5)
         clc
         rts
 

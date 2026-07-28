@@ -59,13 +59,13 @@ BMX_ERR_PACKED = 3                      ; compressed data is not supported
 ; The body reads no T bytes, so T0/T1 is free to indirect through.
 ; ---------------------------------------------------------------------
 x16_bmx_load_hires:
-        sta     X16_P3                  ; device (the only integer arg: A)
-        lda     __rc2
-        sta     X16_P0                  ; name
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_P1
-        sta     X16_T1
+        sta     mos8(X16_P3)            ; device (the only integer arg: A)
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; name
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        sta     mos8(X16_T1)
         ldy     #0
 .Lx16_bmx_load_hires_len:
         lda     (X16_T0),y
@@ -73,7 +73,7 @@ x16_bmx_load_hires:
         iny
         bne     .Lx16_bmx_load_hires_len         ; a 255-byte name is its own problem
 .Lx16_bmx_load_hires_got:
-        sty     X16_P2                  ; length
+        sty     mos8(X16_P2)            ; length
         jsr     bmx_load_hires          ; carry set = failure, A = code
         bcs     .Lx16_bmx_load_hires_err
         lda     #0

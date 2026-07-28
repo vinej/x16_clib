@@ -78,24 +78,24 @@ x16_sort_s16:
 ; ---------------------------------------------------------------------
 x16_sort:
         jsr     sort_args
-        lda     __rc4                   ; cmp, behind the trampoline below
+        lda     mos8(__rc4)             ; cmp, behind the trampoline below
         sta     srt_ccmp
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     srt_ccmp+1
         lda     #<sort_c_tramp
-        sta     X16_P4
+        sta     mos8(X16_P4)
         lda     #>sort_c_tramp
-        sta     X16_P5
+        sta     mos8(X16_P5)
         jmp     sort_ptr
 
 ; base (__rc2/__rc3) -> P0/P1, count (A/X) -> P2/P3
 sort_args:
-        sta     X16_P2
-        stx     X16_P3
-        lda     __rc2
-        sta     X16_P0
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)
+        stx     mos8(X16_P3)
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         rts
 
 ; The assembly-side comparator handed to sort_ptr: forward the two
@@ -105,14 +105,14 @@ sort_args:
 ; reads them, and compiled C code touches llvm-mos's imaginary
 ; registers, never the library's reserved X16_P block.
 sort_c_tramp:
-        lda     X16_P4                  ; element A -> first argument
-        sta     __rc2
-        lda     X16_P5
-        sta     __rc3
-        lda     X16_P6                  ; element B -> second argument
-        sta     __rc4
-        lda     X16_P7
-        sta     __rc5
+        lda     mos8(X16_P4)            ; element A -> first argument
+        sta     mos8(__rc2)
+        lda     mos8(X16_P5)
+        sta     mos8(__rc3)
+        lda     mos8(X16_P6)            ; element B -> second argument
+        sta     mos8(__rc4)
+        lda     mos8(X16_P7)
+        sta     mos8(__rc5)
         jsr     sort_c_call
         cmp     #1                      ; carry set iff A (the verdict) != 0
         rts
@@ -149,8 +149,8 @@ sort_s16:
 
 ; sort_ptr -- element size 2, comparator address in X16_P4/P5
 sort_ptr:
-        lda     X16_P4
-        ldy     X16_P5
+        lda     mos8(X16_P4)
+        ldy     mos8(X16_P5)
         ldx     #2
         ; fall through to sort_setup
 
@@ -158,13 +158,13 @@ sort_setup:
         stx     srt_size
         sta     srt_cmp
         sty     srt_cmp+1
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     srt_base
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     srt_base+1
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     srt_count
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     srt_count+1
 
         ; nothing to do for fewer than two elements
@@ -192,9 +192,9 @@ sort_outer:
 sort_body:
         ; key = arr[i]
         lda     srt_i
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     srt_i+1
-        sta     X16_T1
+        sta     mos8(X16_T1)
         jsr     sort_addr2              ; P4/P5 = &arr[i]
         jsr     sort_load_key
 
@@ -210,14 +210,14 @@ sort_body:
 sort_inner:
         ; P4/P5 = &arr[j],  P6/P7 = &srt_key,  compare
         lda     srt_j
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     srt_j+1
-        sta     X16_T1
+        sta     mos8(X16_T1)
         jsr     sort_addr2              ; P4/P5 = &arr[j]
         lda     #<srt_key
-        sta     X16_P6
+        sta     mos8(X16_P6)
         lda     #>srt_key
-        sta     X16_P7
+        sta     mos8(X16_P7)
         jsr     sort_callcmp            ; carry set if arr[j] > key
         bcc     sort_place_jp1
 
@@ -225,10 +225,10 @@ sort_inner:
         lda     srt_j                   ; T0/T1 = j+1
         clc
         adc     #1
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     srt_j+1
         adc     #0
-        sta     X16_T1
+        sta     mos8(X16_T1)
         jsr     sort_addr3              ; P6/P7 = &arr[j+1]  (dest; P4/P5 still &arr[j])
         jsr     sort_copy_elem
 
@@ -247,8 +247,8 @@ sort_inner:
         bra     sort_inner
 
 sort_place_0:
-        stz     X16_T0                  ; &arr[0]
-        stz     X16_T1
+        stz     mos8(X16_T0)            ; &arr[0]
+        stz     mos8(X16_T1)
         jsr     sort_addr3
         jsr     sort_store_key
         bra     sort_next_i
@@ -257,10 +257,10 @@ sort_place_jp1:
         lda     srt_j                   ; &arr[j+1]
         clc
         adc     #1
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     srt_j+1
         adc     #0
-        sta     X16_T1
+        sta     mos8(X16_T1)
         jsr     sort_addr3
         jsr     sort_store_key
 
@@ -279,26 +279,26 @@ sort_addr2:
         beq     .Lsort_addr2_two
         clc
         lda     srt_base
-        adc     X16_T0
-        sta     X16_P4
+        adc     mos8(X16_T0)
+        sta     mos8(X16_P4)
         lda     srt_base+1
-        adc     X16_T1
-        sta     X16_P5
+        adc     mos8(X16_T1)
+        sta     mos8(X16_P5)
         rts
 .Lsort_addr2_two:
-        lda     X16_T0
+        lda     mos8(X16_T0)
         asl
-        sta     X16_T2
-        lda     X16_T1
+        sta     mos8(X16_T2)
+        lda     mos8(X16_T1)
         rol
-        sta     X16_T3
+        sta     mos8(X16_T3)
         clc
         lda     srt_base
-        adc     X16_T2
-        sta     X16_P4
+        adc     mos8(X16_T2)
+        sta     mos8(X16_P4)
         lda     srt_base+1
-        adc     X16_T3
-        sta     X16_P5
+        adc     mos8(X16_T3)
+        sta     mos8(X16_P5)
         rts
 
 sort_addr3:
@@ -307,26 +307,26 @@ sort_addr3:
         beq     .Lsort_addr3_two3
         clc
         lda     srt_base
-        adc     X16_T0
-        sta     X16_P6
+        adc     mos8(X16_T0)
+        sta     mos8(X16_P6)
         lda     srt_base+1
-        adc     X16_T1
-        sta     X16_P7
+        adc     mos8(X16_T1)
+        sta     mos8(X16_P7)
         rts
 .Lsort_addr3_two3:
-        lda     X16_T0
+        lda     mos8(X16_T0)
         asl
-        sta     X16_T2
-        lda     X16_T1
+        sta     mos8(X16_T2)
+        lda     mos8(X16_T1)
         rol
-        sta     X16_T3
+        sta     mos8(X16_T3)
         clc
         lda     srt_base
-        adc     X16_T2
-        sta     X16_P6
+        adc     mos8(X16_T2)
+        sta     mos8(X16_P6)
         lda     srt_base+1
-        adc     X16_T3
-        sta     X16_P7
+        adc     mos8(X16_T3)
+        sta     mos8(X16_P7)
         rts
 
 ; --- element moves ---------------------------------------------------

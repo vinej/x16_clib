@@ -46,13 +46,13 @@
 ; dst is a pointer -> __rc2/__rc3. count is an int -> A/X. value is a byte,
 ; and the pointer has taken __rc2/__rc3, so it lands in __rc4.
 x16_mem_fill:
-        sta     X16_P2                  ; count lo
-        stx     X16_P3                  ; count hi
-        lda     __rc2
-        sta     X16_P0                  ; dst lo
-        lda     __rc3
-        sta     X16_P1                  ; dst hi
-        lda     __rc4                   ; A = value
+        sta     mos8(X16_P2)            ; count lo
+        stx     mos8(X16_P3)            ; count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; dst lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)            ; dst hi
+        lda     mos8(__rc4)             ; A = value
         jmp     mem_fill
 
 ; ---------------------------------------------------------------------
@@ -66,16 +66,16 @@ x16_mem_fill:
 ; Two pointers take __rc2/__rc3 and __rc4/__rc5; count is the only integer,
 ; so it gets A and X.
 x16_mem_copy:
-        sta     X16_P4                  ; count lo
-        stx     X16_P5                  ; count hi
-        lda     __rc2
-        sta     X16_P0                  ; src
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P2                  ; dst
-        lda     __rc5
-        sta     X16_P3
+        sta     mos8(X16_P4)            ; count lo
+        stx     mos8(X16_P5)            ; count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; src
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; dst
+        lda     mos8(__rc5)
+        sta     mos8(X16_P3)
         jmp     mem_copy
 
 ; ---------------------------------------------------------------------
@@ -83,12 +83,12 @@ x16_mem_copy:
 ;   CRC-16/IBM-3740. An empty block gives the algorithm's init value, $FFFF.
 ; ---------------------------------------------------------------------
 x16_mem_crc:
-        sta     X16_P2                  ; count lo
-        stx     X16_P3                  ; count hi
-        lda     __rc2
-        sta     X16_P0                  ; addr
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; count lo
+        stx     mos8(X16_P3)            ; count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; addr
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         jmp     mem_crc                 ; an int returns in A (lo), X (hi)
 
 ; ---------------------------------------------------------------------
@@ -107,19 +107,19 @@ x16_mem_crc:
 ; __rc4/__rc5, and the RESULT must go back in __rc2/__rc3 -- not in A/X,
 ; where mem_decompress leaves it.
 x16_mem_decompress:
-        lda     __rc2
-        sta     X16_P0                  ; src
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P2                  ; dst
-        lda     __rc5
-        sta     X16_P3
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; src
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; dst
+        lda     mos8(__rc5)
+        sta     mos8(X16_P3)
 
         jsr     mem_decompress          ; A = lo, X = hi
 
-        sta     __rc2                   ; a pointer returns in __rc2/__rc3
-        stx     __rc3
+        sta     mos8(__rc2)             ; a pointer returns in __rc2/__rc3
+        stx     mos8(__rc3)
         rts
 
 ; =====================================================================
@@ -130,19 +130,19 @@ x16_mem_decompress:
 ; mem_fill -- in: X16_P0/P1 = target, X16_P2/P3 = count, A = value
 ; ---------------------------------------------------------------------
 mem_fill:
-        ldx     X16_P2                  ; a zero count fills nothing
+        ldx     mos8(X16_P2)            ; a zero count fills nothing
         bne     .Lmem_fill_go
-        ldx     X16_P3
+        ldx     mos8(X16_P3)
         beq     .Lmem_fill_done
 .Lmem_fill_go:
         pha
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     r0L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     r0H
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     r1L
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     r1H
         pla
         jmp     MEMORY_FILL
@@ -154,20 +154,20 @@ mem_fill:
 ;                 X16_P4/P5 = byte count
 ; ---------------------------------------------------------------------
 mem_copy:
-        lda     X16_P4                  ; a zero count copies nothing
-        ora     X16_P5
+        lda     mos8(X16_P4)            ; a zero count copies nothing
+        ora     mos8(X16_P5)
         beq     .Lmem_copy_done
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     r0L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     r0H
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     r1L
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     r1H
-        lda     X16_P4
+        lda     mos8(X16_P4)
         sta     r2L
-        lda     X16_P5
+        lda     mos8(X16_P5)
         sta     r2H
         jmp     MEMORY_COPY
 .Lmem_copy_done:
@@ -178,20 +178,20 @@ mem_copy:
 ;            out: A = CRC low, X = CRC high
 ; ---------------------------------------------------------------------
 mem_crc:
-        lda     X16_P2
-        ora     X16_P3
+        lda     mos8(X16_P2)
+        ora     mos8(X16_P3)
         bne     .Lmem_crc_go
         lda     #$FF                    ; empty block: the $FFFF init value
         tax
         rts
 .Lmem_crc_go:
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     r0L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     r0H
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     r1L
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     r1H
         jsr     MEMORY_CRC
         lda     r2L
@@ -203,13 +203,13 @@ mem_crc:
 ;                   out: A/X = address one past the last output byte
 ; ---------------------------------------------------------------------
 mem_decompress:
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     r0L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     r0H
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     r1L
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     r1H
         jsr     MEMORY_DECOMPRESS
         lda     r1L                     ; the KERNAL leaves r1 one past the end

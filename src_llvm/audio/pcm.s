@@ -128,34 +128,34 @@ x16_pcm_put:
 ; ---------------------------------------------------------------------
 ; src is a pointer (__rc2/__rc3); count is an int, so it takes A and X.
 x16_pcm_write:
-        sta     X16_P2                  ; count lo
-        stx     X16_P3                  ; count hi
-        lda     __rc2
-        sta     X16_P0                  ; src lo
-        lda     __rc3
-        sta     X16_P1                  ; src hi
+        sta     mos8(X16_P2)            ; count lo
+        stx     mos8(X16_P3)            ; count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; src lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)            ; src hi
         ; fall through
 
 ; pcm_write -- in: X16_P0/P1 = source address, X16_P2/P3 = byte count
 pcm_write:
         ldy     #0
 .Lpcm_write_loop:
-        lda     X16_P2
-        ora     X16_P3
+        lda     mos8(X16_P2)
+        ora     mos8(X16_P3)
         beq     .Lpcm_write_done                   ; count exhausted
 
         lda     (X16_P0),y
         sta     VERA_AUDIO_DATA
 
-        inc     X16_P0                  ; advance the source pointer
+        inc     mos8(X16_P0)            ; advance the source pointer
         bne     .Lpcm_write_dec
-        inc     X16_P1
+        inc     mos8(X16_P1)
 .Lpcm_write_dec:
-        lda     X16_P2                  ; 16-bit decrement of the count
+        lda     mos8(X16_P2)            ; 16-bit decrement of the count
         bne     .Lpcm_write_dec_low
-        dec     X16_P3
+        dec     mos8(X16_P3)
 .Lpcm_write_dec_low:
-        dec     X16_P2
+        dec     mos8(X16_P2)
         bra     .Lpcm_write_loop
 .Lpcm_write_done:
         rts

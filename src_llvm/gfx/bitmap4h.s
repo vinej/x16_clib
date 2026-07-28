@@ -95,7 +95,7 @@ x16_gfx4h_pal_gray:
 ; index -> A, lo -> X, hi -> __rc2. The body wants X = index, A = lo,
 ; Y = hi.
 x16_gfx4h_pal_set:
-        ldy     __rc2                   ; hi
+        ldy     mos8(__rc2)             ; hi
         pha                             ; park the index...
         txa                             ; lo -> A
         plx                             ; ...and pull it into X
@@ -106,23 +106,23 @@ x16_gfx4h_pal_set:
 ; src (pointer) -> __rc2/__rc3; first -> A, count -> X -- exactly what
 ; the body wants, so only the pointer needs a store.
 x16_gfx4h_pal_load:
-        ldy     __rc2
-        sty     X16_P0                  ; src -- P0/P1 is X16_PTR0
-        ldy     __rc3
-        sty     X16_P1
+        ldy     mos8(__rc2)
+        sty     mos8(X16_P0)            ; src -- P0/P1 is X16_PTR0
+        ldy     mos8(__rc3)
+        sty     mos8(X16_P1)
         jmp     gfx4h_pal_load
 
 ; void x16_gfx4h_setptr(unsigned char inc, unsigned int x, unsigned int y)
 ;   inc is a VERA2_INC_* stride index
 ; inc -> A, x -> X/__rc2, y -> __rc3/__rc4.
 x16_gfx4h_setptr:
-        stx     X16_P0                  ; x lo
-        ldx     __rc2
-        stx     X16_P1                  ; x hi
-        ldx     __rc3
-        stx     X16_P2                  ; y lo
-        ldx     __rc4
-        stx     X16_P3                  ; y hi
+        stx     mos8(X16_P0)            ; x lo
+        ldx     mos8(__rc2)
+        stx     mos8(X16_P1)            ; x hi
+        ldx     mos8(__rc3)
+        stx     mos8(X16_P2)            ; y lo
+        ldx     mos8(__rc4)
+        stx     mos8(X16_P3)            ; y hi
         jmp     gfx4h_setptr            ; A = stride index
 
 ; void x16_gfx4h_clear(unsigned char color)
@@ -133,25 +133,25 @@ x16_gfx4h_clear:
 ; void x16_gfx4h_pset(unsigned int x, unsigned int y, unsigned char color)
 ; x -> A/X, y -> __rc2/__rc3, color -> __rc4.
 x16_gfx4h_pset:
-        sta     X16_P0                  ; x lo
-        stx     X16_P1                  ; x hi
-        lda     __rc2
-        sta     X16_P2                  ; y lo
-        lda     __rc3
-        sta     X16_P3                  ; y hi
-        lda     __rc4                   ; color
+        sta     mos8(X16_P0)            ; x lo
+        stx     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; y lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; y hi
+        lda     mos8(__rc4)             ; color
         jmp     gfx4h_pset
 
 ; unsigned char x16_gfx4h_read(unsigned int x, unsigned int y)
 ;   0-15, or $FF off screen (the body answers with carry set)
 ; x -> A/X, y -> __rc2/__rc3.
 x16_gfx4h_read:
-        sta     X16_P0
-        stx     X16_P1
-        lda     __rc2
-        sta     X16_P2
-        lda     __rc3
-        sta     X16_P3
+        sta     mos8(X16_P0)
+        stx     mos8(X16_P1)
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)
         jsr     gfx4h_read
         bcc     .Lg4hread_on
         lda     #$FF
@@ -163,28 +163,28 @@ x16_gfx4h_read:
 ; x -> A/X, y -> __rc2/__rc3, len -> __rc4/__rc5, color -> __rc6.
 x16_gfx4h_hline:
         jsr     span_marshal
-        lda     __rc6                   ; color
+        lda     mos8(__rc6)             ; color
         jmp     gfx4h_hline
 
 ; void x16_gfx4h_vline(unsigned int x, unsigned int y,
 ;                     unsigned int len, unsigned char color)
 x16_gfx4h_vline:
         jsr     span_marshal
-        lda     __rc6                   ; color
+        lda     mos8(__rc6)             ; color
         jmp     gfx4h_vline
 
 ; x, y and one more 16-bit argument into P0..P5
 span_marshal:
-        sta     X16_P0                  ; x lo
-        stx     X16_P1                  ; x hi
-        lda     __rc2
-        sta     X16_P2                  ; y lo
-        lda     __rc3
-        sta     X16_P3                  ; y hi
-        lda     __rc4
-        sta     X16_P4                  ; len/w lo
-        lda     __rc5
-        sta     X16_P5                  ; len/w hi
+        sta     mos8(X16_P0)            ; x lo
+        stx     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; y lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; y hi
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; len/w lo
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; len/w hi
         rts
 
 ; void x16_gfx4h_rect(unsigned int x, unsigned int y,
@@ -193,13 +193,13 @@ span_marshal:
 ; color -> __rc8.
 x16_gfx4h_rect:
         jsr     quad_marshal
-        lda     __rc8                   ; color
+        lda     mos8(__rc8)             ; color
         jmp     gfx4h_rect
 
 ; void x16_gfx4h_frame(... same arguments ...)
 x16_gfx4h_frame:
         jsr     quad_marshal
-        lda     __rc8                   ; color
+        lda     mos8(__rc8)             ; color
         jmp     gfx4h_frame
 
 ; void x16_gfx4h_line(unsigned int x0, unsigned int y0,
@@ -207,16 +207,16 @@ x16_gfx4h_frame:
 ;   the same four words land in the same four parameter slots
 x16_gfx4h_line:
         jsr     quad_marshal
-        lda     __rc8                   ; color
+        lda     mos8(__rc8)             ; color
         jmp     gfx4h_line
 
 ; four 16-bit arguments into P0..P7
 quad_marshal:
         jsr     span_marshal
-        lda     __rc6
-        sta     X16_P6                  ; h/y1 lo
-        lda     __rc7
-        sta     X16_P7                  ; h/y1 hi
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; h/y1 lo
+        lda     mos8(__rc7)
+        sta     mos8(X16_P7)            ; h/y1 hi
         rts
 
 ; void x16_gfx4h_pattern_set(const unsigned char *pattern,
@@ -224,10 +224,10 @@ quad_marshal:
 ;   pattern is a pointer -> __rc2/__rc3; bg and fg take A and X. The
 ;   body wants A/X = pattern, P4 = bg, P5 = fg.
 x16_gfx4h_pattern_set:
-        sta     X16_P4                  ; bg
-        stx     X16_P5                  ; fg
-        lda     __rc2
-        ldx     __rc3                   ; A/X = pattern
+        sta     mos8(X16_P4)            ; bg
+        stx     mos8(X16_P5)            ; fg
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)             ; A/X = pattern
         jmp     gfx4h_pattern_set
 
 ; void x16_gfx4h_pattern_rect(unsigned int x, unsigned int y,
@@ -243,7 +243,7 @@ x16_gfx4h_pattern_rect:
 ; src -> the __rc6/__rc7 pair, op -> __rc8.
 x16_gfx4h_blit:
         jsr     blit_marshal
-        lda     __rc8                   ; op
+        lda     mos8(__rc8)             ; op
         jmp     gfx4h_blit
 
 ; void x16_gfx4h_blitm(unsigned int x, unsigned int y,
@@ -256,20 +256,20 @@ x16_gfx4h_blitm:
 
 ; x, y, two bytes, and a pointer into P0..P7
 blit_marshal:
-        sta     X16_P0                  ; x lo
-        stx     X16_P1                  ; x hi
-        lda     __rc2
-        sta     X16_P2                  ; y lo
-        lda     __rc3
-        sta     X16_P3                  ; y hi
-        lda     __rc4
-        sta     X16_P4                  ; w
-        lda     __rc5
-        sta     X16_P5                  ; h
-        lda     __rc6
-        sta     X16_P6                  ; src lo
-        lda     __rc7
-        sta     X16_P7                  ; src hi
+        sta     mos8(X16_P0)            ; x lo
+        stx     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; y lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; y hi
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; w
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; h
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; src lo
+        lda     mos8(__rc7)
+        sta     mos8(X16_P7)            ; src hi
         rts
 
 ; void x16_gfx4h_copy(unsigned long src, unsigned long dst,
@@ -280,19 +280,19 @@ blit_marshal:
 ; so each long's top byte is ignored. The body wants P0/P1/P2 = source,
 ; P3/P4/P5 = destination, A/X/Y = length.
 x16_gfx4h_copy:
-        sta     X16_P0                  ; src lo
-        stx     X16_P1                  ; src mid
-        lda     __rc2
-        sta     X16_P2                  ; src hi (bits 16-19)
-        lda     __rc4
-        sta     X16_P3                  ; dst lo
-        lda     __rc5
-        sta     X16_P4                  ; dst mid
-        lda     __rc6
-        sta     X16_P5                  ; dst hi
-        lda     __rc8                   ; A/X/Y = len lo/mid/hi
-        ldx     __rc9
-        ldy     __rc10
+        sta     mos8(X16_P0)            ; src lo
+        stx     mos8(X16_P1)            ; src mid
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; src hi (bits 16-19)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P3)            ; dst lo
+        lda     mos8(__rc5)
+        sta     mos8(X16_P4)            ; dst mid
+        lda     mos8(__rc6)
+        sta     mos8(X16_P5)            ; dst hi
+        lda     mos8(__rc8)             ; A/X/Y = len lo/mid/hi
+        ldx     mos8(__rc9)
+        ldy     mos8(__rc10)
         jmp     gfx4h_copy
 
 ; void x16_gfx4h_copy_wait(void)
@@ -472,7 +472,7 @@ gfx4h_pset:
     jsr gfx4h_setptr
     lda VERA2_DATA
     sta g4h_t
-    lda X16_P0
+    lda mos8(X16_P0)
     and #1
     bne .Lgfx4h_pset_odd
     lda g4h_c
@@ -501,7 +501,7 @@ gfx4h_read:
     jsr gfx4h_setptr
     lda VERA2_DATA
     sta g4h_t
-    lda X16_P0
+    lda mos8(X16_P0)
     and #1
     beq .Lgfx4h_read_even
     lda g4h_t
@@ -533,9 +533,9 @@ gfx4h_hline:
     tax
     lda bitmap4h_colbyte,x
     sta g4h_t2                  ; the both-nibbles fill byte
-    lda X16_P4
+    lda mos8(X16_P4)
     sta g4h_n
-    lda X16_P5
+    lda mos8(X16_P5)
     sta g4h_n+1
     ora g4h_n
     bne 1f
@@ -549,9 +549,9 @@ gfx4h_hline:
     and #$F0
     ora g4h_c
     sta VERA2_DATA
-    inc X16_P0
+    inc mos8(X16_P0)
     bne 1f
-    inc X16_P1
+    inc mos8(X16_P1)
 1:	lda g4h_n
     bne 1f
     dec g4h_n+1
@@ -604,14 +604,14 @@ gfx4h_hline:
 gfx4h_vline:
     and #$0F
     sta g4h_c
-    lda X16_P4
+    lda mos8(X16_P4)
     sta g4h_n
-    lda X16_P5
+    lda mos8(X16_P5)
     sta g4h_n+1
     ora g4h_n
     beq .Lgfx4h_vline_done
     jsr bitmap4h_addr_calc              ; g4h_a0..a2 = the column's first byte
-    lda X16_P0
+    lda mos8(X16_P0)
     and #1
     bne .Lgfx4h_vline_odd
     lda #$0F                    ; even x: keep low nibble, or in col<<4
@@ -668,26 +668,26 @@ gfx4h_vline:
 gfx4h_rect:
     and #$0F
     sta g4h_rc
-    lda X16_P0
+    lda mos8(X16_P0)
     sta g4h_rx
-    lda X16_P1
+    lda mos8(X16_P1)
     sta g4h_rx+1
 .Lgfx4h_rect_row:
-    lda X16_P6
-    ora X16_P7
+    lda mos8(X16_P6)
+    ora mos8(X16_P7)
     beq .Lgfx4h_rect_done
     lda g4h_rc
     jsr gfx4h_hline
     lda g4h_rx                  ; hline may nudge x for alignment: restore
-    sta X16_P0
+    sta mos8(X16_P0)
     lda g4h_rx+1
-    sta X16_P1
-    inc X16_P2
+    sta mos8(X16_P1)
+    inc mos8(X16_P2)
     bne 1f
-    inc X16_P3
+    inc mos8(X16_P3)
 1:	lda X16_P6
     bne 1f
-    dec X16_P7
+    dec mos8(X16_P7)
 1:	dec X16_P6
     bra .Lgfx4h_rect_row
 .Lgfx4h_rect_done:
@@ -698,7 +698,7 @@ gfx4h_frame:
     sta g4h_rc
     ldx #7
 .Lgfx4h_frame_take:
-    lda X16_P0,x
+    lda mos8(X16_P0),x
     sta g4h_fx,x
     dex
     bpl .Lgfx4h_frame_take
@@ -711,13 +711,13 @@ gfx4h_frame:
     clc
     lda g4h_fy
     adc g4h_rh
-    sta X16_P2
+    sta mos8(X16_P2)
     lda g4h_fy+1
     adc g4h_rh+1
-    sta X16_P3
-    lda X16_P2
+    sta mos8(X16_P3)
+    lda mos8(X16_P2)
     bne 1f
-    dec X16_P3
+    dec mos8(X16_P3)
 1:	dec X16_P2
     lda g4h_rc
     jsr gfx4h_hline
@@ -730,13 +730,13 @@ gfx4h_frame:
     clc
     lda g4h_fx
     adc g4h_rw
-    sta X16_P0
+    sta mos8(X16_P0)
     lda g4h_fx+1
     adc g4h_rw+1
-    sta X16_P1
-    lda X16_P0
+    sta mos8(X16_P1)
+    lda mos8(X16_P0)
     bne 1f
-    dec X16_P1
+    dec mos8(X16_P1)
 1:	dec X16_P0
     lda g4h_rc
     jmp gfx4h_vline
@@ -745,7 +745,7 @@ bitmap4h_frame_span:
     ldx #5
 .Lbitmap4h_frame_span_s:
     lda g4h_fx,x
-    sta X16_P0,x
+    sta mos8(X16_P0),x
     dex
     bpl .Lbitmap4h_frame_span_s
     rts
@@ -754,13 +754,13 @@ bitmap4h_frame_col:
     ldx #3
 .Lbitmap4h_frame_col_c:
     lda g4h_fx,x
-    sta X16_P0,x
+    sta mos8(X16_P0),x
     dex
     bpl .Lbitmap4h_frame_col_c
     lda g4h_rh
-    sta X16_P4
+    sta mos8(X16_P4)
     lda g4h_rh+1
-    sta X16_P5
+    sta mos8(X16_P5)
     rts
 
 ; ---------------------------------------------------------------------
@@ -772,7 +772,7 @@ gfx4h_line:
     sta g4h_lc
     ldx #7
 .Lgfx4h_line_take:
-    lda X16_P0,x
+    lda mos8(X16_P0),x
     sta g4h_lx0,x
     dex
     bpl .Lgfx4h_line_take
@@ -920,13 +920,13 @@ gfx4h_line:
 bitmap4h_plot:
     sta g4h_c
     lda g4h_lx0
-    sta X16_P0
+    sta mos8(X16_P0)
     lda g4h_lx0+1
-    sta X16_P1
+    sta mos8(X16_P1)
     lda g4h_ly0
-    sta X16_P2
+    sta mos8(X16_P2)
     lda g4h_ly0+1
-    sta X16_P3
+    sta mos8(X16_P3)
     lda g4h_c
     jmp gfx4h_pset
 
@@ -934,41 +934,41 @@ bitmap4h_plot:
 ; gfx4h_pattern_set / gfx4h_pattern_rect
 ; ---------------------------------------------------------------------
 gfx4h_pattern_set:
-    sta X16_T0
-    stx X16_T0+1
+    sta mos8(X16_T0)
+    stx mos8(X16_T0+1)
     ldy #7
 .Lgfx4h_pattern_set_copy:
     lda (X16_T0),y
     sta gp4h_pat,y
     dey
     bpl .Lgfx4h_pattern_set_copy
-    lda X16_P4
+    lda mos8(X16_P4)
     and #$0F
     sta gp4h_bg
-    lda X16_P5
+    lda mos8(X16_P5)
     and #$0F
     sta gp4h_fg
     rts
 
 gfx4h_pattern_rect:
-    lda X16_P4
-    ora X16_P5
-    ora X16_P6
-    ora X16_P7
+    lda mos8(X16_P4)
+    ora mos8(X16_P5)
+    ora mos8(X16_P6)
+    ora mos8(X16_P7)
     bne 1f
     jmp .Lgfx4h_pattern_rect_done
 1:
-    lda X16_P2
+    lda mos8(X16_P2)
     sta gp4h_by
-    lda X16_P3
+    lda mos8(X16_P3)
     sta gp4h_by+1
-    lda X16_P0
+    lda mos8(X16_P0)
     sta gp4h_bx
-    lda X16_P1
+    lda mos8(X16_P1)
     sta gp4h_bx+1
 .Lgfx4h_pattern_rect_row:
-    lda X16_P6
-    ora X16_P7
+    lda mos8(X16_P6)
+    ora mos8(X16_P7)
     bne 1f
     jmp .Lgfx4h_pattern_rect_done
 1:
@@ -976,11 +976,11 @@ gfx4h_pattern_rect:
     sta gp4h_x
     lda gp4h_bx+1
     sta gp4h_x+1
-    lda X16_P4
+    lda mos8(X16_P4)
     sta gp4h_n
-    lda X16_P5
+    lda mos8(X16_P5)
     sta gp4h_n+1
-    lda X16_P2
+    lda mos8(X16_P2)
     and #7
     tay
     lda gp4h_pat,y
@@ -998,13 +998,13 @@ gfx4h_pattern_rect:
 .Lgfx4h_pattern_rect_plot:
     sta gp4h_c
     lda gp4h_x
-    sta X16_P0
+    sta mos8(X16_P0)
     lda gp4h_x+1
-    sta X16_P1
+    sta mos8(X16_P1)
     lda gp4h_by
-    sta X16_P2
+    sta mos8(X16_P2)
     lda gp4h_by+1
-    sta X16_P3
+    sta mos8(X16_P3)
     lda gp4h_c
     jsr gfx4h_pset
     lda gp4h_bits
@@ -1024,12 +1024,12 @@ gfx4h_pattern_rect:
     bne 1f
     inc gp4h_by+1
 1:	lda gp4h_by
-    sta X16_P2
+    sta mos8(X16_P2)
     lda gp4h_by+1
-    sta X16_P3
-    lda X16_P6
+    sta mos8(X16_P3)
+    lda mos8(X16_P6)
     bne 1f
-    dec X16_P7
+    dec mos8(X16_P7)
 1:	dec X16_P6
     jmp .Lgfx4h_pattern_rect_row
 .Lgfx4h_pattern_rect_done:
@@ -1049,17 +1049,17 @@ gfx4h_blitm:
     lda #$80
     sta g4h_op
 bitmap4h_blit_common:
-    lda X16_P6
+    lda mos8(X16_P6)
     sta g4h_src
-    lda X16_P7
+    lda mos8(X16_P7)
     sta g4h_src+1
-    lda X16_P4
+    lda mos8(X16_P4)
     clc
     adc #1
     lsr
     sta g4h_rowbytes
 .Lbitmap4h_blit_common_row:
-    lda X16_P5
+    lda mos8(X16_P5)
     bne 1f
     jmp .Lbitmap4h_blit_common_done
 1:
@@ -1068,7 +1068,7 @@ bitmap4h_blit_common:
     lda g4h_src+1
     sta X16_PTR3+1
     stz g4h_phase
-    lda X16_P4
+    lda mos8(X16_P4)
     sta g4h_w
 .Lbitmap4h_blit_common_col:
     lda g4h_w
@@ -1116,9 +1116,9 @@ bitmap4h_blit_common:
 .Lbitmap4h_blit_common_store:
     jsr gfx4h_pset
 .Lbitmap4h_blit_common_advance:
-    inc X16_P0
+    inc mos8(X16_P0)
     bne 1f
-    inc X16_P1
+    inc mos8(X16_P1)
 1:	lda g4h_phase
     eor #1
     sta g4h_phase
@@ -1130,11 +1130,11 @@ bitmap4h_blit_common:
     jmp .Lbitmap4h_blit_common_col
 .Lbitmap4h_blit_common_next_row:
     sec
-    lda X16_P0
-    sbc X16_P4
-    sta X16_P0
+    lda mos8(X16_P0)
+    sbc mos8(X16_P4)
+    sta mos8(X16_P0)
     bcs 1f
-    dec X16_P1
+    dec mos8(X16_P1)
 1:	clc
     lda g4h_src
     adc g4h_rowbytes
@@ -1142,9 +1142,9 @@ bitmap4h_blit_common:
     lda g4h_src+1
     adc #0
     sta g4h_src+1
-    inc X16_P2
+    inc mos8(X16_P2)
     bne 1f
-    inc X16_P3
+    inc mos8(X16_P3)
 1:	dec X16_P5
     jmp .Lbitmap4h_blit_common_row
 .Lbitmap4h_blit_common_done:
@@ -1158,18 +1158,18 @@ gfx4h_copy:
     sta VERA2_BLIT_LEN_L
     stx VERA2_BLIT_LEN_M
     sty VERA2_BLIT_LEN_H
-    lda X16_P0
+    lda mos8(X16_P0)
     sta VERA2_ADDR_L
-    lda X16_P1
+    lda mos8(X16_P1)
     sta VERA2_ADDR_M
-    lda X16_P2
+    lda mos8(X16_P2)
     and #$0F
     sta VERA2_ADDR_H            ; source pointer, stride +1
-    lda X16_P3
+    lda mos8(X16_P3)
     sta VERA2_BLIT_DST_L
-    lda X16_P4
+    lda mos8(X16_P4)
     sta VERA2_BLIT_DST_M
-    lda X16_P5
+    lda mos8(X16_P5)
     and #$0F
     sta VERA2_BLIT_DST_H
     lda #1
@@ -1184,19 +1184,19 @@ gfx4h_copy_wait:
 ; private helpers
 ; ---------------------------------------------------------------------
 bitmap4h_onscreen:
-    lda X16_P1
+    lda mos8(X16_P1)
     cmp #>GFX4H_WIDTH
     bcc .Lbitmap4h_onscreen_xok
     bne .Lbitmap4h_onscreen_bad
-    lda X16_P0
+    lda mos8(X16_P0)
     cmp #<GFX4H_WIDTH
     bcs .Lbitmap4h_onscreen_bad
 .Lbitmap4h_onscreen_xok:
-    lda X16_P3
+    lda mos8(X16_P3)
     cmp #>GFX4H_HEIGHT
     bcc .Lbitmap4h_onscreen_ok
     bne .Lbitmap4h_onscreen_bad
-    lda X16_P2
+    lda mos8(X16_P2)
     cmp #<GFX4H_HEIGHT
     bcs .Lbitmap4h_onscreen_bad
 .Lbitmap4h_onscreen_ok:
@@ -1207,22 +1207,22 @@ bitmap4h_onscreen:
     rts
 
 bitmap4h_addr_calc:
-    lda X16_P2                  ; y*320 = y*256 + y*64, in ~25 cycles:
+    lda mos8(X16_P2)            ; y*320 = y*256 + y*64, in ~25 cycles:
     ror                         ; lo = (y & 3) << 6
     ror                         ; md = y + (y >> 2)
     ror                         ; hi = carry out of the md add
     and #$C0
     sta g4h_a0
-    lda X16_P2
+    lda mos8(X16_P2)
     lsr
     lsr
     clc
-    adc X16_P2
+    adc mos8(X16_P2)
     sta g4h_a1
     lda #0
     rol
     sta g4h_a2
-    lda X16_P3                  ; y >= 256: + 256*320 = $14000
+    lda mos8(X16_P3)            ; y >= 256: + 256*320 = $14000
     beq .Lbitmap4h_addr_calc_addx
     clc
     lda g4h_a1
@@ -1232,16 +1232,16 @@ bitmap4h_addr_calc:
     inc g4h_a2
 1:	inc g4h_a2
 .Lbitmap4h_addr_calc_addx:
-    lda X16_P1                  ; + x >> 1
+    lda mos8(X16_P1)            ; + x >> 1
     lsr
-    sta X16_T1
-    lda X16_P0
+    sta mos8(X16_T1)
+    lda mos8(X16_P0)
     ror
     clc
     adc g4h_a0
     sta g4h_a0
     lda g4h_a1
-    adc X16_T1
+    adc mos8(X16_T1)
     sta g4h_a1
     bcc 1f
     inc g4h_a2

@@ -62,10 +62,10 @@ x16_joy_scan:
 ; return, plus presence in Y, so the shim's only work is unpacking Y.
 x16_joy_get:
         pha                             ; joy
-        lda     __rc2
-        sta     X16_T0                  ; present*
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)            ; present*
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
         pla                             ; A = joy
 
         jsr     JOYSTICK_GET            ; A = byte0, X = byte1, Y = $00/$FF
@@ -117,27 +117,27 @@ mouse_hide:
 ; through X16_P0..P3 -- the KERNAL writes them itself -- so the
 ; destinations must live elsewhere: T0/T1 and T2/T3.
 x16_mouse_get:
-        lda     __rc2
-        sta     X16_T0                  ; x*
-        lda     __rc3
-        sta     X16_T1
-        lda     __rc4
-        sta     X16_T2                  ; y*
-        lda     __rc5
-        sta     X16_T3
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)            ; x*
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_T2)            ; y*
+        lda     mos8(__rc5)
+        sta     mos8(X16_T3)
 
         jsr     mouse_get               ; X16_P0..P3, A = buttons
         pha
 
         ldy     #0
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     (X16_T0),y
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     (X16_T2),y
         iny
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     (X16_T0),y
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     (X16_T2),y
 
         pla                             ; a char return is A alone

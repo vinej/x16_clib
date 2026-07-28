@@ -44,12 +44,12 @@
 ; ---------------------------------------------------------------------
 x16_str_left:
         tay                             ; Y = length
-        lda     __rc2
-        sta     X16_P0                  ; target
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; A/X = source
-        ldx     __rc5
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; target
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; A/X = source
+        ldx     mos8(__rc5)
         jmp     str_left
 
 ; ---------------------------------------------------------------------
@@ -59,12 +59,12 @@ x16_str_left:
 ; ---------------------------------------------------------------------
 x16_str_right:
         tay                             ; Y = length
-        lda     __rc2
-        sta     X16_P0                  ; target
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; A/X = source
-        ldx     __rc5
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; target
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; A/X = source
+        ldx     mos8(__rc5)
         jmp     str_right
 
 ; ---------------------------------------------------------------------
@@ -76,15 +76,15 @@ x16_str_right:
 ; P0/P1 = target, P2 = start, Y = length.
 ; ---------------------------------------------------------------------
 x16_str_slice:
-        sta     X16_P2                  ; start
+        sta     mos8(X16_P2)            ; start
         txa
         tay                             ; Y = length
-        lda     __rc2
-        sta     X16_P0                  ; target
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; A/X = source
-        ldx     __rc5
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; target
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; A/X = source
+        ldx     mos8(__rc5)
         jmp     str_slice
 
 ; ---------------------------------------------------------------------
@@ -93,22 +93,22 @@ x16_str_slice:
 ; s -> __rc2/__rc3; the asm wants it in A/X and answers in Y.
 ; ---------------------------------------------------------------------
 x16_str_ltrim:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_ltrim
         tya                             ; A = the new length
         rts
 
 x16_str_rtrim:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_rtrim
         tya
         rts
 
 x16_str_trim:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_trim
         tya
         rts
@@ -123,8 +123,8 @@ x16_str_trim:
 ;   in: A = source low, X = source high, X16_P0/P1 = target, Y = length
 ; ---------------------------------------------------------------------
 str_left:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     lda #0
     sta (X16_P0),y              ; terminate the target at [length]
     cpy #0
@@ -143,9 +143,9 @@ str_left:
 ;   in: A = source low, X = source high, X16_P0/P1 = target, Y = length
 ; ---------------------------------------------------------------------
 str_right:
-    sty X16_T2                  ; length
-    sta X16_T0
-    stx X16_T1
+    sty mos8(X16_T2)            ; length
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0                      ; measure the source
 .Lstr_right_len:
     lda (X16_T0),y
@@ -155,14 +155,14 @@ str_right:
 .Lstr_right_gotlen:
     tya                         ; source += (total - length)
     sec
-    sbc X16_T2
+    sbc mos8(X16_T2)
     clc
-    adc X16_T0
-    sta X16_T0
+    adc mos8(X16_T0)
+    sta mos8(X16_T0)
     bcc .Lstr_right_nc
-    inc X16_T1
+    inc mos8(X16_T1)
 .Lstr_right_nc:
-    ldy X16_T2                  ; then it is just a left-copy of `length`
+    ldy mos8(X16_T2)            ; then it is just a left-copy of `length`
     lda #0
     sta (X16_P0),y
     cpy #0
@@ -182,14 +182,14 @@ str_right:
 ;       X16_P2 = start, Y = length
 ; ---------------------------------------------------------------------
 str_slice:
-    sta X16_T0
-    stx X16_T1
-    lda X16_T0                  ; source += start
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
+    lda mos8(X16_T0)            ; source += start
     clc
-    adc X16_P2
-    sta X16_T0
+    adc mos8(X16_P2)
+    sta mos8(X16_T0)
     bcc .Lstr_slice_nc
-    inc X16_T1
+    inc mos8(X16_T1)
 .Lstr_slice_nc:
     lda #0
     sta (X16_P0),y              ; terminate the target at [length]
@@ -211,8 +211,8 @@ str_slice:
 ; the same set as str_isspace.
 ; ---------------------------------------------------------------------
 str_rtrim:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_rtrim_len:
     lda (X16_T0),y
@@ -237,8 +237,8 @@ str_rtrim:
 ;   in: A = low, X = high.  out: Y = the new length
 ; ---------------------------------------------------------------------
 str_ltrim:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_ltrim_skip:
     lda (X16_T0),y
@@ -252,11 +252,11 @@ str_ltrim:
     beq .Lstr_ltrim_nolead                 ; nothing to strip
     tya                         ; T2/T3 = source = string + first-kept index
     clc
-    adc X16_T0
-    sta X16_T2
-    lda X16_T1
+    adc mos8(X16_T0)
+    sta mos8(X16_T2)
+    lda mos8(X16_T1)
     adc #0
-    sta X16_T3
+    sta mos8(X16_T3)
     ldy #0
 .Lstr_ltrim_shift:
     lda (X16_T2),y
@@ -286,11 +286,11 @@ str_ltrim:
 ;   in: A = low, X = high.  out: Y = the new length
 ; ---------------------------------------------------------------------
 str_trim:
-    sta X16_T6
-    stx X16_T7
+    sta mos8(X16_T6)
+    stx mos8(X16_T7)
     jsr str_rtrim
-    lda X16_T6
-    ldx X16_T7
+    lda mos8(X16_T6)
+    ldx mos8(X16_T7)
     jmp str_ltrim
 
 ; whitespace test: A = char -> carry set if whitespace. Preserves A, X, Y.

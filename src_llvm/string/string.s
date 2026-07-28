@@ -46,8 +46,8 @@
 ; s -> __rc2/__rc3. The asm wants it in A/X.
 ; ---------------------------------------------------------------------
 x16_str_length:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_length
         tya                             ; A = the length
         rts
@@ -59,12 +59,12 @@ x16_str_length:
 ; in A/X and the target in X16_P0/P1.
 ; ---------------------------------------------------------------------
 x16_str_copy:
-        lda     __rc2
-        sta     X16_P0                  ; target
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; A/X = source
-        ldx     __rc5
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; target
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; A/X = source
+        ldx     mos8(__rc5)
         jsr     str_copy
         tya                             ; A = length copied
         rts
@@ -79,12 +79,12 @@ x16_str_copy:
 ; ---------------------------------------------------------------------
 x16_str_ncopy:
         tay                             ; Y = maxlength
-        lda     __rc2
-        sta     X16_P0                  ; target
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; A/X = source
-        ldx     __rc5
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; target
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; A/X = source
+        ldx     mos8(__rc5)
         jsr     str_ncopy
         tya                             ; A = target length
         rts
@@ -96,12 +96,12 @@ x16_str_ncopy:
 ; target, P0/P1 = suffix.
 ; ---------------------------------------------------------------------
 x16_str_append:
-        lda     __rc4
-        sta     X16_P0                  ; suffix
-        lda     __rc5
-        sta     X16_P1
-        lda     __rc2                   ; A/X = target
-        ldx     __rc3
+        lda     mos8(__rc4)
+        sta     mos8(X16_P0)            ; suffix
+        lda     mos8(__rc5)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc2)             ; A/X = target
+        ldx     mos8(__rc3)
         jmp     str_append              ; A = resulting length
 
 ; ---------------------------------------------------------------------
@@ -114,12 +114,12 @@ x16_str_append:
 ; ---------------------------------------------------------------------
 x16_str_nappend:
         tay                             ; Y = maxlength
-        lda     __rc4
-        sta     X16_P0                  ; suffix
-        lda     __rc5
-        sta     X16_P1
-        lda     __rc2                   ; A/X = target
-        ldx     __rc3
+        lda     mos8(__rc4)
+        sta     mos8(X16_P0)            ; suffix
+        lda     mos8(__rc5)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc2)             ; A/X = target
+        ldx     mos8(__rc3)
         jmp     str_nappend             ; A = resulting length
 
 ; ---------------------------------------------------------------------
@@ -129,12 +129,12 @@ x16_str_nappend:
 ; s1 -> __rc2/__rc3, s2 -> __rc4/__rc5.
 ; ---------------------------------------------------------------------
 x16_str_compare:
-        lda     __rc4
-        sta     X16_P0                  ; s2
-        lda     __rc5
-        sta     X16_P1
-        lda     __rc2                   ; A/X = s1
-        ldx     __rc3
+        lda     mos8(__rc4)
+        sta     mos8(X16_P0)            ; s2
+        lda     mos8(__rc5)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc2)             ; A/X = s1
+        ldx     mos8(__rc3)
         jmp     str_compare             ; A = $FF / 0 / 1
 
 ; ---------------------------------------------------------------------
@@ -142,8 +142,8 @@ x16_str_compare:
 ; s -> __rc2/__rc3.
 ; ---------------------------------------------------------------------
 x16_str_hash:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jmp     str_hash
 
 ; =====================================================================
@@ -156,8 +156,8 @@ x16_str_hash:
 ; Counts up to the first NUL. A string of 256+ bytes reports 0.
 ; ---------------------------------------------------------------------
 str_length:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_length_loop:
     lda (X16_T0),y
@@ -173,8 +173,8 @@ str_length:
 ;   out: Y = length copied
 ; ---------------------------------------------------------------------
 str_copy:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_copy_loop:
     lda (X16_T0),y
@@ -192,12 +192,12 @@ str_copy:
 ;   out: Y = length of the target string
 ; ---------------------------------------------------------------------
 str_ncopy:
-    sta X16_T0
-    stx X16_T1
-    sty X16_T2                  ; maxlength
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
+    sty mos8(X16_T2)            ; maxlength
     ldy #0
 .Lstr_ncopy_loop:
-    cpy X16_T2
+    cpy mos8(X16_T2)
     beq .Lstr_ncopy_cap                    ; hit the cap
     lda (X16_T0),y
     sta (X16_P0),y
@@ -217,13 +217,13 @@ str_ncopy:
 ; ---------------------------------------------------------------------
 str_append:
     jsr str_length              ; T0/T1 = target, Y = its length
-    sty X16_T2
+    sty mos8(X16_T2)
     tya                         ; T0/T1 += length -> the append point
     clc
-    adc X16_T0
-    sta X16_T0
+    adc mos8(X16_T0)
+    sta mos8(X16_T0)
     bcc .Lstr_append_nc
-    inc X16_T1
+    inc mos8(X16_T1)
 .Lstr_append_nc:
     ldy #0
 .Lstr_append_loop:
@@ -235,7 +235,7 @@ str_append:
 .Lstr_append_done:
     tya                         ; result length = target + suffix
     clc
-    adc X16_T2
+    adc mos8(X16_T2)
     rts
 
 ; ---------------------------------------------------------------------
@@ -246,25 +246,25 @@ str_append:
 ;        overflow the cap)
 ; ---------------------------------------------------------------------
 str_nappend:
-    sty X16_T3                  ; maxlength
+    sty mos8(X16_T3)            ; maxlength
     jsr str_length              ; T0/T1 = target, Y = its length
-    sty X16_T2                  ; current length
-    cpy X16_T3
+    sty mos8(X16_T2)            ; current length
+    cpy mos8(X16_T3)
     bcs .Lstr_nappend_toosmall               ; length >= max: no room, leave it be
-    lda X16_T3                  ; room = max - length
+    lda mos8(X16_T3)            ; room = max - length
     sec
-    sbc X16_T2
-    sta X16_T3
-    lda X16_T2                  ; T0/T1 += length -> the append point
+    sbc mos8(X16_T2)
+    sta mos8(X16_T3)
+    lda mos8(X16_T2)            ; T0/T1 += length -> the append point
     clc
-    adc X16_T0
-    sta X16_T0
+    adc mos8(X16_T0)
+    sta mos8(X16_T0)
     bcc .Lstr_nappend_nc
-    inc X16_T1
+    inc mos8(X16_T1)
 .Lstr_nappend_nc:
     ldy #0
 .Lstr_nappend_loop:
-    cpy X16_T3                  ; stop at the room limit
+    cpy mos8(X16_T3)            ; stop at the room limit
     beq .Lstr_nappend_cap
     lda (X16_P0),y
     sta (X16_T0),y
@@ -277,10 +277,10 @@ str_nappend:
 .Lstr_nappend_done:
     tya                         ; result length = old length + appended
     clc
-    adc X16_T2
+    adc mos8(X16_T2)
     rts
 .Lstr_nappend_toosmall:
-    lda X16_T2                  ; unchanged length
+    lda mos8(X16_T2)            ; unchanged length
     rts
 
 ; ---------------------------------------------------------------------
@@ -289,8 +289,8 @@ str_nappend:
 ;   out: A = $FF (-1) if string1 < string2, 0 if equal, 1 if greater
 ; ---------------------------------------------------------------------
 str_compare:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_compare_loop:
     lda (X16_T0),y              ; string1 char
@@ -323,20 +323,20 @@ str_compare:
 ;   hash(-1) = 179; hash(i) = rol(hash(i-1)) XOR string[i]
 ; ---------------------------------------------------------------------
 str_hash:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     lda #179
-    sta X16_T2
+    sta mos8(X16_T2)
     ldy #0
     clc
 .Lstr_hash_loop:
     lda (X16_T0),y
     beq .Lstr_hash_done
-    rol X16_T2
-    eor X16_T2
-    sta X16_T2
+    rol mos8(X16_T2)
+    eor mos8(X16_T2)
+    sta mos8(X16_T2)
     iny
     bne .Lstr_hash_loop
 .Lstr_hash_done:
-    lda X16_T2
+    lda mos8(X16_T2)
     rts

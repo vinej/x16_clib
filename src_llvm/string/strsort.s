@@ -36,12 +36,12 @@
 ; array -> __rc2/__rc3 (the pointer), count -> A/X (the integer).
 ; ---------------------------------------------------------------------
 x16_str_sort:
-        sta     X16_P2                  ; count
-        stx     X16_P3
-        lda     __rc2
-        sta     X16_P0                  ; array base
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; count
+        stx     mos8(X16_P3)
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; array base
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         jmp     str_sort
 
 ; =====================================================================
@@ -60,13 +60,13 @@ ss_key:   .word 0               ; the pointer being inserted
 ;   in: X16_P0/P1 = array base, X16_P2/P3 = element count
 ; ---------------------------------------------------------------------
 str_sort:
-    lda X16_P0
+    lda mos8(X16_P0)
     sta ss_base
-    lda X16_P1
+    lda mos8(X16_P1)
     sta ss_base+1
-    lda X16_P2
+    lda mos8(X16_P2)
     sta ss_count
-    lda X16_P3
+    lda mos8(X16_P3)
     sta ss_count+1
 
     lda ss_count+1
@@ -92,9 +92,9 @@ str_sort:
 .Lstr_sort_body:
     ; key = arr[i]
     lda ss_i
-    sta X16_T0
+    sta mos8(X16_T0)
     lda ss_i+1
-    sta X16_T1
+    sta mos8(X16_T1)
     jsr strsort_addr4                 ; P4/P5 = &arr[i]
     ldy #0
     lda (X16_P4),y
@@ -113,15 +113,15 @@ str_sort:
 
 .Lstr_sort_inner:
     lda ss_j                   ; P4/P5 = &arr[j]
-    sta X16_T0
+    sta mos8(X16_T0)
     lda ss_j+1
-    sta X16_T1
+    sta mos8(X16_T1)
     jsr strsort_addr4
     ; str_compare(s1 = *arr[j], s2 = key)  ->  A = -1/0/1
     lda ss_key
-    sta X16_P0
+    sta mos8(X16_P0)
     lda ss_key+1
-    sta X16_P1
+    sta mos8(X16_P1)
     ldy #1
     lda (X16_P4),y
     tax                        ; s1 high
@@ -135,10 +135,10 @@ str_sort:
     lda ss_j
     clc
     adc #1
-    sta X16_T0
+    sta mos8(X16_T0)
     lda ss_j+1
     adc #0
-    sta X16_T1
+    sta mos8(X16_T1)
     jsr strsort_addr6                 ; P6/P7 = &arr[j+1]
     ldy #0
     lda (X16_P4),y
@@ -160,8 +160,8 @@ str_sort:
     jmp .Lstr_sort_inner
 
 .Lstr_sort_place_0:
-    stz X16_T0
-    stz X16_T1
+    stz mos8(X16_T0)
+    stz mos8(X16_T1)
     jsr strsort_addr6                 ; P6/P7 = &arr[0]
     bra .Lstr_sort_store
 
@@ -169,10 +169,10 @@ str_sort:
     lda ss_j
     clc
     adc #1
-    sta X16_T0
+    sta mos8(X16_T0)
     lda ss_j+1
     adc #0
-    sta X16_T1
+    sta mos8(X16_T1)
     jsr strsort_addr6                 ; P6/P7 = &arr[j+1]
 
 .Lstr_sort_store:
@@ -192,32 +192,32 @@ str_sort:
 
 ; X16_T0/T1 = index -> P4/P5 (strsort_addr4) or P6/P7 (strsort_addr6) = base + index*2
 strsort_addr4:
-    lda X16_T0
+    lda mos8(X16_T0)
     asl
-    sta X16_T2
-    lda X16_T1
+    sta mos8(X16_T2)
+    lda mos8(X16_T1)
     rol
-    sta X16_T3
+    sta mos8(X16_T3)
     clc
     lda ss_base
-    adc X16_T2
-    sta X16_P4
+    adc mos8(X16_T2)
+    sta mos8(X16_P4)
     lda ss_base+1
-    adc X16_T3
-    sta X16_P5
+    adc mos8(X16_T3)
+    sta mos8(X16_P5)
     rts
 strsort_addr6:
-    lda X16_T0
+    lda mos8(X16_T0)
     asl
-    sta X16_T2
-    lda X16_T1
+    sta mos8(X16_T2)
+    lda mos8(X16_T1)
     rol
-    sta X16_T3
+    sta mos8(X16_T3)
     clc
     lda ss_base
-    adc X16_T2
-    sta X16_P6
+    adc mos8(X16_T2)
+    sta mos8(X16_P6)
     lda ss_base+1
-    adc X16_T3
-    sta X16_P7
+    adc mos8(X16_T3)
+    sta mos8(X16_P7)
     rts

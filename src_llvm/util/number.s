@@ -60,8 +60,8 @@ x16_u8_to_dec:
         jmp     number_ptr_return
 
 x16_u16_to_dec:
-        sta     X16_P0
-        stx     X16_P1
+        sta     mos8(X16_P0)
+        stx     mos8(X16_P1)
         jsr     u16_to_dec
         jmp     number_ptr_return
 
@@ -70,8 +70,8 @@ x16_s8_to_dec:
         jmp     number_ptr_return
 
 x16_s16_to_dec:
-        sta     X16_P0
-        stx     X16_P1
+        sta     mos8(X16_P0)
+        stx     mos8(X16_P1)
         jsr     s16_to_dec
         jmp     number_ptr_return
 
@@ -80,8 +80,8 @@ x16_u8_to_hex:
         jmp     number_ptr_return
 
 x16_u16_to_hex:
-        sta     X16_P0
-        stx     X16_P1
+        sta     mos8(X16_P0)
+        stx     mos8(X16_P1)
         jsr     u16_to_hex
         jmp     number_ptr_return
 
@@ -90,15 +90,15 @@ x16_u8_to_bin:
         jmp     number_ptr_return
 
 x16_u16_to_bin:
-        sta     X16_P0
-        stx     X16_P1
+        sta     mos8(X16_P0)
+        stx     mos8(X16_P1)
         jsr     u16_to_bin
         jmp     number_ptr_return
 
 ; A = buffer low, X = buffer high -> the __rc2/__rc3 pointer return.
 number_ptr_return:
-        sta     __rc2
-        stx     __rc3
+        sta     mos8(__rc2)
+        stx     mos8(__rc3)
         rts
 
 ; ---------------------------------------------------------------------
@@ -111,21 +111,21 @@ number_ptr_return:
 ; len -> A. value parks in T6/T7: dec_to_u16 only touches P0-P5/T0-T2.
 ; ---------------------------------------------------------------------
 x16_dec_to_u16:
-        sta     X16_P2                  ; len
-        lda     __rc4
-        sta     X16_T6                  ; value
-        lda     __rc5
-        sta     X16_T7
-        lda     __rc2
-        sta     X16_P0                  ; s
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; len
+        lda     mos8(__rc4)
+        sta     mos8(X16_T6)            ; value
+        lda     mos8(__rc5)
+        sta     mos8(X16_T7)
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; s
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         jsr     dec_to_u16
         bcs     .Lx16_dec_to_u16_bad
-        lda     X16_P4
+        lda     mos8(X16_P4)
         sta     (X16_T6)
         ldy     #1
-        lda     X16_P5
+        lda     mos8(X16_P5)
         sta     (X16_T6),y
         lda     #1
         rts
@@ -148,49 +148,49 @@ x16_dec_to_u16:
 ; ---------------------------------------------------------------------
 ; Consumes X16_P0/P1.
 u16_to_dec:
-        stz     X16_T2                  ; have we emitted a significant digit yet?
-        stz     X16_T4                  ; output length
+        stz     mos8(X16_T2)            ; have we emitted a significant digit yet?
+        stz     mos8(X16_T4)            ; output length
 
         ldx     #0                      ; index into the power-of-ten table
 .Lu16_to_dec_digit:
         lda     #$30                    ; '0' (ASCII)
-        sta     X16_T3                  ; digit accumulator
+        sta     mos8(X16_T3)            ; digit accumulator
 .Lu16_to_dec_subtract:
         sec
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sbc     number_pow10_lo,x
-        sta     X16_T0                  ; tentative low byte
-        lda     X16_P1
+        sta     mos8(X16_T0)            ; tentative low byte
+        lda     mos8(X16_P1)
         sbc     number_pow10_hi,x
         bcc     .Lu16_to_dec_next_digit             ; would go negative: this digit is done
-        sta     X16_P1
-        lda     X16_T0
-        sta     X16_P0
-        inc     X16_T3
+        sta     mos8(X16_P1)
+        lda     mos8(X16_T0)
+        sta     mos8(X16_P0)
+        inc     mos8(X16_T3)
         bra     .Lu16_to_dec_subtract
 
 .Lu16_to_dec_next_digit:
-        lda     X16_T3
+        lda     mos8(X16_T3)
         cmp     #$30                    ; '0'
         bne     .Lu16_to_dec_emit                   ; a non-zero digit always prints
-        lda     X16_T2
+        lda     mos8(X16_T2)
         bne     .Lu16_to_dec_emit                   ; already past the leading zeros
         cpx     #4
         beq     .Lu16_to_dec_emit                   ; the units digit always prints
         bra     .Lu16_to_dec_skip
 .Lu16_to_dec_emit:
-        inc     X16_T2
-        ldy     X16_T4
-        lda     X16_T3
+        inc     mos8(X16_T2)
+        ldy     mos8(X16_T4)
+        lda     mos8(X16_T3)
         sta     num_buf,y
         iny
-        sty     X16_T4
+        sty     mos8(X16_T4)
 .Lu16_to_dec_skip:
         inx
         cpx     #5
         bne     .Lu16_to_dec_digit
 
-        ldy     X16_T4
+        ldy     mos8(X16_T4)
         lda     #0
         sta     num_buf,y               ; NUL terminator; Y is now the length
 
@@ -204,16 +204,16 @@ u16_to_dec:
 ;   out: A = buffer low, X = buffer high, Y = 4
 ; ---------------------------------------------------------------------
 u16_to_hex:
-        lda     X16_P1
+        lda     mos8(X16_P1)
         jsr     number_hi_digit
         sta     num_buf
-        lda     X16_P1
+        lda     mos8(X16_P1)
         jsr     number_lo_digit
         sta     num_buf+1
-        lda     X16_P0
+        lda     mos8(X16_P0)
         jsr     number_hi_digit
         sta     num_buf+2
-        lda     X16_P0
+        lda     mos8(X16_P0)
         jsr     number_lo_digit
         sta     num_buf+3
         stz     num_buf+4
@@ -246,49 +246,49 @@ number_letter:
 ;   out: X16_P4/P5 = value, carry set if a non-digit or overflow was found
 ; ---------------------------------------------------------------------
 dec_to_u16:
-        stz     X16_P4
-        stz     X16_P5
+        stz     mos8(X16_P4)
+        stz     mos8(X16_P5)
         ldy     #0
 .Ldec_to_u16_loop:
-        cpy     X16_P2
+        cpy     mos8(X16_P2)
         beq     .Ldec_to_u16_ok
         lda     (X16_P0),y
         sec
         sbc     #$30                    ; '0'
         cmp     #10
         bcs     .Ldec_to_u16_bad
-        sta     X16_T0                  ; the new digit
+        sta     mos8(X16_T0)            ; the new digit
 
         ; value = value * 10 + digit
-        lda     X16_P4
-        sta     X16_T1
-        lda     X16_P5
-        sta     X16_T2                  ; T2:T1 = value
-        asl     X16_P4
-        rol     X16_P5                  ; value * 2
+        lda     mos8(X16_P4)
+        sta     mos8(X16_T1)
+        lda     mos8(X16_P5)
+        sta     mos8(X16_T2)            ; T2:T1 = value
+        asl     mos8(X16_P4)
+        rol     mos8(X16_P5)            ; value * 2
         bcs     .Ldec_to_u16_bad
-        asl     X16_P4
-        rol     X16_P5                  ; value * 4
-        bcs     .Ldec_to_u16_bad
-        clc
-        lda     X16_P4
-        adc     X16_T1
-        sta     X16_P4
-        lda     X16_P5
-        adc     X16_T2
-        bcs     .Ldec_to_u16_bad
-        sta     X16_P5                  ; value * 5
-        asl     X16_P4
-        rol     X16_P5                  ; value * 10
+        asl     mos8(X16_P4)
+        rol     mos8(X16_P5)            ; value * 4
         bcs     .Ldec_to_u16_bad
         clc
-        lda     X16_P4
-        adc     X16_T0
-        sta     X16_P4
-        lda     X16_P5
+        lda     mos8(X16_P4)
+        adc     mos8(X16_T1)
+        sta     mos8(X16_P4)
+        lda     mos8(X16_P5)
+        adc     mos8(X16_T2)
+        bcs     .Ldec_to_u16_bad
+        sta     mos8(X16_P5)            ; value * 5
+        asl     mos8(X16_P4)
+        rol     mos8(X16_P5)            ; value * 10
+        bcs     .Ldec_to_u16_bad
+        clc
+        lda     mos8(X16_P4)
+        adc     mos8(X16_T0)
+        sta     mos8(X16_P4)
+        lda     mos8(X16_P5)
         adc     #0
         bcs     .Ldec_to_u16_bad
-        sta     X16_P5
+        sta     mos8(X16_P5)
 
         iny
         bra     .Ldec_to_u16_loop
@@ -304,8 +304,8 @@ dec_to_u16:
 ;   in:  A = value      out: A = buf low, X = buf high, Y = length
 ; ---------------------------------------------------------------------
 u8_to_dec:
-        sta     X16_P0
-        stz     X16_P1
+        sta     mos8(X16_P0)
+        stz     mos8(X16_P1)
         jmp     u16_to_dec
 
 ; ---------------------------------------------------------------------
@@ -330,10 +330,10 @@ u8_to_hex:
 ;   in:  A = value      out: A = buf low, X = buf high, Y = 8
 ; ---------------------------------------------------------------------
 u8_to_bin:
-        sta     X16_T0
+        sta     mos8(X16_T0)
         ldy     #0
 .Lu8_to_bin_loop:
-        asl     X16_T0                  ; MSB -> carry
+        asl     mos8(X16_T0)            ; MSB -> carry
         lda     #$30                    ; '0'
         adc     #0
         sta     num_buf,y
@@ -354,8 +354,8 @@ u8_to_bin:
 u16_to_bin:
         ldy     #0
 .Lu16_to_bin_loop:
-        asl     X16_P0
-        rol     X16_P1                  ; MSB -> carry
+        asl     mos8(X16_P0)
+        rol     mos8(X16_P1)            ; MSB -> carry
         lda     #$30                    ; '0'
         adc     #0
         sta     num_buf,y
@@ -374,18 +374,18 @@ u16_to_bin:
 ;   in:  X16_P0/P1 = value (consumed)   out: A/X = buf, Y = length
 ; ---------------------------------------------------------------------
 s16_to_dec:
-        lda     X16_P1
+        lda     mos8(X16_P1)
         bpl     .Ls16_to_dec_pos
         sec                             ; value = -value
         lda     #0
-        sbc     X16_P0
-        sta     X16_P0
+        sbc     mos8(X16_P0)
+        sta     mos8(X16_P0)
         lda     #0
-        sbc     X16_P1
-        sta     X16_P1
+        sbc     mos8(X16_P1)
+        sta     mos8(X16_P1)
         jsr     u16_to_dec              ; format the magnitude
-        sty     X16_T5                  ; length of the digits
-        ldx     X16_T5
+        sty     mos8(X16_T5)            ; length of the digits
+        ldx     mos8(X16_T5)
 .Ls16_to_dec_shift:
         lda     num_buf,x               ; make room for the sign: shift right by one
         sta     num_buf+1,x
@@ -395,7 +395,7 @@ s16_to_dec:
         sta     num_buf
         lda     #<num_buf
         ldx     #>num_buf
-        ldy     X16_T5
+        ldy     mos8(X16_T5)
         iny
         rts
 .Ls16_to_dec_pos:
@@ -406,12 +406,12 @@ s16_to_dec:
 ;   in:  A = value      out: A/X = buf, Y = length
 ; ---------------------------------------------------------------------
 s8_to_dec:
-        sta     X16_P0
-        stz     X16_P1
-        bit     X16_P0
+        sta     mos8(X16_P0)
+        stz     mos8(X16_P1)
+        bit     mos8(X16_P0)
         bpl     .Ls8_to_dec_go
         lda     #$FF                    ; sign-extend into the high byte
-        sta     X16_P1
+        sta     mos8(X16_P1)
 .Ls8_to_dec_go:
         jmp     s16_to_dec
 

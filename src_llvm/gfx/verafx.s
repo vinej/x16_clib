@@ -84,21 +84,21 @@ fx_off:
 ; a -> A/X, b -> __rc2/__rc3. A 32-bit result goes back in A, X, __rc2,
 ; __rc3 -- the same places it would have arrived.
 x16_fx_mult:
-        sta     X16_P0                  ; a lo
-        stx     X16_P1                  ; a hi
-        lda     __rc2
-        sta     X16_P2                  ; b lo
-        lda     __rc3
-        sta     X16_P3                  ; b hi
+        sta     mos8(X16_P0)            ; a lo
+        stx     mos8(X16_P1)            ; a hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; b lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; b hi
 
         jsr     fx_mult
 
-        lda     X16_P6
-        sta     __rc2                   ; product bits 16-23
-        lda     X16_P7
-        sta     __rc3                   ; product bits 24-31
-        lda     X16_P4                  ; bits 0-7
-        ldx     X16_P5                  ; bits 8-15
+        lda     mos8(X16_P6)
+        sta     mos8(__rc2)             ; product bits 16-23
+        lda     mos8(X16_P7)
+        sta     mos8(__rc3)             ; product bits 24-31
+        lda     mos8(X16_P4)            ; bits 0-7
+        ldx     mos8(X16_P5)            ; bits 8-15
         rts
 
 ; ---------------------------------------------------------------------
@@ -112,15 +112,15 @@ x16_fx_mult:
 ; the bytes simply run A, X, __rc2, __rc3, ...
 x16_fx_fill:
         pha                             ; value
-        stx     X16_P3                  ; count lo
-        lda     __rc2
-        sta     X16_P4                  ; count hi
-        lda     __rc3
-        sta     X16_P0                  ; addr bits 0-7
-        lda     __rc4
-        sta     X16_P1                  ; addr bits 8-15
-        lda     __rc5
-        sta     X16_P2                  ; addr bit 16
+        stx     mos8(X16_P3)            ; count lo
+        lda     mos8(__rc2)
+        sta     mos8(X16_P4)            ; count hi
+        lda     mos8(__rc3)
+        sta     mos8(X16_P0)            ; addr bits 0-7
+        lda     mos8(__rc4)
+        sta     mos8(X16_P1)            ; addr bits 8-15
+        lda     mos8(__rc5)
+        sta     mos8(X16_P2)            ; addr bit 16
         pla                             ; A = value
         jmp     fx_fill
 
@@ -129,14 +129,14 @@ x16_fx_fill:
 ; ---------------------------------------------------------------------
 ; count -> A/X, addr -> __rc2..__rc5.
 x16_fx_clear:
-        sta     X16_P3                  ; count lo
-        stx     X16_P4                  ; count hi
-        lda     __rc2
-        sta     X16_P0                  ; addr bits 0-7
-        lda     __rc3
-        sta     X16_P1                  ; addr bits 8-15
-        lda     __rc4
-        sta     X16_P2                  ; addr bit 16
+        sta     mos8(X16_P3)            ; count lo
+        stx     mos8(X16_P4)            ; count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; addr bits 0-7
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)            ; addr bits 8-15
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; addr bit 16
         lda     #0
         jmp     fx_fill
 
@@ -152,20 +152,20 @@ x16_fx_clear:
 ; src -> A, X, __rc2, __rc3;  dst -> __rc4..__rc7;  count -> __rc8/__rc9.
 ; cc65 needed four popax calls because it has no 32-bit stack pop.
 x16_fx_copy:
-        sta     X16_P0                  ; src bits 0-7
-        stx     X16_P1                  ; src bits 8-15
-        lda     __rc2
-        sta     X16_P2                  ; src bit 16
-        lda     __rc4
-        sta     X16_P3                  ; dst bits 0-7
-        lda     __rc5
-        sta     X16_P4                  ; dst bits 8-15
-        lda     __rc6
-        sta     X16_P5                  ; dst bit 16
-        lda     __rc8
-        sta     X16_P6                  ; count lo
-        lda     __rc9
-        sta     X16_P7                  ; count hi
+        sta     mos8(X16_P0)            ; src bits 0-7
+        stx     mos8(X16_P1)            ; src bits 8-15
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; src bit 16
+        lda     mos8(__rc4)
+        sta     mos8(X16_P3)            ; dst bits 0-7
+        lda     mos8(__rc5)
+        sta     mos8(X16_P4)            ; dst bits 8-15
+        lda     mos8(__rc6)
+        sta     mos8(X16_P5)            ; dst bit 16
+        lda     mos8(__rc8)
+        sta     mos8(X16_P6)            ; count lo
+        lda     mos8(__rc9)
+        sta     mos8(X16_P7)            ; count hi
         jmp     fx_copy
 
 ; ---------------------------------------------------------------------
@@ -197,18 +197,18 @@ x16_fx_transp_off:
 ; ---------------------------------------------------------------------
 ; x0 -> A/X, y0 -> __rc2, x1 -> __rc3/__rc4, y1 -> __rc5, color -> __rc6.
 x16_fx_line:
-        sta     X16_P0                  ; x0 lo
-        stx     X16_P1                  ; x0 hi
-        lda     __rc2
-        sta     X16_P2                  ; y0
-        lda     __rc3
-        sta     X16_P3                  ; x1 lo
-        lda     __rc4
-        sta     X16_P4                  ; x1 hi
-        lda     __rc5
-        sta     X16_P5                  ; y1
-        lda     __rc6
-        sta     X16_P6                  ; color
+        sta     mos8(X16_P0)            ; x0 lo
+        stx     mos8(X16_P1)            ; x0 hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; y0
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; x1 lo
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; x1 hi
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; y1
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; color
         jmp     fx_line
 
 ; ---------------------------------------------------------------------
@@ -227,10 +227,10 @@ x16_fx_line:
 x16_fx_triangle:
         sta     tri_color               ; colour
 
-        lda     __rc2
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
         ldy     #2
 .Lx16_fx_triangle_copy_a:
         lda     (X16_T0),y
@@ -238,10 +238,10 @@ x16_fx_triangle:
         dey
         bpl     .Lx16_fx_triangle_copy_a
 
-        lda     __rc4
-        sta     X16_T0
-        lda     __rc5
-        sta     X16_T1
+        lda     mos8(__rc4)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc5)
+        sta     mos8(X16_T1)
         ldy     #2
 .Lx16_fx_triangle_copy_b:
         lda     (X16_T0),y
@@ -249,10 +249,10 @@ x16_fx_triangle:
         dey
         bpl     .Lx16_fx_triangle_copy_b
 
-        lda     __rc6
-        sta     X16_T0
-        lda     __rc7
-        sta     X16_T1
+        lda     mos8(__rc6)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc7)
+        sta     mos8(X16_T1)
         ldy     #2
 .Lx16_fx_triangle_copy_c:
         lda     (X16_T0),y
@@ -287,13 +287,13 @@ fx_mult:
 
         vera_dcsel 6
         lda     VERA_FX_ACCUM_RESET     ; a *read* clears the accumulator
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_FX_CACHE_L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     VERA_FX_CACHE_M         ; cache 15:0  = a
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     VERA_FX_CACHE_H
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     VERA_FX_CACHE_U         ; cache 31:16 = b
 
         vera_dcsel 2
@@ -308,13 +308,13 @@ fx_mult:
         ; Read it back, now advancing one byte at a time.
         vera_addr 0, VRAM_FX_SCRATCH, VERA_INC_1
         lda     VERA_DATA0
-        sta     X16_P4
+        sta     mos8(X16_P4)
         lda     VERA_DATA0
-        sta     X16_P5
+        sta     mos8(X16_P5)
         lda     VERA_DATA0
-        sta     X16_P6
+        sta     mos8(X16_P6)
         lda     VERA_DATA0
-        sta     X16_P7
+        sta     mos8(X16_P7)
 
         jmp     fx_off
 
@@ -329,7 +329,7 @@ fx_mult:
 ; remaining 1-3 bytes are written normally with FX switched back off.
 ; ---------------------------------------------------------------------
 fx_fill:
-        sta     X16_T0                  ; fill value
+        sta     mos8(X16_T0)            ; fill value
 
         vera_dcsel 2
         stz     VERA_FX_MULT            ; multiplier off: write the cache itself
@@ -337,7 +337,7 @@ fx_fill:
         sta     VERA_FX_CTRL
 
         vera_dcsel 6
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     VERA_FX_CACHE_L
         sta     VERA_FX_CACHE_M
         sta     VERA_FX_CACHE_H
@@ -347,34 +347,34 @@ fx_fill:
         ; Point port 0 at the destination, stepping 4 bytes per write.
         lda     #VERA_CTRL_ADDRSEL
         trb     VERA_CTRL
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_ADDR_L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     VERA_ADDR_M
-        lda     X16_P2
+        lda     mos8(X16_P2)
         and     #VERA_ADDR_H_BANK
         ora     #(VERA_INC_4 << 4)
         sta     VERA_ADDR_H
 
         ; quads = count >> 2, remainder = count & 3
-        lda     X16_P3
+        lda     mos8(X16_P3)
         and     #$03
-        sta     X16_T3
-        lda     X16_P4
-        sta     X16_T2
-        lda     X16_P3
-        sta     X16_T1
-        lsr     X16_T2
-        ror     X16_T1
-        lsr     X16_T2
-        ror     X16_T1
+        sta     mos8(X16_T3)
+        lda     mos8(X16_P4)
+        sta     mos8(X16_T2)
+        lda     mos8(X16_P3)
+        sta     mos8(X16_T1)
+        lsr     mos8(X16_T2)
+        ror     mos8(X16_T1)
+        lsr     mos8(X16_T2)
+        ror     mos8(X16_T1)
 
-        lda     X16_T1
-        ora     X16_T2
+        lda     mos8(X16_T1)
+        ora     mos8(X16_T2)
         beq     .Lfx_fill_tail                   ; fewer than four bytes
 
-        ldx     X16_T1
-        ldy     X16_T2
+        ldx     mos8(X16_T1)
+        ldy     mos8(X16_T2)
         txa
         beq     .Lfx_fill_full
         iny
@@ -392,7 +392,7 @@ fx_fill:
         stz     VERA_FX_CTRL
         vera_dcsel 0
 
-        lda     X16_T3
+        lda     mos8(X16_T3)
         beq     .Lfx_fill_done
 
         ; Port 0 already sits just past the quads. Keep its bank and DECR
@@ -402,8 +402,8 @@ fx_fill:
         ora     #(VERA_INC_1 << 4)
         sta     VERA_ADDR_H
 
-        ldx     X16_T3
-        lda     X16_T0
+        ldx     mos8(X16_T3)
+        lda     mos8(X16_T0)
 .Lfx_fill_rest:
         sta     VERA_DATA0
         dex
@@ -428,20 +428,20 @@ fx_copy:
         stz     VERA_FX_MULT            ; multiplier off, cache index to 0
 
         vera_addrsel 1                  ; port 1 reads the source
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_ADDR_L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     VERA_ADDR_M
-        lda     X16_P2
+        lda     mos8(X16_P2)
         and     #VERA_ADDR_H_BANK
         ora     #(VERA_INC_1 << 4)
         sta     VERA_ADDR_H
         vera_addrsel 0                  ; port 0 writes quads
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     VERA_ADDR_L
-        lda     X16_P4
+        lda     mos8(X16_P4)
         sta     VERA_ADDR_M
-        lda     X16_P5
+        lda     mos8(X16_P5)
         and     #VERA_ADDR_H_BANK
         ora     #(VERA_INC_4 << 4)
         sta     VERA_ADDR_H
@@ -451,24 +451,24 @@ fx_copy:
         sta     VERA_FX_CTRL
 
         ; quads = count >> 2, remainder = count & 3
-        lda     X16_P6
+        lda     mos8(X16_P6)
         and     #$03
-        sta     X16_T3
-        lda     X16_P7
-        sta     X16_T2
-        lda     X16_P6
-        sta     X16_T1
-        lsr     X16_T2
-        ror     X16_T1
-        lsr     X16_T2
-        ror     X16_T1
+        sta     mos8(X16_T3)
+        lda     mos8(X16_P7)
+        sta     mos8(X16_T2)
+        lda     mos8(X16_P6)
+        sta     mos8(X16_T1)
+        lsr     mos8(X16_T2)
+        ror     mos8(X16_T1)
+        lsr     mos8(X16_T2)
+        ror     mos8(X16_T1)
 
-        lda     X16_T1
-        ora     X16_T2
+        lda     mos8(X16_T1)
+        ora     mos8(X16_T2)
         beq     .Lfx_copy_tail
 
-        ldx     X16_T1
-        ldy     X16_T2
+        ldx     mos8(X16_T1)
+        ldy     mos8(X16_T2)
         txa
         beq     .Lfx_copy_full
         iny
@@ -489,13 +489,13 @@ fx_copy:
         stz     VERA_FX_CTRL            ; leftovers are plain byte copies
         vera_dcsel 0
 
-        lda     X16_T3
+        lda     mos8(X16_T3)
         beq     .Lfx_copy_cdone
         lda     VERA_ADDR_H             ; port 0 sits just past the quads:
         and     #$0F                    ; step it by 1 for the tail
         ora     #(VERA_INC_1 << 4)
         sta     VERA_ADDR_H
-        ldx     X16_T3
+        ldx     mos8(X16_T3)
 .Lfx_copy_crest:
         lda     VERA_DATA1
         sta     VERA_DATA0
@@ -531,11 +531,11 @@ fx_line:
         ; |dx| and the x direction
         stz     fxl_sx
         sec
-        lda     X16_P3
-        sbc     X16_P0
+        lda     mos8(X16_P3)
+        sbc     mos8(X16_P0)
         sta     fxl_dx
-        lda     X16_P4
-        sbc     X16_P1
+        lda     mos8(X16_P4)
+        sbc     mos8(X16_P1)
         sta     fxl_dx+1
         bpl     .Lfx_line_dx_done
         inc     fxl_sx                  ; x runs right to left
@@ -551,8 +551,8 @@ fx_line:
         ; |dy| and the y direction, in 16 bits (239 - 0 overflows a byte)
         stz     fxl_sy
         sec
-        lda     X16_P5
-        sbc     X16_P2
+        lda     mos8(X16_P5)
+        sbc     mos8(X16_P2)
         sta     fxl_dy
         lda     #0
         sbc     #0
@@ -693,7 +693,7 @@ fx_line:
         beq     .Lfx_line_full
         iny
 .Lfx_line_full:
-        lda     X16_P6
+        lda     mos8(X16_P6)
 .Lfx_line_draw:
         sta     VERA_DATA1
         dex
@@ -965,10 +965,10 @@ poly_setup:
         and     #$07
         sta     VERA_FX_Y_POS_H
 
-        stz     X16_P0                  ; ADDR0 = row base of the top row
-        stz     X16_P1
+        stz     mos8(X16_P0)            ; ADDR0 = row base of the top row
+        stz     mos8(X16_P1)
         lda     tri_y0
-        sta     X16_P2
+        sta     mos8(X16_P2)
         jsr     pix_addr
         vera_addrsel 0
         lda     fxa
@@ -1204,34 +1204,34 @@ udiv24:
 
 ; fxa = X16_P0/P1 + X16_P2 * 320  (the 17-bit bitmap pixel address)
 pix_addr:
-        lda     X16_P2                  ; y << 6
-        stz     X16_T3
+        lda     mos8(X16_P2)            ; y << 6
+        stz     mos8(X16_T3)
         asl     a
-        rol     X16_T3
+        rol     mos8(X16_T3)
         asl     a
-        rol     X16_T3
+        rol     mos8(X16_T3)
         asl     a
-        rol     X16_T3
+        rol     mos8(X16_T3)
         asl     a
-        rol     X16_T3
+        rol     mos8(X16_T3)
         asl     a
-        rol     X16_T3
+        rol     mos8(X16_T3)
         asl     a
-        rol     X16_T3
+        rol     mos8(X16_T3)
         sta     fxa                     ; low byte of y*64 (and of y*320)
         clc                             ; + y << 8
-        lda     X16_P2
-        adc     X16_T3
+        lda     mos8(X16_P2)
+        adc     mos8(X16_T3)
         sta     fxa+1
         lda     #0
         adc     #0
         sta     fxa+2
         clc                             ; + x
         lda     fxa
-        adc     X16_P0
+        adc     mos8(X16_P0)
         sta     fxa
         lda     fxa+1
-        adc     X16_P1
+        adc     mos8(X16_P1)
         sta     fxa+1
         lda     fxa+2
         adc     #0
@@ -1356,20 +1356,20 @@ fxa:       .zero  3
 ; clip -> __rc9. Only bit 16 of each long's high half exists.
 ; ---------------------------------------------------------------------
 x16_fx_affine_on:
-        sta     X16_P0                  ; tiles bits 0-7
-        stx     X16_P1                  ; tiles bits 8-15
-        lda     __rc2
-        sta     X16_P2                  ; tiles bit 16
-        lda     __rc4
-        sta     X16_P3                  ; map bits 0-7
-        lda     __rc5
-        sta     X16_P4                  ; map bits 8-15
-        lda     __rc6
-        sta     X16_P5                  ; map bit 16
-        lda     __rc8
-        sta     X16_P6                  ; map size code
-        lda     __rc9
-        sta     X16_P7                  ; clip
+        sta     mos8(X16_P0)            ; tiles bits 0-7
+        stx     mos8(X16_P1)            ; tiles bits 8-15
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; tiles bit 16
+        lda     mos8(__rc4)
+        sta     mos8(X16_P3)            ; map bits 0-7
+        lda     mos8(__rc5)
+        sta     mos8(X16_P4)            ; map bits 8-15
+        lda     mos8(__rc6)
+        sta     mos8(X16_P5)            ; map bit 16
+        lda     mos8(__rc8)
+        sta     mos8(X16_P6)            ; map size code
+        lda     mos8(__rc9)
+        sta     mos8(X16_P7)            ; clip
         jmp     fx_affine_on
 
 ; ---------------------------------------------------------------------
@@ -1379,20 +1379,20 @@ x16_fx_affine_on:
 ; Four 16-bit integers: x -> A/X, y -> __rc2/__rc3, dx -> __rc4/__rc5,
 ; dy -> __rc6/__rc7.
 x16_fx_affine_ray:
-        sta     X16_P0                  ; x lo
-        stx     X16_P1                  ; x hi
-        lda     __rc2
-        sta     X16_P2                  ; y lo
-        lda     __rc3
-        sta     X16_P3                  ; y hi
-        lda     __rc4
-        sta     X16_P4                  ; dx lo
-        lda     __rc5
-        sta     X16_P5                  ; dx hi
-        lda     __rc6
-        sta     X16_P6                  ; dy lo
-        lda     __rc7
-        sta     X16_P7                  ; dy hi
+        sta     mos8(X16_P0)            ; x lo
+        stx     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; y lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; y hi
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; dx lo
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; dx hi
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; dy lo
+        lda     mos8(__rc7)
+        sta     mos8(X16_P7)            ; dy hi
         jmp     fx_affine_ray
 
 ; ---------------------------------------------------------------------
@@ -1400,8 +1400,8 @@ x16_fx_affine_ray:
 ; ---------------------------------------------------------------------
 ; count -> A/X.
 x16_fx_affine_span:
-        sta     X16_P0
-        stx     X16_P1
+        sta     mos8(X16_P0)
+        stx     mos8(X16_P1)
         jmp     fx_affine_span
 
 ; ---------------------------------------------------------------------
@@ -1418,44 +1418,44 @@ fx_affine_on:
         sta     VERA_FX_CTRL
 
         ; FX_TILEBASE: bits 7:2 = address 16:11, bit 1 = clip enable
-        lda     X16_P1
+        lda     mos8(X16_P1)
         lsr
         lsr
         lsr                             ; address bits 15:11 -> 4:0
-        sta     X16_T0
-        lda     X16_P2
+        sta     mos8(X16_T0)
+        lda     mos8(X16_P2)
         and     #$01
         beq     .Lfx_affine_on_tb_low
         lda     #%00100000              ; address bit 16 -> value bit 5
 .Lfx_affine_on_tb_low:
-        ora     X16_T0
+        ora     mos8(X16_T0)
         asl
         asl                             ; the register wants them in bits 7:2
-        sta     X16_T0
-        lda     X16_P7
+        sta     mos8(X16_T0)
+        lda     mos8(X16_P7)
         and     #$01
         asl                             ; clip enable is bit 1
-        ora     X16_T0
+        ora     mos8(X16_T0)
         sta     VERA_FX_TILEBASE
 
         ; FX_MAPBASE: bits 7:2 = address 16:11, bits 1:0 = map size
-        lda     X16_P4
+        lda     mos8(X16_P4)
         lsr
         lsr
         lsr
-        sta     X16_T0
-        lda     X16_P5
+        sta     mos8(X16_T0)
+        lda     mos8(X16_P5)
         and     #$01
         beq     .Lfx_affine_on_mb_low
         lda     #%00100000
 .Lfx_affine_on_mb_low:
-        ora     X16_T0
+        ora     mos8(X16_T0)
         asl
         asl
-        sta     X16_T0
-        lda     X16_P6
+        sta     mos8(X16_T0)
+        lda     mos8(X16_P6)
         and     #$03
-        ora     X16_T0
+        ora     mos8(X16_T0)
         sta     VERA_FX_MAPBASE
         vera_dcsel 0
         rts
@@ -1474,27 +1474,27 @@ fx_affine_on:
 ; ---------------------------------------------------------------------
 fx_affine_ray:
         vera_dcsel 3
-        lda     X16_P4
+        lda     mos8(X16_P4)
         sta     VERA_FX_X_INCR_L
-        lda     X16_P5
+        lda     mos8(X16_P5)
         sta     VERA_FX_X_INCR_H
-        lda     X16_P6
+        lda     mos8(X16_P6)
         sta     VERA_FX_Y_INCR_L
-        lda     X16_P7
+        lda     mos8(X16_P7)
         sta     VERA_FX_Y_INCR_H
         vera_dcsel 5
         lda     #$80                    ; subpixel 0.5: sample texel centres
         sta     VERA_FX_X_POS_S
         sta     VERA_FX_Y_POS_S
         vera_dcsel 4
-        lda     X16_P0                  ; positions last: writing them makes
+        lda     mos8(X16_P0)            ; positions last: writing them makes
         sta     VERA_FX_X_POS_L         ; VERA prefetch the first texel
-        lda     X16_P1
+        lda     mos8(X16_P1)
         and     #$07
         sta     VERA_FX_X_POS_H
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     VERA_FX_Y_POS_L
-        lda     X16_P3
+        lda     mos8(X16_P3)
         and     #$07
         sta     VERA_FX_Y_POS_H
         vera_dcsel 0
@@ -1509,8 +1509,8 @@ fx_affine_ray:
 ; The mode-7 inner loop: one read, one write per pixel.
 ; ---------------------------------------------------------------------
 fx_affine_span:
-        ldx     X16_P0
-        ldy     X16_P1
+        ldx     mos8(X16_P0)
+        ldy     mos8(X16_P1)
         txa
         beq     .Lfx_affine_span_full
         iny

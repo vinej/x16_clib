@@ -55,15 +55,15 @@
 ; order SETLFS wants them, so only the secondary needs moving.
 ; ---------------------------------------------------------------------
 x16_fio_set_lfs:
-        ldy     __rc2                   ; Y = secondary
+        ldy     mos8(__rc2)             ; Y = secondary
         jmp     SETLFS                  ; A = lfn, X = device already
 
 ; ---------------------------------------------------------------------
 ; void __fastcall__ x16_fio_set_name(const char *name, unsigned char len)
 ; ---------------------------------------------------------------------
 x16_fio_set_name:
-        ldx     __rc2                   ; X = name low
-        ldy     __rc3                   ; Y = name high
+        ldx     mos8(__rc2)             ; X = name low
+        ldy     mos8(__rc3)             ; Y = name high
         jmp     SETNAM                  ; A already holds len
 
 ; ---------------------------------------------------------------------
@@ -184,16 +184,16 @@ x16_fio_open_write:
 ; The five arguments into X16_P0..P5. The pointer claims __rc2/__rc3,
 ; so the four bytes land in A, X, __rc4 and __rc5.
 open_marshal:
-        sta     X16_P2                  ; len
-        stx     X16_P3                  ; lfn
-        lda     __rc4
-        sta     X16_P4                  ; device
-        lda     __rc5
-        sta     X16_P5                  ; secondary
-        lda     __rc2                   ; name
-        sta     X16_P0
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; len
+        stx     mos8(X16_P3)            ; lfn
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; device
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; secondary
+        lda     mos8(__rc2)             ; name
+        sta     mos8(X16_P0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         rts
 
 ; ---------------------------------------------------------------------
@@ -201,7 +201,7 @@ open_marshal:
 ;   CLRCHN + CLOSE.
 ; ---------------------------------------------------------------------
 x16_fio_close_named:
-        sta     X16_P3
+        sta     mos8(X16_P3)
         jmp     fio_close_named
 
 ; =====================================================================
@@ -223,7 +223,7 @@ fio_open_named:
 fio_open_read:
         jsr     fio_open_named
         bcs     .Lfio_open_read_done
-        ldx     X16_P3
+        ldx     mos8(X16_P3)
         jmp     CHKIN
 .Lfio_open_read_done:
         rts
@@ -235,7 +235,7 @@ fio_open_read:
 fio_open_write:
         jsr     fio_open_named
         bcs     .Lfio_open_write_done
-        ldx     X16_P3
+        ldx     mos8(X16_P3)
         jmp     CHKOUT
 .Lfio_open_write_done:
         rts
@@ -245,15 +245,15 @@ fio_open_write:
 ; ---------------------------------------------------------------------
 fio_close_named:
         jsr     CLRCHN
-        lda     X16_P3
+        lda     mos8(X16_P3)
         jmp     CLOSE
 
 fileio_setup:
-        lda     X16_P2
-        ldx     X16_P0
-        ldy     X16_P1
+        lda     mos8(X16_P2)
+        ldx     mos8(X16_P0)
+        ldy     mos8(X16_P1)
         jsr     SETNAM
-        lda     X16_P3
-        ldx     X16_P4
-        ldy     X16_P5
+        lda     mos8(X16_P3)
+        ldx     mos8(X16_P4)
+        ldy     mos8(X16_P5)
         jmp     SETLFS

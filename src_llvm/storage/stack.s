@@ -108,16 +108,16 @@ stack_init:
 ; stack_push -- push one byte.  in: A = byte
 ; ---------------------------------------------------------------------
 stack_push:
-        sta     X16_T2
+        sta     mos8(X16_T2)
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     stack_bank
         sta     RAM_BANK
         jsr     stack_sptr
-        lda     X16_T2
+        lda     mos8(X16_T2)
         sta     (X16_T0)                ; buffer[sp] = value
         jsr     stack_spdec
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     RAM_BANK
         rts
 
@@ -126,21 +126,21 @@ stack_push:
 ;   in: A = low, X = high
 ; ---------------------------------------------------------------------
 stack_pushw:
-        sta     X16_T2
-        stx     X16_T4
+        sta     mos8(X16_T2)
+        stx     mos8(X16_T4)
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     stack_bank
         sta     RAM_BANK
         jsr     stack_sptr
-        lda     X16_T2
+        lda     mos8(X16_T2)
         sta     (X16_T0)                ; buffer[sp] = low
         jsr     stack_spdec
         jsr     stack_sptr
-        lda     X16_T4
+        lda     mos8(X16_T4)
         sta     (X16_T0)                ; buffer[sp] = high
         jsr     stack_spdec
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     RAM_BANK
         rts
 
@@ -149,14 +149,14 @@ stack_pushw:
 ; ---------------------------------------------------------------------
 stack_pop:
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     stack_bank
         sta     RAM_BANK
         jsr     stack_spinc
         jsr     stack_sptr
         lda     (X16_T0)
         tay
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     RAM_BANK
         tya
         rts
@@ -167,21 +167,21 @@ stack_pop:
 ; ---------------------------------------------------------------------
 stack_popw:
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     stack_bank
         sta     RAM_BANK
         jsr     stack_spinc
         jsr     stack_sptr
         lda     (X16_T0)
-        sta     X16_T4                  ; high
+        sta     mos8(X16_T4)            ; high
         jsr     stack_spinc
         jsr     stack_sptr
         lda     (X16_T0)
-        sta     X16_T2                  ; low
-        lda     X16_T3
+        sta     mos8(X16_T2)            ; low
+        lda     mos8(X16_T3)
         sta     RAM_BANK
-        lda     X16_T2
-        ldx     X16_T4
+        lda     mos8(X16_T2)
+        ldx     mos8(X16_T4)
         rts
 
 ; ---------------------------------------------------------------------
@@ -252,11 +252,11 @@ stack_full:
 ; T0/T1 = $A000 + stack_sp
 stack_sptr:
         lda     stack_sp
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     stack_sp+1
         clc
         adc     #$A0                    ; $A000's high byte; sp_hi <= $1F, no carry
-        sta     X16_T1
+        sta     mos8(X16_T1)
         rts
 
 ; sp-- (16-bit)

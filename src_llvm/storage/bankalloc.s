@@ -45,8 +45,8 @@ x16_bank_alloc_init:
 ;
 ; Banks outside the range are never handed out.
 bank_alloc_init:
-        sta     X16_T0                  ; first
-        stx     X16_T1                  ; last
+        sta     mos8(X16_T0)            ; first
+        stx     mos8(X16_T1)            ; last
 
         ldx     #31                     ; everything starts out un-ownable
 .Lbank_alloc_init_clear:
@@ -54,14 +54,14 @@ bank_alloc_init:
         dex
         bpl     .Lbank_alloc_init_clear
 
-        lda     X16_T0
+        lda     mos8(X16_T0)
 .Lbank_alloc_init_mark:
         jsr     set_bit                 ; mark free
-        lda     X16_T0
-        cmp     X16_T1
+        lda     mos8(X16_T0)
+        cmp     mos8(X16_T1)
         beq     .Lbank_alloc_init_done
-        inc     X16_T0
-        lda     X16_T0
+        inc     mos8(X16_T0)
+        lda     mos8(X16_T0)
         bra     .Lbank_alloc_init_mark
 .Lbank_alloc_init_done:
         rts
@@ -108,9 +108,9 @@ bank_alloc:
         asl     a
         asl     a
         asl     a
-        sta     X16_T0
+        sta     mos8(X16_T0)
         tya
-        ora     X16_T0
+        ora     mos8(X16_T0)
         clc
         rts
 

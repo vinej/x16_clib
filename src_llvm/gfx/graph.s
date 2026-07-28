@@ -61,17 +61,17 @@ x16_graph_set_window:
         pha                             ; A and X hold the first
         phx                             ; argument; the loads below
                                         ; clobber both, so park them
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                ; height (rightmost arg: A/X)
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                ; width
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                ; y
         plx
         pla
@@ -85,7 +85,7 @@ x16_graph_set_window:
 ;                                        unsigned char background)
 ; ---------------------------------------------------------------------
 x16_graph_set_colors:
-        ldy     __rc2                   ; Y = background; stroke and fill
+        ldy     mos8(__rc2)             ; Y = background; stroke and fill
         jmp     GRAPH_SET_COLORS        ; already sit in A and X
 
 ; ---------------------------------------------------------------------
@@ -96,17 +96,17 @@ x16_graph_draw_line:
         pha                             ; A and X hold the first
         phx                             ; argument; the loads below
                                         ; clobber both, so park them
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                ; y2 (rightmost arg: A/X)
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                ; x2
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                ; y1
         plx
         pla
@@ -127,23 +127,23 @@ x16_graph_draw_line:
 x16_graph_draw_rect:
         pha                             ; park x low
         phx                             ; and x high
-        lda     __rc10                  ; the fill flag, before r4H lands
+        lda     mos8(__rc10)            ; the fill flag, before r4H lands
         pha                             ; on top of __rc10's neighbour
-        lda     __rc9                   ; highest destination first: every
+        lda     mos8(__rc9)             ; highest destination first: every
         sta     r4H                     ; source is one KERNAL register
-        lda     __rc8                   ; below its destination
+        lda     mos8(__rc8)             ; below its destination
         sta     r4L                     ; radius
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                     ; height
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                     ; width
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                     ; y
         pla                             ; A = fill flag
         tay
@@ -167,25 +167,25 @@ x16_graph_move_rect:
         pha                             ; A and X hold the first
         phx                             ; argument; the loads below
                                         ; clobber both, so park them
-        lda     __rc11
+        lda     mos8(__rc11)
         sta     r5H
-        lda     __rc10
+        lda     mos8(__rc10)
         sta     r5L                ; height (rightmost arg: A/X)
-        lda     __rc9
+        lda     mos8(__rc9)
         sta     r4H
-        lda     __rc8
+        lda     mos8(__rc8)
         sta     r4L                ; width
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                ; ty
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                ; tx
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                ; sy
         plx
         pla
@@ -204,19 +204,19 @@ x16_graph_move_rect:
 x16_graph_draw_oval:
         pha                             ; park x low
         phx                             ; and x high
-        lda     __rc8                   ; the fill flag, read first
+        lda     mos8(__rc8)             ; the fill flag, read first
         pha
-        lda     __rc7                   ; highest destination first
+        lda     mos8(__rc7)             ; highest destination first
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                     ; height
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                     ; width
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                     ; y
         pla                             ; A = fill flag
         tay
@@ -240,21 +240,21 @@ x16_graph_draw_image:
         pha                             ; A and X hold the first
         phx                             ; argument; the loads below
                                         ; clobber both, so park them
-        lda     __rc9
+        lda     mos8(__rc9)
         sta     r4H
-        lda     __rc8
+        lda     mos8(__rc8)
         sta     r4L                ; height (rightmost arg: A/X)
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                ; width
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                ; image
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                ; y
         plx
         pla
@@ -277,10 +277,10 @@ x16_graph_set_font:
 ;   returns 0 for a control code:        out->style = the style it selects
 ; ---------------------------------------------------------------------
 x16_graph_get_char_size:
-        ldy     __rc2                   ; out*: staged out of r0 before
-        sty     X16_TPTR0               ; the ROM call overwrites it
-        ldy     __rc3
-        sty     X16_TPTR0+1             ; c stays in A, style in X
+        ldy     mos8(__rc2)             ; out*: staged out of r0 before
+        sty     mos8(X16_TPTR0)         ; the ROM call overwrites it
+        ldy     mos8(__rc3)
+        sty     mos8(X16_TPTR0+1)       ; c stays in A, style in X
         jsr     GRAPH_GET_CHAR_SIZE
         bcs     .Lx16_graph_get_char_size_control
 
@@ -318,14 +318,14 @@ x16_graph_get_char_size:
 ; ---------------------------------------------------------------------
 x16_graph_put_char:
         pha                             ; park c
-        lda     __rc2                   ; x* and y* live in r0/r1, which
-        sta     X16_TPTR0               ; the ROM call is about to use
-        lda     __rc3
-        sta     X16_TPTR0+1
-        lda     __rc4                   ; y*
-        sta     X16_TPTR1
-        lda     __rc5
-        sta     X16_TPTR1+1
+        lda     mos8(__rc2)             ; x* and y* live in r0/r1, which
+        sta     mos8(X16_TPTR0)         ; the ROM call is about to use
+        lda     mos8(__rc3)
+        sta     mos8(X16_TPTR0+1)
+        lda     mos8(__rc4)             ; y*
+        sta     mos8(X16_TPTR1)
+        lda     mos8(__rc5)
+        sta     mos8(X16_TPTR1+1)
 
         ldy     #0
         lda     (X16_TPTR0),y

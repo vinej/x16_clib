@@ -76,6 +76,7 @@
 #endif
 
 #include <x16/vera.h>           /* VRAM data ports: fill, copy, FX probe */
+#include <x16/vdc.h>           /* VERA display composer: scale, border, layers */
 #include <x16/screen.h>         /* screen mode, text output, cursor */
 #include <x16/palette.h>        /* 256 entries of 12-bit colour */
 #include <x16/tile.h>           /* tilemap cells, layer config, scroll */
@@ -91,6 +92,9 @@
 #include <x16/verafx_utils.h>   /* the raw FX register knobs, one at a time */
 #include <x16/psg.h>            /* 16-voice PSG */
 #include <x16/ym.h>             /* YM2151 FM */
+#include <x16/audiorom.h>      /* the AUDIO ROM bank: PSG, FM, note conversion */
+#include <x16/wavfile.h>       /* RIFF/WAVE header parsing */
+#include <x16/zsm.h>           /* ZSM music playback */
 #include <x16/pcm.h>            /* PCM FIFO, and AFLOW streaming */
 #include <x16/input.h>          /* joystick, mouse, keyboard */
 #include <x16/keyboard.h>       /* kbd buffer injection, modifiers, keymap */

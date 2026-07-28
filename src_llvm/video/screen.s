@@ -108,23 +108,23 @@ screen_get_mode:
 ; loop needs, so stash them first.
 ; ---------------------------------------------------------------------
 x16_screen_get_size:
-        lda     __rc2
-        sta     X16_T3                  ; cols* lo
-        lda     __rc3
-        sta     X16_T4                  ; cols* hi
-        lda     __rc4
-        sta     X16_T5                  ; rows* lo
-        lda     __rc5
-        sta     X16_T6                  ; rows* hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_T3)            ; cols* lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_T4)            ; cols* hi
+        lda     mos8(__rc4)
+        sta     mos8(X16_T5)            ; rows* lo
+        lda     mos8(__rc5)
+        sta     mos8(X16_T6)            ; rows* hi
 
         jsr     screen_get_size         ; X = columns, Y = rows
-        stx     X16_T0
-        sty     X16_T1
+        stx     mos8(X16_T0)
+        sty     mos8(X16_T1)
 
         ldy     #0
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     (X16_T3),y
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     (X16_T5),y
         rts
 
@@ -180,14 +180,14 @@ x16_screen_color:
 ; Touches no VERA state.
 screen_color:
         and     #$0F
-        sta     X16_T0
+        sta     mos8(X16_T0)
         txa
         and     #$0F
         asl     a
         asl     a
         asl     a
         asl     a                       ; background into the high nibble
-        ora     X16_T0
+        ora     mos8(X16_T0)
         sta     KERNAL_COLOR
         rts
 
@@ -246,23 +246,23 @@ screen_locate:
 ; needs, so stash them before touching either.
 ; ---------------------------------------------------------------------
 x16_screen_get_cursor:
-        lda     __rc2
-        sta     X16_T3                  ; row* lo
-        lda     __rc3
-        sta     X16_T4                  ; row* hi
-        lda     __rc4
-        sta     X16_T5                  ; col* lo
-        lda     __rc5
-        sta     X16_T6                  ; col* hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_T3)            ; row* lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_T4)            ; row* hi
+        lda     mos8(__rc4)
+        sta     mos8(X16_T5)            ; col* lo
+        lda     mos8(__rc5)
+        sta     mos8(X16_T6)            ; col* hi
 
         jsr     screen_get_cursor       ; X = row, Y = col
-        stx     X16_T0
-        sty     X16_T1
+        stx     mos8(X16_T0)
+        sty     mos8(X16_T1)
 
         ldy     #0
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     (X16_T3),y
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     (X16_T5),y
         rts
 
@@ -291,13 +291,13 @@ screen_charset:
 ; each way. It cannot be a bare fall-through as it is on the cc65 side.
 ; ---------------------------------------------------------------------
 x16_screen_puts:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         ; fall through
 
 screen_puts:
-        sta     X16_TPTR0
-        stx     X16_TPTR0+1
+        sta     mos8(X16_TPTR0)
+        stx     mos8(X16_TPTR0+1)
         vera_addrsel 0
         ldy     #0
 .Lscreen_puts_loop:
@@ -375,10 +375,10 @@ x16_screen_scode:
 ; ---------------------------------------------------------------------
 x16_screen_blit:
         pha                             ; count
-        lda     __rc2
-        sta     X16_P0                  ; source
-        lda     __rc3
-        sta     X16_P1
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; source
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         pla                             ; A = count, X still = colour
         jmp     screen_blit
 
@@ -391,7 +391,7 @@ x16_screen_blit:
 ; wants A = count, X = colour, Y = character.
 ; ---------------------------------------------------------------------
 x16_screen_blitfill:
-        ldy     __rc2                   ; Y = character
+        ldy     mos8(__rc2)             ; Y = character
         jmp     screen_blitfill
 
 ; ---------------------------------------------------------------------
@@ -405,15 +405,15 @@ x16_screen_blitfill:
 ; P2 = height, P3 = width, P4 = distance, A = direction.
 ; ---------------------------------------------------------------------
 x16_screen_scroll:
-        sta     X16_P0                  ; top
-        stx     X16_P1                  ; left
-        lda     __rc2
-        sta     X16_P2                  ; height
-        lda     __rc3
-        sta     X16_P3                  ; width
-        lda     __rc4
-        sta     X16_P4                  ; distance
-        lda     __rc5                   ; A = direction
+        sta     mos8(X16_P0)            ; top
+        stx     mos8(X16_P1)            ; left
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; height
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; width
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; distance
+        lda     mos8(__rc5)             ; A = direction
         jmp     screen_scroll
 
 ; =====================================================================
@@ -444,11 +444,11 @@ screen_addr1:
         jsr     screen_addr_calc
         vera_addrsel 1
 screen_addr_store:
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     VERA_ADDR_L
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     VERA_ADDR_M
-        lda     X16_T2
+        lda     mos8(X16_T2)
         and     #VERA_ADDR_H_BANK       ; bit 16 of the address
         ora     #$10                    ; increment 1
         sta     VERA_ADDR_H
@@ -456,16 +456,16 @@ screen_addr_store:
 
 ; address of (X = row, Y = column) into X16_T0/T1/T2, port untouched
 screen_addr_calc:
-        sty     X16_T5                  ; column
-        stx     X16_T6                  ; row
+        sty     mos8(X16_T5)            ; column
+        stx     mos8(X16_T6)            ; row
 
         lda     VERA_L1_MAPBASE         ; map base = MAPBASE << 9
         asl     a                       ; carry = bit 16
-        sta     X16_T1                  ; mid
+        sta     mos8(X16_T1)            ; mid
         lda     #0
         rol     a
-        sta     X16_T2                  ; high
-        stz     X16_T0                  ; low
+        sta     mos8(X16_T2)            ; high
+        stz     mos8(X16_T0)            ; low
 
         lda     VERA_L1_CONFIG          ; MAP_WIDTH: 0=32 1=64 2=128 3=256
         lsr     a
@@ -477,26 +477,26 @@ screen_addr_calc:
         adc     #6                      ; bytes per row = 2 << (5 + width)
         tay
 
-        lda     X16_T6                  ; row << Y
-        sta     X16_T3
-        stz     X16_T4
+        lda     mos8(X16_T6)            ; row << Y
+        sta     mos8(X16_T3)
+        stz     mos8(X16_T4)
 .Lscreen_addr_calc_shift:
-        asl     X16_T3
-        rol     X16_T4
+        asl     mos8(X16_T3)
+        rol     mos8(X16_T4)
         dey
         bne     .Lscreen_addr_calc_shift
 
         clc                             ; base += row * stride
-        lda     X16_T0
-        adc     X16_T3
-        sta     X16_T0
-        lda     X16_T1
-        adc     X16_T4
-        sta     X16_T1
+        lda     mos8(X16_T0)
+        adc     mos8(X16_T3)
+        sta     mos8(X16_T0)
+        lda     mos8(X16_T1)
+        adc     mos8(X16_T4)
+        sta     mos8(X16_T1)
         bcc     .Lscreen_addr_calc_nocarry1
-        inc     X16_T2
+        inc     mos8(X16_T2)
 .Lscreen_addr_calc_nocarry1:
-        lda     X16_T5                  ; base += column * 2
+        lda     mos8(X16_T5)            ; base += column * 2
         asl     a
         tax
         lda     #0
@@ -504,13 +504,13 @@ screen_addr_calc:
         tay
         txa
         clc
-        adc     X16_T0
-        sta     X16_T0
+        adc     mos8(X16_T0)
+        sta     mos8(X16_T0)
         tya
-        adc     X16_T1
-        sta     X16_T1
+        adc     mos8(X16_T1)
+        sta     mos8(X16_T1)
         bcc     .Lscreen_addr_calc_nocarry2
-        inc     X16_T2
+        inc     mos8(X16_T2)
 .Lscreen_addr_calc_nocarry2:
         rts
 
@@ -560,17 +560,17 @@ screen_scode:
 ;   in:  X16_P0/P1 = source, A = count (1-255), X = colour byte
 ; ---------------------------------------------------------------------
 screen_blit:
-        sta     X16_T7                  ; count
-        stx     X16_T3                  ; colour
+        sta     mos8(X16_T7)            ; count
+        stx     mos8(X16_T3)            ; colour
         ldy     #0
 .Lscreen_blit_loop:
         lda     (X16_P0),y
         jsr     screen_scode
         sta     VERA_DATA0
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     VERA_DATA0
         iny
-        cpy     X16_T7
+        cpy     mos8(X16_T7)
         bne     .Lscreen_blit_loop
         rts
 
@@ -579,19 +579,19 @@ screen_blit:
 ;   in:  A = count (1-255), X = colour byte, Y = character (PETSCII)
 ; ---------------------------------------------------------------------
 screen_blitfill:
-        sta     X16_T7                  ; count
-        stx     X16_T3                  ; colour
+        sta     mos8(X16_T7)            ; count
+        stx     mos8(X16_T3)            ; colour
         tya
         jsr     screen_scode
-        sta     X16_T4                  ; screen code, converted once
+        sta     mos8(X16_T4)            ; screen code, converted once
         ldy     #0
 .Lscreen_blitfill_loop:
-        lda     X16_T4
+        lda     mos8(X16_T4)
         sta     VERA_DATA0
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     VERA_DATA0
         iny
-        cpy     X16_T7
+        cpy     mos8(X16_T7)
         bne     .Lscreen_blitfill_loop
         rts
 
@@ -615,58 +615,58 @@ screen_blitfill:
 ; vera_copy walks forward, so the two would overlap.
 ; ---------------------------------------------------------------------
 screen_scroll:
-        sta     X16_P7                  ; direction
-        lda     X16_P4
+        sta     mos8(X16_P7)            ; direction
+        lda     mos8(X16_P4)
         beq     .Lscreen_scroll_done                   ; nothing to do
-        cmp     X16_P2
+        cmp     mos8(X16_P2)
         bcs     .Lscreen_scroll_done                   ; nothing survives: caller repaints
 
         sec
-        lda     X16_P2
-        sbc     X16_P4
-        sta     X16_P5                  ; rows to copy
-        stz     X16_P6                  ; index
+        lda     mos8(X16_P2)
+        sbc     mos8(X16_P4)
+        sta     mos8(X16_P5)            ; rows to copy
+        stz     mos8(X16_P6)            ; index
 .Lscreen_scroll_loop:
-        lda     X16_P7
+        lda     mos8(X16_P7)
         bne     .Lscreen_scroll_down
-        lda     X16_P0                  ; up: dst = top + i, src = dst + dist
+        lda     mos8(X16_P0)            ; up: dst = top + i, src = dst + dist
         clc
-        adc     X16_P6
-        sta     X16_T7
+        adc     mos8(X16_P6)
+        sta     mos8(X16_T7)
         clc
-        adc     X16_P4
+        adc     mos8(X16_P4)
         tax
         bra     .Lscreen_scroll_move
 .Lscreen_scroll_down:
-        lda     X16_P0                  ; down: dst = bottom - i, src = dst - dist
+        lda     mos8(X16_P0)            ; down: dst = bottom - i, src = dst - dist
         clc
-        adc     X16_P2
+        adc     mos8(X16_P2)
         sec
         sbc     #1
         sec
-        sbc     X16_P6
-        sta     X16_T7
+        sbc     mos8(X16_P6)
+        sta     mos8(X16_T7)
         sec
-        sbc     X16_P4
+        sbc     mos8(X16_P4)
         tax
 .Lscreen_scroll_move:
         phx                             ; port 1 = destination
-        ldx     X16_T7
-        ldy     X16_P1
+        ldx     mos8(X16_T7)
+        ldy     mos8(X16_P1)
         jsr     screen_addr1
         plx                             ; port 0 = source
-        ldy     X16_P1
+        ldy     mos8(X16_P1)
         jsr     screen_addr
-        lda     X16_P3                  ; width in cells -> bytes
+        lda     mos8(X16_P3)            ; width in cells -> bytes
         asl     a
         tax
         lda     #0
         rol     a
         tay
         jsr     vera_copy
-        inc     X16_P6
-        lda     X16_P6
-        cmp     X16_P5
+        inc     mos8(X16_P6)
+        lda     mos8(X16_P6)
+        cmp     mos8(X16_P5)
         bne     .Lscreen_scroll_loop
 .Lscreen_scroll_done:
         rts

@@ -82,14 +82,14 @@ sprites_off:
 ; ---------------------------------------------------------------------
 ; A = sprite, X = x lo, __rc2 = x hi, __rc3 = y lo, __rc4 = y hi.
 x16_sprite_pos:
-        stx     X16_P0                  ; x lo
+        stx     mos8(X16_P0)            ; x lo
         pha                             ; sprite -- A is about to go
-        lda     __rc2
-        sta     X16_P1                  ; x hi
-        lda     __rc3
-        sta     X16_P2                  ; y lo
-        lda     __rc4
-        sta     X16_P3                  ; y hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc3)
+        sta     mos8(X16_P2)            ; y lo
+        lda     mos8(__rc4)
+        sta     mos8(X16_P3)            ; y hi
         plx                             ; X = sprite
         jmp     sprite_pos
 
@@ -107,26 +107,26 @@ x16_sprite_pos:
 ; store loop must not disturb.
 x16_sprite_get_pos:
         tax                             ; X = sprite
-        lda     __rc2
-        sta     X16_T4                  ; x* lo
-        lda     __rc3
-        sta     X16_T5                  ; x* hi
-        lda     __rc4
-        sta     X16_T6                  ; y* lo
-        lda     __rc5
-        sta     X16_T7                  ; y* hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_T4)            ; x* lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_T5)            ; x* hi
+        lda     mos8(__rc4)
+        sta     mos8(X16_T6)            ; y* lo
+        lda     mos8(__rc5)
+        sta     mos8(X16_T7)            ; y* hi
 
         jsr     sprite_get_pos          ; X16_P0..P3
 
         ldy     #0
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     (X16_T4),y
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     (X16_T6),y
         iny
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     (X16_T4),y
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     (X16_T6),y
         rts
 
@@ -142,12 +142,12 @@ x16_sprite_get_pos:
 x16_sprite_image:
         pha                             ; sprite
         phx                             ; mode
-        lda     __rc2
-        sta     X16_P0                  ; addr bits 0-7
-        lda     __rc3
-        sta     X16_P1                  ; addr bits 8-15
-        lda     __rc4
-        sta     X16_P2                  ; addr bit 16
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; addr bits 0-7
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)            ; addr bits 8-15
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; addr bit 16
         pla                             ; A = mode
         plx                             ; X = sprite
         jmp     sprite_image
@@ -180,9 +180,9 @@ x16_sprite_z:
 ; sprite_size wants X = sprite, A = width, Y = height, X16_P0 = offset.
 x16_sprite_size:
         pha                             ; sprite
-        lda     __rc3
-        sta     X16_P0                  ; palette offset
-        ldy     __rc2                   ; Y = height
+        lda     mos8(__rc3)
+        sta     mos8(X16_P0)            ; palette offset
+        ldy     mos8(__rc2)             ; Y = height
         txa                             ; A = width
         plx                             ; X = sprite
         jmp     sprite_size
@@ -211,23 +211,23 @@ sprite_init_all:
 ;   Leaves the port on auto-increment, so consecutive fields stream.
 ; ---------------------------------------------------------------------
 sprite_setptr:
-        sta     X16_T2                  ; byte offset
+        sta     mos8(X16_T2)            ; byte offset
         lda     #VERA_CTRL_ADDRSEL
         trb     VERA_CTRL               ; ADDRSEL = 0, DCSEL untouched
 
-        stz     X16_T1
+        stz     mos8(X16_T1)
         txa
         asl     a
-        rol     X16_T1
+        rol     mos8(X16_T1)
         asl     a
-        rol     X16_T1
+        rol     mos8(X16_T1)
         asl     a
-        rol     X16_T1                  ; T1:A = sprite * 8
+        rol     mos8(X16_T1)            ; T1:A = sprite * 8
 
         clc
-        adc     X16_T2
+        adc     mos8(X16_T2)
         sta     VERA_ADDR_L
-        lda     X16_T1
+        lda     mos8(X16_T1)
         adc     #>VRAM_SPRITE_ATTR      ; $FC, plus any carry from the offset
         sta     VERA_ADDR_M
         lda     #(VERA_ADDR_H_BANK | (VERA_INC_1 << 4))
@@ -241,14 +241,14 @@ sprite_setptr:
 sprite_pos:
         lda     #SPRITE_ATTR_X_L
         jsr     sprite_setptr
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_DATA0
-        lda     X16_P1
+        lda     mos8(X16_P1)
         and     #$03
         sta     VERA_DATA0
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     VERA_DATA0
-        lda     X16_P3
+        lda     mos8(X16_P3)
         and     #$03
         sta     VERA_DATA0
         rts
@@ -262,15 +262,15 @@ sprite_get_pos:
         lda     #SPRITE_ATTR_X_L
         jsr     sprite_setptr
         lda     VERA_DATA0
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     VERA_DATA0
         and     #$03
-        sta     X16_P1
+        sta     mos8(X16_P1)
         lda     VERA_DATA0
-        sta     X16_P2
+        sta     mos8(X16_P2)
         lda     VERA_DATA0
         and     #$03
-        sta     X16_P3
+        sta     mos8(X16_P3)
         rts
 
 ; ---------------------------------------------------------------------
@@ -283,38 +283,38 @@ sprite_get_pos:
 ; aligned; the low five bits are simply dropped.
 ; ---------------------------------------------------------------------
 sprite_image:
-        sta     X16_T3                  ; mode flag
+        sta     mos8(X16_T3)            ; mode flag
         lda     #SPRITE_ATTR_ADDR_L
         jsr     sprite_setptr
 
-        lda     X16_P0
+        lda     mos8(X16_P0)
         lsr     a
         lsr     a
         lsr     a
         lsr     a
         lsr     a                       ; addr bits 7:5 -> 2:0
-        sta     X16_T4
-        lda     X16_P1
+        sta     mos8(X16_T4)
+        lda     mos8(X16_P1)
         asl     a
         asl     a
         asl     a                       ; addr bits 12:8 -> 7:3
-        ora     X16_T4
+        ora     mos8(X16_T4)
         sta     VERA_DATA0              ; byte 0 = addr 12:5
 
-        lda     X16_P1
+        lda     mos8(X16_P1)
         lsr     a
         lsr     a
         lsr     a
         lsr     a
         lsr     a                       ; addr bits 15:13 -> 2:0
-        sta     X16_T4
-        lda     X16_P2
+        sta     mos8(X16_T4)
+        lda     mos8(X16_P2)
         and     #$01
         asl     a
         asl     a
         asl     a                       ; addr bit 16 -> bit 3
-        ora     X16_T4
-        ora     X16_T3                  ; mode in bit 7
+        ora     mos8(X16_T4)
+        ora     mos8(X16_T3)            ; mode in bit 7
         sta     VERA_DATA0              ; byte 1
         rts
 
@@ -323,10 +323,10 @@ sprite_image:
 ;   in:  X = sprite, A = collision<<4 | Z | vflip | hflip
 ; ---------------------------------------------------------------------
 sprite_flags:
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     #SPRITE_ATTR_FLAGS
         jsr     sprite_setptr
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     VERA_DATA0
         rts
 
@@ -338,16 +338,16 @@ sprite_flags:
 ; least once (see the note at the top of this file).
 ; ---------------------------------------------------------------------
 sprite_z:
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     #SPRITE_ATTR_FLAGS
         jsr     sprite_setptr
         lda     VERA_DATA0              ; read advances the port past byte 6
         and     #%11110011
-        ora     X16_T3
-        sta     X16_T4
+        ora     mos8(X16_T3)
+        sta     mos8(X16_T4)
         lda     #SPRITE_ATTR_FLAGS
         jsr     sprite_setptr           ; point at byte 6 again to write it
-        lda     X16_T4
+        lda     mos8(X16_T4)
         sta     VERA_DATA0
         rts
 
@@ -364,7 +364,7 @@ sprite_size:
         asl     a
         asl     a
         asl     a                       ; width into bits 5:4
-        sta     X16_T3
+        sta     mos8(X16_T3)
         tya
         and     #$03
         asl     a
@@ -373,15 +373,15 @@ sprite_size:
         asl     a
         asl     a
         asl     a                       ; height into bits 7:6
-        ora     X16_T3
-        sta     X16_T3
-        lda     X16_P0
+        ora     mos8(X16_T3)
+        sta     mos8(X16_T3)
+        lda     mos8(X16_P0)
         and     #$0F                    ; an offset >15 must not corrupt the size
-        ora     X16_T3
-        sta     X16_T3
+        ora     mos8(X16_T3)
+        sta     mos8(X16_T3)
 
         lda     #SPRITE_ATTR_SIZE_PAL
         jsr     sprite_setptr
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     VERA_DATA0
         rts

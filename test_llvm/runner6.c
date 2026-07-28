@@ -249,18 +249,19 @@ static void t_double (void)
     dset(da, "-2.75");
     x16_d_load(da);
     t_check(x16_d_to_s32() == -2L, "D_TRUNC_NEG");
-    /* UNEXPLAINED, llvm-mos ONLY: x16_d_to_s32() answers 0 instead of
-    ** clamping when the value is outside int32. Everything around it
-    ** checks out -- "3000000000" parses, stores, loads and renders back
-    ** exactly (verified), every in-range conversion is correct up to and
-    ** including 2147483647, and the module body is byte-identical to the
-    ** cc65 build's (diffed, only the segment directives differ), where
-    ** these two cases pass. Skipped rather than deleted or asserted at
-    ** the wrong value, so the gap stays visible until someone traces
-    ** which branch d_to_s32 really takes here.
-    */
-    t_skip("D_CLAMP_POS");
-    t_skip("D_CLAMP_NEG");
+    /* These two answered 0 instead of clamping for a long while, on
+    ** llvm-mos alone, with the module body byte-identical to the cc65
+    ** build's. The cause was not in the module at all: `bmi
+    ** double_dto_over`, the branch to the clamping tail, had drifted 135
+    ** bytes out of reach, and mos-as truncates an out-of-range
+    ** displacement without a word of complaint. See
+    ** tools/llvm_branch_check.py. */
+    dset(da, "3000000000");
+    x16_d_load(da);
+    t_check(x16_d_to_s32() == 2147483647L, "D_CLAMP_POS");
+    dset(da, "-3000000000");
+    x16_d_load(da);
+    t_check(x16_d_to_s32() == (long)0x80000000UL, "D_CLAMP_NEG");
 
     /* Arithmetic identities over exactly-representable values. */
     x16_d_from_s16(1);

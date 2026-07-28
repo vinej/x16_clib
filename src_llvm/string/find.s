@@ -48,8 +48,8 @@ CH_QMARK = $3F                          ; '?'
 ; ---------------------------------------------------------------------
 x16_str_find:
         tay                             ; Y = the character
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jmp     str_find                ; A = index or 255
 
 ; ---------------------------------------------------------------------
@@ -58,8 +58,8 @@ x16_str_find:
 ; ---------------------------------------------------------------------
 x16_str_rfind:
         tay
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jmp     str_rfind
 
 ; ---------------------------------------------------------------------
@@ -68,8 +68,8 @@ x16_str_rfind:
 ; ---------------------------------------------------------------------
 x16_str_contains:
         tay
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_contains            ; carry set when found
         lda     #0
         rol     a                       ; A = the carry
@@ -81,8 +81,8 @@ x16_str_contains:
 ; s -> __rc2/__rc3.
 ; ---------------------------------------------------------------------
 x16_str_find_eol:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jmp     str_find_eol
 
 ; ---------------------------------------------------------------------
@@ -93,12 +93,12 @@ x16_str_find_eol:
 ; P0/P1 = pattern.
 ; ---------------------------------------------------------------------
 x16_str_pattern_match:
-        lda     __rc4
-        sta     X16_P0                  ; pattern
-        lda     __rc5
-        sta     X16_P1
-        lda     __rc2                   ; A/X = s
-        ldx     __rc3
+        lda     mos8(__rc4)
+        sta     mos8(X16_P0)            ; pattern
+        lda     mos8(__rc5)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc2)             ; A/X = s
+        ldx     mos8(__rc3)
         jmp     str_pattern_match       ; A = 1/0 already
 
 ; =====================================================================
@@ -114,14 +114,14 @@ x16_str_pattern_match:
 ;        (the carry says the same thing: set when found)
 ; ---------------------------------------------------------------------
 str_find:
-    sta X16_T0
-    stx X16_T1
-    sty X16_T2
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
+    sty mos8(X16_T2)
     ldy #0
 .Lstr_find_loop:
     lda (X16_T0),y
     beq .Lstr_find_notfound
-    cmp X16_T2
+    cmp mos8(X16_T2)
     beq .Lstr_find_found
     iny
     bne .Lstr_find_loop
@@ -148,8 +148,8 @@ str_contains:
 ;        (the carry says the same thing: set when found)
 ; ---------------------------------------------------------------------
 str_find_eol:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_find_eol_loop:
     lda (X16_T0),y
@@ -176,9 +176,9 @@ str_find_eol:
 ;        (the carry says the same thing: set when found)
 ; ---------------------------------------------------------------------
 str_rfind:
-    sty X16_T2
-    sta X16_T0
-    stx X16_T1
+    sty mos8(X16_T2)
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_rfind_len:
     lda (X16_T0),y
@@ -191,7 +191,7 @@ str_rfind:
     dey                         ; start at the last character
 .Lstr_rfind_loop:
     lda (X16_T0),y
-    cmp X16_T2
+    cmp mos8(X16_T2)
     beq .Lstr_rfind_found
     dey
     cpy #255                    ; walked past index 0
@@ -221,12 +221,12 @@ str_rfind:
 ; scope under some assemblers.
 ; ---------------------------------------------------------------------
 str_pattern_match:
-    sta X16_T0                  ; strptr = the string
-    stx X16_T1
-    lda X16_P0                  ; patch the pattern address into both loads
+    sta mos8(X16_T0)            ; strptr = the string
+    stx mos8(X16_T1)
+    lda mos8(X16_P0)            ; patch the pattern address into both loads
     sta find_pm_pat1+1
     sta find_pm_pat2+1
-    lda X16_P1
+    lda mos8(X16_P1)
     sta find_pm_pat1+2
     sta find_pm_pat2+2
     jsr find_pm_match               ; carry = the match result

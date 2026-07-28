@@ -173,7 +173,7 @@ save_zp:
         bpl     .Lsave_zp_imag
         ldx     #X16_ZP_SAVE_SIZE - 1
 .Lsave_zp_lib:
-        lda     X16_P0,x
+        lda     mos8(X16_P0),x
         sta     zp_save + IMAG_SAVE_SIZE,x
         dex
         bpl     .Lsave_zp_lib
@@ -189,7 +189,7 @@ restore_zp:
         ldx     #X16_ZP_SAVE_SIZE - 1
 .Lrestore_zp_lib:
         lda     zp_save + IMAG_SAVE_SIZE,x
-        sta     X16_P0,x
+        sta     mos8(X16_P0),x
         dex
         bpl     .Lrestore_zp_lib
         rts
@@ -290,10 +290,10 @@ vsync_wait:
 ; first __rc pair, __rc2/__rc3, and not A/X as under cc65.
 ; irq_line_install wants A/X = handler, X16_P0/P1 = line.
 x16_irq_line_install:
-        sta     X16_P0                  ; line lo
-        stx     X16_P1                  ; line hi
-        lda     __rc2                   ; A/X = handler
-        ldx     __rc3
+        sta     mos8(X16_P0)            ; line lo
+        stx     mos8(X16_P1)            ; line hi
+        lda     mos8(__rc2)             ; A/X = handler
+        ldx     mos8(__rc3)
         ; fall through
 
 ; irq_line_install -- in: A/X = handler, X16_P0/P1 = scanline (0-511)
@@ -307,9 +307,9 @@ irq_line_install:
         sei
         sta     irq_line_vec
         stx     irq_line_vec+1
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_IRQ_LINE_L
-        lda     X16_P1
+        lda     mos8(X16_P1)
         lsr     a                       ; scanline bit 8 -> carry
         lda     #$80                    ; ...lives in IEN bit 7
         bcs     .Lirq_line_install_bit8_set
@@ -349,8 +349,8 @@ x16_irq_line_remove:
 ; irq_sprcol_install wants A/X. cc65 needed no shim here; llvm-mos does.
 ; ---------------------------------------------------------------------
 x16_irq_sprcol_install:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         ; fall through
 irq_sprcol_install:
         pha                             ; irq_install clobbers A

@@ -50,8 +50,8 @@ x16_clock_update:
 ; ---------------------------------------------------------------------
 x16_clock_get_timer:
         jsr     RDTIM                   ; A = low, X = mid, Y = high
-        sty     __rc2
-        stz     __rc3
+        sty     mos8(__rc2)
+        stz     mos8(__rc3)
         rts
 
 ; ---------------------------------------------------------------------
@@ -59,7 +59,7 @@ x16_clock_get_timer:
 ;   bits 24-31 are ignored: the counter is 24 bits wide
 ; ---------------------------------------------------------------------
 x16_clock_set_timer:
-        ldy     __rc2                   ; bits 16-23; A/X arrive correct
+        ldy     mos8(__rc2)             ; bits 16-23; A/X arrive correct
         jmp     SETTIM
 
 ; ---------------------------------------------------------------------
@@ -69,10 +69,10 @@ x16_clock_set_timer:
 ; There is no lda zp,y form, so this assembles as absolute,y.
 ; ---------------------------------------------------------------------
 x16_clock_get_date_time:
-        lda     __rc2
-        sta     X16_TPTR0
-        lda     __rc3
-        sta     X16_TPTR0+1
+        lda     mos8(__rc2)
+        sta     mos8(X16_TPTR0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_TPTR0+1)
         jsr     CLOCK_GET_DATE_TIME
         ldy     #7
 .Lx16_clock_get_date_time_copy:
@@ -89,10 +89,10 @@ x16_clock_get_date_time:
 ; validate, so pass sane values.
 ; ---------------------------------------------------------------------
 x16_clock_set_date_time:
-        lda     __rc2
-        sta     X16_TPTR0
-        lda     __rc3
-        sta     X16_TPTR0+1
+        lda     mos8(__rc2)
+        sta     mos8(X16_TPTR0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_TPTR0+1)
         ldy     #7
 .Lx16_clock_set_date_time_copy:
         lda     (X16_TPTR0),y

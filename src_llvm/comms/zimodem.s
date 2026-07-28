@@ -67,10 +67,10 @@
 ;   which frees A/X for the popped UART base -- what zi_init wants.
 ; ---------------------------------------------------------------------
 x16_zi_init:
-        ldy     __rc2                   ; divisor, moved through Y so the
-        sty     X16_P0                  ; uart base stays put in A/X, which is
-        ldy     __rc3                   ; where the internal routine wants
-        sty     X16_P1                  ; it
+        ldy     mos8(__rc2)             ; divisor, moved through Y so the
+        sty     mos8(X16_P0)            ; uart base stays put in A/X, which is
+        ldy     mos8(__rc3)             ; where the internal routine wants
+        sty     mos8(X16_P1)            ; it
         jmp     zi_init
 
 ; ---------------------------------------------------------------------
@@ -92,14 +92,14 @@ x16_zi_hex_close:
         jmp     zi_hex_close
 
 x16_zi_cmd:
-        lda     __rc2                   ; a lone pointer never lands in
-        ldx     __rc3                   ; A/X -- it takes an __rc pair,
+        lda     mos8(__rc2)             ; a lone pointer never lands in
+        ldx     mos8(__rc3)             ; A/X -- it takes an __rc pair,
                                         ; and the routine below wants A/X
         jmp     zi_cmd
 
 x16_zi_get_ip:
-        lda     __rc2                   ; a lone pointer never lands in
-        ldx     __rc3                   ; A/X -- it takes an __rc pair,
+        lda     mos8(__rc2)             ; a lone pointer never lands in
+        ldx     mos8(__rc3)             ; A/X -- it takes an __rc pair,
                                         ; and the routine below wants A/X
         jmp     zi_get_ip
 
@@ -136,12 +136,12 @@ x16_zi_hex_chunk:
 ; ---------------------------------------------------------------------
 x16_zi_hexdecode:
         tay                             ; Y = ndigits (it arrives in A)
-        lda     __rc2                   ; dest, into the library's own
-        sta     X16_P0                  ; block -- no aliasing there
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4                   ; src, into A/X for the call
-        ldx     __rc5
+        lda     mos8(__rc2)             ; dest, into the library's own
+        sta     mos8(X16_P0)            ; block -- no aliasing there
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; src, into A/X for the call
+        ldx     mos8(__rc5)
         jsr     zi_hexdecode
         ldx     #0
         rts
@@ -219,19 +219,19 @@ zi_get_ip:
         ldx     #>zi_ati2
         jsr     zi_cmd                  ; ATI2 -> the board prints its IP then OK
         lda     zi_dest                 ; read the reply into the caller's buffer
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     zi_dest+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
         lda     #24
-        sta     X16_P2
-        stz     X16_P3
+        sta     mos8(X16_P2)
+        stz     mos8(X16_P3)
         lda     #<zi_ok
         ldx     #>zi_ok
         jsr     ser_read_until          ; up to and including "OK\r\n"
         lda     zi_dest                 ; a zero-page cursor to walk the reply
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     zi_dest+1
-        sta     X16_T0+1
+        sta     mos8(X16_T0+1)
         ldy     #0                      ; trim at the first control/space char
 .Lzi_get_ip_scan:
         lda     (X16_T0),y
@@ -293,18 +293,18 @@ zi_hex_chunk:
         sta     zi_dest
         stx     zi_dest+1
         lda     #<zi_linebuf            ; read one CR/LF-terminated line
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     #>zi_linebuf
-        sta     X16_P1
+        sta     mos8(X16_P1)
         lda     #90
-        sta     X16_P2
-        stz     X16_P3
+        sta     mos8(X16_P2)
+        stz     mos8(X16_P3)
         lda     #<zi_crlf
         ldx     #>zi_crlf
         jsr     ser_read_until          ; P4/P5 = bytes stored (incl. the CR/LF)
-        lda     X16_P5
+        lda     mos8(X16_P5)
         bne     .Lzi_hex_chunk_data
-        lda     X16_P4                  ; "OK\r\n" (4 bytes, starts 'O') ends it
+        lda     mos8(X16_P4)            ; "OK\r\n" (4 bytes, starts 'O') ends it
         cmp     #4
         bne     .Lzi_hex_chunk_data
         lda     zi_linebuf
@@ -313,14 +313,14 @@ zi_hex_chunk:
         lda     #0
         rts
 .Lzi_hex_chunk_data:
-        lda     X16_P4                  ; digits = line length minus the CR/LF
+        lda     mos8(X16_P4)            ; digits = line length minus the CR/LF
         sec
         sbc     #2
         tay
         lda     zi_dest                 ; decode into the caller's buffer
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     zi_dest+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
         lda     #<zi_linebuf
         ldx     #>zi_linebuf
         jmp     zi_hexdecode            ; returns A = bytes produced
@@ -341,12 +341,12 @@ zi_hex_close:
 ; standalone routine the test suite drives directly.
 ; ---------------------------------------------------------------------
 zi_hexdecode:
-        sta     X16_T4                  ; T4/T5 = source cursor
-        stx     X16_T5
-        sty     X16_T6                  ; T6 = digits left
-        stz     X16_T7                  ; T7 = bytes produced
+        sta     mos8(X16_T4)            ; T4/T5 = source cursor
+        stx     mos8(X16_T5)
+        sty     mos8(X16_T6)            ; T6 = digits left
+        stz     mos8(X16_T7)            ; T7 = bytes produced
 .Lzi_hexdecode_loop:
-        lda     X16_T6
+        lda     mos8(X16_T6)
         beq     .Lzi_hexdecode_done
         ldy     #0
         lda     (X16_T4),y              ; high nibble digit
@@ -355,29 +355,29 @@ zi_hexdecode:
         asl
         asl
         asl
-        sta     X16_T3
+        sta     mos8(X16_T3)
         ldy     #1
         lda     (X16_T4),y              ; low nibble digit
         jsr     zimodem_nib
-        ora     X16_T3
+        ora     mos8(X16_T3)
         sta     (X16_P0)                ; store the packed byte
-        inc     X16_P0
+        inc     mos8(X16_P0)
         bne     .Lzi_hexdecode_dst
-        inc     X16_P1
+        inc     mos8(X16_P1)
 .Lzi_hexdecode_dst:
-        lda     X16_T4                  ; source += 2
+        lda     mos8(X16_T4)            ; source += 2
         clc
         adc     #2
-        sta     X16_T4
+        sta     mos8(X16_T4)
         bcc     .Lzi_hexdecode_src
-        inc     X16_T5
+        inc     mos8(X16_T5)
 .Lzi_hexdecode_src:
-        inc     X16_T7
-        dec     X16_T6
-        dec     X16_T6
+        inc     mos8(X16_T7)
+        dec     mos8(X16_T6)
+        dec     mos8(X16_T6)
         bra     .Lzi_hexdecode_loop
 .Lzi_hexdecode_done:
-        lda     X16_T7
+        lda     mos8(X16_T7)
         rts
 
 ; one ASCII hex digit in A -> its 0..15 value (uppercase A-F)

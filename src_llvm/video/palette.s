@@ -36,7 +36,7 @@
 ; obvious.
 ; ---------------------------------------------------------------------
 x16_pal_set:
-        ldy     __rc2                   ; Y = colour hi
+        ldy     mos8(__rc2)             ; Y = colour hi
         pha                             ; index
         txa                             ; A = colour lo
         plx                             ; X = index
@@ -47,8 +47,8 @@ x16_pal_set:
 ;        A = low byte  (Green<<4 | Blue)
 ;        Y = high byte (Red)
 pal_set:
-        sta     X16_T0                  ; colour low
-        sty     X16_T1                  ; colour high
+        sta     mos8(X16_T0)            ; colour low
+        sty     mos8(X16_T1)            ; colour high
 
         lda     #VERA_CTRL_ADDRSEL
         trb     VERA_CTRL               ; ADDRSEL = 0 (leaves DCSEL alone)
@@ -63,9 +63,9 @@ pal_set:
         lda     #(VERA_ADDR_H_BANK | (VERA_INC_1 << 4))   ; $1FA00 is in bank 1
         sta     VERA_ADDR_H
 
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     VERA_DATA0
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     VERA_DATA0
         rts
 
@@ -88,9 +88,9 @@ pal_set:
 ; A has to survive the pointer copy, hence the push.
 x16_pal_load:
         pha                             ; first
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     X16_PTR0                ; src lo
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     X16_PTR0+1              ; src hi
         pla                             ; A = first; X = count, untouched
         ; fall through
@@ -102,7 +102,7 @@ x16_pal_load:
 pal_load:
         cpx     #0                      ; count 0 loads nothing -- without
         beq     .Lpal_load_done                   ; this guard the loop would run 256
-        stx     X16_T2                  ; times and shred the whole palette
+        stx     mos8(X16_T2)            ; times and shred the whole palette
 
         tax                             ; X = first index
         lda     #VERA_CTRL_ADDRSEL
@@ -125,7 +125,7 @@ pal_load:
         lda     (X16_PTR0),y
         sta     VERA_DATA0              ; high byte
         iny
-        dec     X16_T2
+        dec     mos8(X16_T2)
         bne     .Lpal_load_loop
 .Lpal_load_done:
         rts

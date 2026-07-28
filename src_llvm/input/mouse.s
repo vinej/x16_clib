@@ -41,7 +41,7 @@
 ; current bounds unchanged.
 ; ---------------------------------------------------------------------
 x16_mse_config:
-        ldy     __rc2                   ; Y = height8; A = show and
+        ldy     mos8(__rc2)             ; Y = height8; A = show and
         jmp     MOUSE_CONFIG            ; X = width8 arrive in place
 
 ; ---------------------------------------------------------------------
@@ -62,18 +62,18 @@ x16_mse_scan:
 ; buttons through the third, and the wheel as the return value.
 ; ---------------------------------------------------------------------
 x16_mse_get:
-        lda     __rc2                   ; x*: the first pointer pair
-        sta     X16_TPTR0
-        lda     __rc3
-        sta     X16_TPTR0+1
-        lda     __rc4                   ; y*
-        sta     X16_TPTR1
-        lda     __rc5
-        sta     X16_TPTR1+1
-        lda     __rc6                   ; buttons*
-        sta     X16_TPTR2
-        lda     __rc7
-        sta     X16_TPTR2+1
+        lda     mos8(__rc2)             ; x*: the first pointer pair
+        sta     mos8(X16_TPTR0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_TPTR0+1)
+        lda     mos8(__rc4)             ; y*
+        sta     mos8(X16_TPTR1)
+        lda     mos8(__rc5)
+        sta     mos8(X16_TPTR1+1)
+        lda     mos8(__rc6)             ; buttons*
+        sta     mos8(X16_TPTR2)
+        lda     mos8(__rc7)
+        sta     mos8(X16_TPTR2+1)
 
         ldx     #<X16_P0
         jsr     MOUSE_GET               ; X16_P0..P3, A = buttons, X = wheel
@@ -81,14 +81,14 @@ x16_mse_get:
 
         ldy     #0
         sta     (X16_TPTR2),y                ; *buttons
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     (X16_TPTR0),y
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     (X16_TPTR1),y
         iny
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     (X16_TPTR0),y
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     (X16_TPTR1),y
 
         pla                             ; A = wheel delta

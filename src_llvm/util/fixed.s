@@ -29,38 +29,38 @@
 ; A 32-bit result goes back the way it would arrive: A, X, __rc2, __rc3.
 ; cc65 put the upper half in its sreg.
 x16_umul16:
-        sta     X16_P0                  ; a lo
-        stx     X16_P1                  ; a hi
-        lda     __rc2
-        sta     X16_P2                  ; b lo
-        lda     __rc3
-        sta     X16_P3                  ; b hi
+        sta     mos8(X16_P0)            ; a lo
+        stx     mos8(X16_P1)            ; a hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; b lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; b hi
 
         jsr     umul16
 
-        lda     X16_P6
-        sta     __rc2                   ; product bits 16-23
-        lda     X16_P7
-        sta     __rc3                   ; product bits 24-31
-        lda     X16_P4                  ; bits 0-7
-        ldx     X16_P5                  ; bits 8-15
+        lda     mos8(X16_P6)
+        sta     mos8(__rc2)             ; product bits 16-23
+        lda     mos8(X16_P7)
+        sta     mos8(__rc3)             ; product bits 24-31
+        lda     mos8(X16_P4)            ; bits 0-7
+        ldx     mos8(X16_P5)            ; bits 8-15
         rts
 
 ; ---------------------------------------------------------------------
 ; int __fastcall__ x16_mul88(int a, int b)
 ; ---------------------------------------------------------------------
 x16_mul88:
-        sta     X16_P0                  ; a lo
-        stx     X16_P1                  ; a hi
-        lda     __rc2
-        sta     X16_P2                  ; b lo
-        lda     __rc3
-        sta     X16_P3                  ; b hi
+        sta     mos8(X16_P0)            ; a lo
+        stx     mos8(X16_P1)            ; a hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; b lo
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; b hi
 
         jsr     mul88
 
-        lda     X16_P0                  ; a 16-bit result is A (low), X (high)
-        ldx     X16_P1
+        lda     mos8(X16_P0)            ; a 16-bit result is A (low), X (high)
+        ldx     mos8(X16_P1)
         rts
 
 ; =====================================================================
@@ -73,13 +73,13 @@ x16_mul88:
 ;   out: X16_P4..P7 = product, low byte first
 ; ---------------------------------------------------------------------
 umul16:
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     fx_mcand
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     fx_mcand+1
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     fx_mplier
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     fx_mplier+1
 
         stz     fx_prod+2
@@ -108,13 +108,13 @@ umul16:
         bne     .Lumul16_shift
 
         lda     fx_prod
-        sta     X16_P4
+        sta     mos8(X16_P4)
         lda     fx_prod+1
-        sta     X16_P5
+        sta     mos8(X16_P5)
         lda     fx_prod+2
-        sta     X16_P6
+        sta     mos8(X16_P6)
         lda     fx_prod+3
-        sta     X16_P7
+        sta     mos8(X16_P7)
         rts
 
 ; ---------------------------------------------------------------------
@@ -130,12 +130,12 @@ umul16:
 mul88:
         stz     fx_sign
 
-        lda     X16_P1                  ; sign of a
+        lda     mos8(X16_P1)            ; sign of a
         bpl     .Lmul88_a_positive
         inc     fx_sign
         jsr     negate_a
 .Lmul88_a_positive:
-        lda     X16_P3                  ; sign of b
+        lda     mos8(X16_P3)            ; sign of b
         bpl     .Lmul88_b_positive
         inc     fx_sign
         jsr     negate_b
@@ -143,10 +143,10 @@ mul88:
 
         jsr     umul16                  ; P4..P7 = |a| * |b|
 
-        lda     X16_P5                  ; >> 8 : take bytes 1 and 2
-        sta     X16_P0
-        lda     X16_P6
-        sta     X16_P1
+        lda     mos8(X16_P5)            ; >> 8 : take bytes 1 and 2
+        sta     mos8(X16_P0)
+        lda     mos8(X16_P6)
+        sta     mos8(X16_P1)
 
         lda     fx_sign
         lsr     a                       ; odd number of negatives -> negate
@@ -158,21 +158,21 @@ mul88:
 negate_a:
         sec
         lda     #0
-        sbc     X16_P0
-        sta     X16_P0
+        sbc     mos8(X16_P0)
+        sta     mos8(X16_P0)
         lda     #0
-        sbc     X16_P1
-        sta     X16_P1
+        sbc     mos8(X16_P1)
+        sta     mos8(X16_P1)
         rts
 
 negate_b:
         sec
         lda     #0
-        sbc     X16_P2
-        sta     X16_P2
+        sbc     mos8(X16_P2)
+        sta     mos8(X16_P2)
         lda     #0
-        sbc     X16_P3
-        sta     X16_P3
+        sbc     mos8(X16_P3)
+        sta     mos8(X16_P3)
         rts
 
 ; ---------------------------------------------------------------------

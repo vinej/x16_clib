@@ -71,10 +71,10 @@ x16_bank_get:
 ; ---------------------------------------------------------------------
 ; A = bank, X = offset lo, __rc2 = offset hi.
 x16_bank_peek:
-        stx     X16_P0                  ; offset lo
+        stx     mos8(X16_P0)            ; offset lo
         pha                             ; bank
-        lda     __rc2
-        sta     X16_P1                  ; offset hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P1)            ; offset hi
         pla                             ; A = bank
         jmp     bank_peek               ; the byte comes back in A
 
@@ -85,11 +85,11 @@ x16_bank_peek:
 ; A = bank, X = offset lo, __rc2 = offset hi, __rc3 = value.
 ; bank_poke wants A = value, X = bank, X16_P0/P1 = offset.
 x16_bank_poke:
-        stx     X16_P0                  ; offset lo
+        stx     mos8(X16_P0)            ; offset lo
         tax                             ; X = bank
-        lda     __rc2
-        sta     X16_P1                  ; offset hi
-        lda     __rc3                   ; A = value
+        lda     mos8(__rc2)
+        sta     mos8(X16_P1)            ; offset hi
+        lda     mos8(__rc3)             ; A = value
         jmp     bank_poke
 
 ; ---------------------------------------------------------------------
@@ -100,18 +100,18 @@ x16_bank_poke:
 ; in declaration order: bank -> A, offset lo -> X, offset hi -> __rc4,
 ; count lo -> __rc5, count hi -> __rc6.
 x16_mem_to_bank:
-        sta     X16_P2                  ; bank
-        stx     X16_P3                  ; offset lo
-        lda     __rc4
-        sta     X16_P4                  ; offset hi
-        lda     __rc5
-        sta     X16_P5                  ; count lo
-        lda     __rc6
-        sta     X16_P6                  ; count hi
-        lda     __rc2
-        sta     X16_P0                  ; src
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; bank
+        stx     mos8(X16_P3)            ; offset lo
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; offset hi
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; count lo
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; src
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         jmp     mem_to_bank
 
 ; ---------------------------------------------------------------------
@@ -122,18 +122,18 @@ x16_mem_to_bank:
 ; bank -> A, offset lo -> X, offset hi -> __rc4, count lo -> __rc5,
 ; count hi -> __rc6.
 x16_bank_to_mem:
-        sta     X16_P0                  ; bank
-        stx     X16_P1                  ; offset lo
-        lda     __rc4
-        sta     X16_P2                  ; offset hi
-        lda     __rc5
-        sta     X16_P5                  ; count lo
-        lda     __rc6
-        sta     X16_P6                  ; count hi
-        lda     __rc2
-        sta     X16_P3                  ; dst
-        lda     __rc3
-        sta     X16_P4
+        sta     mos8(X16_P0)            ; bank
+        stx     mos8(X16_P1)            ; offset lo
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; offset hi
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; count lo
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P3)            ; dst
+        lda     mos8(__rc3)
+        sta     mos8(X16_P4)
         jmp     bank_to_mem
 
 ; ---------------------------------------------------------------------
@@ -146,20 +146,20 @@ x16_bank_to_mem:
 ; Seven integer bytes, no pointers: src_bank -> A, src_offset -> X/__rc2,
 ; dst_bank -> __rc3, dst_offset -> __rc4/__rc5, count -> __rc6/__rc7.
 x16_bank_copy_far:
-        sta     X16_P0                  ; src bank
-        stx     X16_P1                  ; src offset lo
-        lda     __rc2
-        sta     X16_P2                  ; src offset hi
-        lda     __rc3
-        sta     X16_P3                  ; dst bank
-        lda     __rc4
-        sta     X16_P4                  ; dst offset lo
-        lda     __rc5
-        sta     X16_P5                  ; dst offset hi
-        lda     __rc6
-        sta     X16_P6                  ; count lo
-        lda     __rc7
-        sta     X16_P7                  ; count hi
+        sta     mos8(X16_P0)            ; src bank
+        stx     mos8(X16_P1)            ; src offset lo
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; src offset hi
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)            ; dst bank
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; dst offset lo
+        lda     mos8(__rc5)
+        sta     mos8(X16_P5)            ; dst offset hi
+        lda     mos8(__rc6)
+        sta     mos8(X16_P6)            ; count lo
+        lda     mos8(__rc7)
+        sta     mos8(X16_P7)            ; count hi
         jmp     bank_copy_far
 
 ; =====================================================================
@@ -203,13 +203,13 @@ bank_poke:
 ; could not then see a helper defined after bank_poke.
 window_ptr:
         pha
-        lda     X16_P0
+        lda     mos8(X16_P0)
         clc
         adc     #<BANK_WINDOW
-        sta     X16_T0
-        lda     X16_P1
+        sta     mos8(X16_T0)
+        lda     mos8(X16_P1)
         adc     #>BANK_WINDOW
-        sta     X16_T1
+        sta     mos8(X16_T1)
         pla
         rts
 
@@ -232,38 +232,38 @@ window_ptr:
 mem_to_bank:
         lda     RAM_BANK
         pha
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     RAM_BANK
 
-        lda     X16_P0                  ; T0/T1 = low-RAM side
-        sta     X16_T0
-        lda     X16_P1
-        sta     X16_T1
-        lda     X16_P3                  ; T2/T3 = offset within the window
-        sta     X16_T2
-        lda     X16_P4
-        sta     X16_T3
-        lda     X16_P5                  ; T4/T5 = remaining
-        sta     X16_T4
-        lda     X16_P6
-        sta     X16_T5
+        lda     mos8(X16_P0)            ; T0/T1 = low-RAM side
+        sta     mos8(X16_T0)
+        lda     mos8(X16_P1)
+        sta     mos8(X16_T1)
+        lda     mos8(X16_P3)            ; T2/T3 = offset within the window
+        sta     mos8(X16_T2)
+        lda     mos8(X16_P4)
+        sta     mos8(X16_T3)
+        lda     mos8(X16_P5)            ; T4/T5 = remaining
+        sta     mos8(X16_T4)
+        lda     mos8(X16_P6)
+        sta     mos8(X16_T5)
 
 .Lmem_to_bank_seg_out:
         jsr     seg_span                ; T6/T7 = bytes until the bank edge
         beq     .Lmem_to_bank_out_done
-        lda     X16_T0                  ; source: low RAM
+        lda     mos8(X16_T0)            ; source: low RAM
         sta     r0L
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     r0H
-        lda     X16_T2                  ; target: window + offset
+        lda     mos8(X16_T2)            ; target: window + offset
         sta     r1L
-        lda     X16_T3
+        lda     mos8(X16_T3)
         clc
         adc     #>BANK_WINDOW
         sta     r1H
-        lda     X16_T6
+        lda     mos8(X16_T6)
         sta     r2L
-        lda     X16_T7
+        lda     mos8(X16_T7)
         sta     r2H
         jsr     MEMORY_COPY
         jsr     advance
@@ -276,38 +276,38 @@ mem_to_bank:
 bank_to_mem:
         lda     RAM_BANK
         pha
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     RAM_BANK
 
-        lda     X16_P3                  ; T0/T1 = low-RAM side
-        sta     X16_T0
-        lda     X16_P4
-        sta     X16_T1
-        lda     X16_P1                  ; T2/T3 = offset within the window
-        sta     X16_T2
-        lda     X16_P2
-        sta     X16_T3
-        lda     X16_P5
-        sta     X16_T4
-        lda     X16_P6
-        sta     X16_T5
+        lda     mos8(X16_P3)            ; T0/T1 = low-RAM side
+        sta     mos8(X16_T0)
+        lda     mos8(X16_P4)
+        sta     mos8(X16_T1)
+        lda     mos8(X16_P1)            ; T2/T3 = offset within the window
+        sta     mos8(X16_T2)
+        lda     mos8(X16_P2)
+        sta     mos8(X16_T3)
+        lda     mos8(X16_P5)
+        sta     mos8(X16_T4)
+        lda     mos8(X16_P6)
+        sta     mos8(X16_T5)
 
 .Lbank_to_mem_seg_in:
         jsr     seg_span
         beq     .Lbank_to_mem_in_done
-        lda     X16_T2                  ; source: window + offset
+        lda     mos8(X16_T2)            ; source: window + offset
         sta     r0L
-        lda     X16_T3
+        lda     mos8(X16_T3)
         clc
         adc     #>BANK_WINDOW
         sta     r0H
-        lda     X16_T0                  ; target: low RAM
+        lda     mos8(X16_T0)            ; target: low RAM
         sta     r1L
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     r1H
-        lda     X16_T6
+        lda     mos8(X16_T6)
         sta     r2L
-        lda     X16_T7
+        lda     mos8(X16_T7)
         sta     r2H
         jsr     MEMORY_COPY
         jsr     advance
@@ -322,30 +322,30 @@ bank_to_mem:
 ; T6/T7 = min(remaining, space left in this bank). Z set when nothing
 ; remains.
 seg_span:
-        lda     X16_T4
-        ora     X16_T5
+        lda     mos8(X16_T4)
+        ora     mos8(X16_T5)
         beq     seg_done                ; remaining == 0 (Z set for the caller)
 
         sec                             ; space = $2000 - offset
         lda     #<BANK_SIZE
-        sbc     X16_T2
-        sta     X16_T6
+        sbc     mos8(X16_T2)
+        sta     mos8(X16_T6)
         lda     #>BANK_SIZE
-        sbc     X16_T3
-        sta     X16_T7
+        sbc     mos8(X16_T3)
+        sta     mos8(X16_T7)
 
-        lda     X16_T5                  ; remaining < space? then take remaining
-        cmp     X16_T7
+        lda     mos8(X16_T5)            ; remaining < space? then take remaining
+        cmp     mos8(X16_T7)
         bcc     seg_take_rem
         bne     seg_have
-        lda     X16_T4
-        cmp     X16_T6
+        lda     mos8(X16_T4)
+        cmp     mos8(X16_T6)
         bcs     seg_have
 seg_take_rem:
-        lda     X16_T4
-        sta     X16_T6
-        lda     X16_T5
-        sta     X16_T7
+        lda     mos8(X16_T4)
+        sta     mos8(X16_T6)
+        lda     mos8(X16_T5)
+        sta     mos8(X16_T7)
 seg_have:
         lda     #1                      ; Z clear: there is work to do
 seg_done:
@@ -355,33 +355,33 @@ seg_done:
 ; (rolling into the next bank), shrink the remaining count.
 advance:
         clc
-        lda     X16_T0
-        adc     X16_T6
-        sta     X16_T0
-        lda     X16_T1
-        adc     X16_T7
-        sta     X16_T1
+        lda     mos8(X16_T0)
+        adc     mos8(X16_T6)
+        sta     mos8(X16_T0)
+        lda     mos8(X16_T1)
+        adc     mos8(X16_T7)
+        sta     mos8(X16_T1)
 
         clc
-        lda     X16_T2
-        adc     X16_T6
-        sta     X16_T2
-        lda     X16_T3
-        adc     X16_T7
-        sta     X16_T3
+        lda     mos8(X16_T2)
+        adc     mos8(X16_T6)
+        sta     mos8(X16_T2)
+        lda     mos8(X16_T3)
+        adc     mos8(X16_T7)
+        sta     mos8(X16_T3)
         cmp     #>BANK_SIZE             ; offset reached $2000: next bank
         bne     .Ladvance_count
-        stz     X16_T2
-        stz     X16_T3
+        stz     mos8(X16_T2)
+        stz     mos8(X16_T3)
         inc     RAM_BANK
 .Ladvance_count:
         sec
-        lda     X16_T4
-        sbc     X16_T6
-        sta     X16_T4
-        lda     X16_T5
-        sbc     X16_T7
-        sta     X16_T5
+        lda     mos8(X16_T4)
+        sbc     mos8(X16_T6)
+        sta     mos8(X16_T4)
+        lda     mos8(X16_T5)
+        sbc     mos8(X16_T7)
+        sta     mos8(X16_T5)
         rts
 
 ; ---------------------------------------------------------------------
@@ -399,17 +399,17 @@ bank_copy_far:
         pha
 
 .Lbank_copy_far_far_loop:
-        lda     X16_P6
-        ora     X16_P7
+        lda     mos8(X16_P6)
+        ora     mos8(X16_P7)
         bne     .Lbank_copy_far_far_more
         jmp     .Lbank_copy_far_far_done               ; out of branch range from here
 .Lbank_copy_far_far_more:
 
         ; chunk = min(count, bounce size, source bank space, dest space)
         ldx     #BANK_BOUNCE_SIZE
-        lda     X16_P7
+        lda     mos8(X16_P7)
         bne     .Lbank_copy_far_far_src_cap            ; count >= 256: the buffer is the cap
-        lda     X16_P6
+        lda     mos8(X16_P6)
         cmp     #BANK_BOUNCE_SIZE
         bcs     .Lbank_copy_far_far_src_cap
         tax                             ; count < buffer: count is the cap
@@ -418,35 +418,35 @@ bank_copy_far:
         ; window's last page: below that, more than a full chunk remains.
         sec
         lda     #<BANK_SIZE
-        sbc     X16_P1
-        sta     X16_T0
+        sbc     mos8(X16_P1)
+        sta     mos8(X16_T0)
         lda     #>BANK_SIZE
-        sbc     X16_P2
+        sbc     mos8(X16_P2)
         bne     .Lbank_copy_far_far_dst_cap            ; >= 256 bytes left in the source bank
         txa
-        cmp     X16_T0
+        cmp     mos8(X16_T0)
         bcc     .Lbank_copy_far_far_dst_cap
-        ldx     X16_T0
+        ldx     mos8(X16_T0)
 .Lbank_copy_far_far_dst_cap:
         sec
         lda     #<BANK_SIZE
-        sbc     X16_P4
-        sta     X16_T0
+        sbc     mos8(X16_P4)
+        sta     mos8(X16_T0)
         lda     #>BANK_SIZE
-        sbc     X16_P5
+        sbc     mos8(X16_P5)
         bne     .Lbank_copy_far_far_go
         txa
-        cmp     X16_T0
+        cmp     mos8(X16_T0)
         bcc     .Lbank_copy_far_far_go
-        ldx     X16_T0
+        ldx     mos8(X16_T0)
 .Lbank_copy_far_far_go:
-        stx     X16_T7                  ; T7 = chunk (1..BANK_BOUNCE_SIZE)
+        stx     mos8(X16_T7)            ; T7 = chunk (1..BANK_BOUNCE_SIZE)
 
-        lda     X16_P0                  ; leg 1: source bank -> bounce buffer
+        lda     mos8(X16_P0)            ; leg 1: source bank -> bounce buffer
         sta     RAM_BANK
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     r0L
-        lda     X16_P2
+        lda     mos8(X16_P2)
         clc
         adc     #>BANK_WINDOW
         sta     r0H
@@ -458,56 +458,56 @@ bank_copy_far:
         stz     r2H
         jsr     MEMORY_COPY
 
-        lda     X16_P3                  ; leg 2: bounce buffer -> destination
+        lda     mos8(X16_P3)            ; leg 2: bounce buffer -> destination
         sta     RAM_BANK
         lda     #<bounce
         sta     r0L
         lda     #>bounce
         sta     r0H
-        lda     X16_P4
+        lda     mos8(X16_P4)
         sta     r1L
-        lda     X16_P5
+        lda     mos8(X16_P5)
         clc
         adc     #>BANK_WINDOW
         sta     r1H
-        lda     X16_T7
+        lda     mos8(X16_T7)
         sta     r2L
         stz     r2H
         jsr     MEMORY_COPY
 
         clc                             ; advance the source (rolls at $2000)
-        lda     X16_P1
-        adc     X16_T7
-        sta     X16_P1
-        lda     X16_P2
+        lda     mos8(X16_P1)
+        adc     mos8(X16_T7)
+        sta     mos8(X16_P1)
+        lda     mos8(X16_P2)
         adc     #0
-        sta     X16_P2
+        sta     mos8(X16_P2)
         cmp     #>BANK_SIZE
         bne     .Lbank_copy_far_far_adv_dst
-        stz     X16_P1
-        stz     X16_P2
-        inc     X16_P0
+        stz     mos8(X16_P1)
+        stz     mos8(X16_P2)
+        inc     mos8(X16_P0)
 .Lbank_copy_far_far_adv_dst:
         clc
-        lda     X16_P4
-        adc     X16_T7
-        sta     X16_P4
-        lda     X16_P5
+        lda     mos8(X16_P4)
+        adc     mos8(X16_T7)
+        sta     mos8(X16_P4)
+        lda     mos8(X16_P5)
         adc     #0
-        sta     X16_P5
+        sta     mos8(X16_P5)
         cmp     #>BANK_SIZE
         bne     .Lbank_copy_far_far_count
-        stz     X16_P4
-        stz     X16_P5
-        inc     X16_P3
+        stz     mos8(X16_P4)
+        stz     mos8(X16_P5)
+        inc     mos8(X16_P3)
 .Lbank_copy_far_far_count:
         sec
-        lda     X16_P6
-        sbc     X16_T7
-        sta     X16_P6
-        lda     X16_P7
+        lda     mos8(X16_P6)
+        sbc     mos8(X16_T7)
+        sta     mos8(X16_P6)
+        lda     mos8(X16_P7)
         sbc     #0
-        sta     X16_P7
+        sta     mos8(X16_P7)
         jmp     .Lbank_copy_far_far_loop
 
 .Lbank_copy_far_far_done:

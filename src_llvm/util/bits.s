@@ -35,17 +35,17 @@
 ; the loads below go through Y so the mask never leaves A.
 ; ---------------------------------------------------------------------
 x16_bit_set:
-        ldy     __rc2                   ; addr
-        sty     X16_P0
-        ldy     __rc3
-        sty     X16_P1
+        ldy     mos8(__rc2)             ; addr
+        sty     mos8(X16_P0)
+        ldy     mos8(__rc3)
+        sty     mos8(X16_P1)
         jmp     bit_set
 
 x16_bit_clr:
-        ldy     __rc2
-        sty     X16_P0
-        ldy     __rc3
-        sty     X16_P1
+        ldy     mos8(__rc2)
+        sty     mos8(X16_P0)
+        ldy     mos8(__rc3)
+        sty     mos8(X16_P1)
         jmp     bit_clr
 
 ; ---------------------------------------------------------------------
@@ -56,10 +56,10 @@ x16_bit_clr:
 ; A = mask, X = the flag, so only the pointer moves.
 ; ---------------------------------------------------------------------
 x16_bit_put:
-        ldy     __rc2                   ; addr
-        sty     X16_P0
-        ldy     __rc3
-        sty     X16_P1
+        ldy     mos8(__rc2)             ; addr
+        sty     mos8(X16_P0)
+        ldy     mos8(__rc3)
+        sty     mos8(X16_P1)
         jmp     bit_put
 
 ; ---------------------------------------------------------------------
@@ -68,10 +68,10 @@ x16_bit_put:
 ;   Returns *addr & mask -- nonzero iff any masked bit is set.
 ; ---------------------------------------------------------------------
 x16_bit_test:
-        ldy     __rc2
-        sty     X16_P0
-        ldy     __rc3
-        sty     X16_P1
+        ldy     mos8(__rc2)
+        sty     mos8(X16_P0)
+        ldy     mos8(__rc3)
+        sty     mos8(X16_P1)
         jmp     bit_test                ; A = *addr & mask
 
 ; ---------------------------------------------------------------------
@@ -108,10 +108,10 @@ catnib:
         asl
         asl
         asl
-        sta     X16_T0
+        sta     mos8(X16_T0)
         txa
         and     #$0F
-        ora     X16_T0
+        ora     mos8(X16_T0)
         rts
 
 ; ---------------------------------------------------------------------

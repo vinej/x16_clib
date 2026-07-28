@@ -142,8 +142,8 @@ x16_ym_patch_rom:
 ; channel is a byte -> A; patch is a pointer -> __rc2/__rc3. ym_patch wants
 ; the address in X/Y.
 x16_ym_patch_ram:
-        ldx     __rc2                   ; patch lo
-        ldy     __rc3                   ; patch hi
+        ldx     mos8(__rc2)             ; patch lo
+        ldy     mos8(__rc3)             ; patch hi
         clc                             ; patch in RAM
         jsr     ym_patch
         carry_to_ok
@@ -159,9 +159,9 @@ x16_ym_patch_ram:
 ; set_retrigger_carry preserves X and Y.
 x16_ym_note:
         pha                             ; channel
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     ym_tmp                  ; retrigger
-        ldy     __rc2                   ; Y = kf
+        ldy     mos8(__rc2)             ; Y = kf
         pla                             ; A = channel; X = kc, untouched
         jsr     set_retrigger_carry
         jmp     ym_note
@@ -176,7 +176,7 @@ x16_ym_note:
 ; A = channel, X = note, __rc2 = retrigger.
 x16_ym_note_bas:
         pha                             ; channel
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     ym_tmp                  ; retrigger
         pla                             ; A = channel; X = note, untouched
         jsr     set_retrigger_carry

@@ -36,19 +36,19 @@
 ; TOO, which llvm-mos returns in __rc2/__rc3 -- not in A/X, where the
 ; internal routine leaves it.
 x16_zx0_decompress:
-        lda     __rc2
-        sta     X16_P0                  ; src
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P2                  ; dst
-        lda     __rc5
-        sta     X16_P3
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; src
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; dst
+        lda     mos8(__rc5)
+        sta     mos8(X16_P3)
 
         jsr     zx0_decompress          ; A = lo, X = hi
 
-        sta     __rc2                   ; ...but a pointer returns in __rc2/3
-        stx     __rc3
+        sta     mos8(__rc2)             ; ...but a pointer returns in __rc2/3
+        stx     mos8(__rc3)
         rts
 
 ; =====================================================================
@@ -73,9 +73,9 @@ zx0_decompress:
 .Lzx0_decompress_lit_byte:
         jsr     getbyte
         sta     (X16_P2)
-        inc     X16_P2
+        inc     mos8(X16_P2)
         bne     .Lzx0_decompress_lit_dec
-        inc     X16_P3
+        inc     mos8(X16_P3)
 .Lzx0_decompress_lit_dec:
         jsr     dec_len
         bne     .Lzx0_decompress_lit_byte
@@ -95,8 +95,8 @@ zx0_decompress:
         beq     .Lzx0_decompress_not_end
         lda     zx_val
         bne     .Lzx0_decompress_not_end
-        lda     X16_P2                  ; done: hand back the output end
-        ldx     X16_P3
+        lda     mos8(X16_P2)            ; done: hand back the output end
+        ldx     mos8(X16_P3)
         rts
 .Lzx0_decompress_not_end:
         lda     zx_val                  ; offset = MSB*128 - (next byte >> 1)
@@ -132,22 +132,22 @@ zx0_decompress:
 ; copy zx_val bytes from (output - zx_off) to the output
 copy:
         sec
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sbc     zx_off
-        sta     X16_T6
-        lda     X16_P3
+        sta     mos8(X16_T6)
+        lda     mos8(X16_P3)
         sbc     zx_off+1
-        sta     X16_T7
+        sta     mos8(X16_T7)
 .Lcopy_byte:
         lda     (X16_T6)
         sta     (X16_P2)
-        inc     X16_T6
+        inc     mos8(X16_T6)
         bne     .Lcopy_dst
-        inc     X16_T7
+        inc     mos8(X16_T7)
 .Lcopy_dst:
-        inc     X16_P2
+        inc     mos8(X16_P2)
         bne     .Lcopy_count
-        inc     X16_P3
+        inc     mos8(X16_P3)
 .Lcopy_count:
         jsr     dec_len
         bne     .Lcopy_byte
@@ -213,9 +213,9 @@ getbit:
 getbyte:
         lda     (X16_P0)
         sta     zx_last
-        inc     X16_P0
+        inc     mos8(X16_P0)
         bne     .Lgetbyte_gb_ok
-        inc     X16_P1
+        inc     mos8(X16_P1)
 .Lgetbyte_gb_ok:
         lda     zx_last
         rts

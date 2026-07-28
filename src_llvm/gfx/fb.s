@@ -51,14 +51,14 @@ x16_fb_init:
 ;   returns the color depth in bits per pixel
 ; ---------------------------------------------------------------------
 x16_fb_get_info:
-        lda     __rc2                   ; width*; staged into the library's
-        sta     X16_TPTR0               ; own block, which does not alias
-        lda     __rc3                   ; the KERNAL registers the call
-        sta     X16_TPTR0+1             ; is about to fill
-        lda     __rc4                   ; height*
-        sta     X16_TPTR1
-        lda     __rc5
-        sta     X16_TPTR1+1
+        lda     mos8(__rc2)             ; width*; staged into the library's
+        sta     mos8(X16_TPTR0)         ; own block, which does not alias
+        lda     mos8(__rc3)             ; the KERNAL registers the call
+        sta     mos8(X16_TPTR0+1)       ; is about to fill
+        lda     mos8(__rc4)             ; height*
+        sta     mos8(X16_TPTR1)
+        lda     mos8(__rc5)
+        sta     mos8(X16_TPTR1+1)
 
         jsr     FB_GET_INFO             ; r0 = width, r1 = height, A = depth
         pha
@@ -94,9 +94,9 @@ x16_fb_cursor_position:
         pha                             ; A and X hold the first
         phx                             ; argument; the loads below
                                         ; clobber both, so park them
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                ; y (rightmost arg: A/X)
         plx
         pla
@@ -179,11 +179,11 @@ x16_fb_set_8_pixels:
 ; advances the cursor by 8.
 ; ---------------------------------------------------------------------
 x16_fb_set_8_pixels_opaque:
-        sta     X16_T0                  ; park the pattern: writing it to
-        ldy     __rc3                   ; r0L would bury fg, because r0L
-        lda     __rc2                   ; and __rc2 are the same byte
+        sta     mos8(X16_T0)            ; park the pattern: writing it to
+        ldy     mos8(__rc3)             ; r0L would bury fg, because r0L
+        lda     mos8(__rc2)             ; and __rc2 are the same byte
         pha                             ; fg
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     r0L                     ; pattern -- fg is safe now
         txa                             ; A = mask
         plx                             ; X = fg, Y already holds bg
@@ -199,11 +199,11 @@ x16_fb_set_8_pixels_opaque:
 ; ---------------------------------------------------------------------
 x16_fb_fill_pixels:
         pha                             ; park count low
-        lda     __rc4                   ; color, read before r1H buries it
+        lda     mos8(__rc4)             ; color, read before r1H buries it
         pha
-        lda     __rc3                   ; step high -- __rc2/3 IS r0, so
+        lda     mos8(__rc3)             ; step high -- __rc2/3 IS r0, so
         sta     r1H                     ; step must move up to r1 before
-        lda     __rc2                   ; count is written into r0
+        lda     mos8(__rc2)             ; count is written into r0
         sta     r1L
         pla                             ; A = color
         tay
@@ -231,9 +231,9 @@ x16_fb_fill_pixels:
 ; call back into the fb/graph API.
 ; ---------------------------------------------------------------------
 x16_fb_filter_pixels:
-        ldy     __rc2                   ; the filter pointer lives in r0,
+        ldy     mos8(__rc2)             ; the filter pointer lives in r0,
         sty     filter_vec              ; which count is about to occupy
-        ldy     __rc3
+        ldy     mos8(__rc3)
         sty     filter_vec+1
         sta     r0L                     ; count
         stx     r0H
@@ -270,21 +270,21 @@ filter_tramp:
 x16_fb_move_pixels:
         pha                             ; sx: A and X are needed last but
         phx                             ; the loads below clobber them
-        lda     __rc9                   ; highest destination first: the
+        lda     mos8(__rc9)             ; highest destination first: the
         sta     r4H                     ; sources are the same bytes one
-        lda     __rc8                   ; KERNAL register lower down
+        lda     mos8(__rc8)             ; KERNAL register lower down
         sta     r4L                     ; count
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                     ; ty
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                     ; tx
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                     ; sy
         plx
         pla

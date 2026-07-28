@@ -133,8 +133,8 @@ x16_bcd_sub32:
 ; ---------------------------------------------------------------------
 x16_bcd_addto:
         jsr     bcd_arg_b32
-        lda     __rc2                   ; A = value low, X = value high
-        ldx     __rc3
+        lda     mos8(__rc2)             ; A = value low, X = value high
+        ldx     mos8(__rc3)
         jsr     bcd_addto
         lda     #0
         adc     #0
@@ -142,8 +142,8 @@ x16_bcd_addto:
 
 x16_bcd_subfrom:
         jsr     bcd_arg_b32
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     bcd_subfrom
         lda     #0
         adc     #0
@@ -155,10 +155,10 @@ x16_bcd_subfrom:
 ; b (in A) -> bcd_b; a (__rc2/__rc3) -> X16_T0/T1; *a -> bcd_a
 bcd_arg8:
         sta     bcd_b
-        lda     __rc2
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
         lda     (X16_T0)
         sta     bcd_a
         rts
@@ -166,10 +166,10 @@ bcd_arg8:
 bcd_arg16:
         sta     bcd_b
         stx     bcd_b+1
-        lda     __rc2
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
         lda     (X16_T0)
         sta     bcd_a
         ldy     #1
@@ -189,18 +189,18 @@ bcd_store16:
 bcd_arg_b32:
         sta     bcd_b
         stx     bcd_b+1
-        ldy     __rc4
+        ldy     mos8(__rc4)
         sty     bcd_b+2
-        ldy     __rc5
+        ldy     mos8(__rc5)
         sty     bcd_b+3
         rts
 
 bcd_arg32:
         jsr     bcd_arg_b32
-        lda     __rc2
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
         ldy     #3
 .Lbcd_arg32_copy:  lda     (X16_T0),y
         sta     bcd_a,y
@@ -306,8 +306,8 @@ bcd_sub32:
 ;   out: carry set on overflow. Saves copying the value through bcd_a.
 ; ---------------------------------------------------------------------
 bcd_addto:
-        sta     X16_T0
-        stx     X16_T1
+        sta     mos8(X16_T0)
+        stx     mos8(X16_T1)
         sed
         clc
         ldy     #0
@@ -335,8 +335,8 @@ bcd_addto:
 ;   out: carry clear on borrow.
 ; ---------------------------------------------------------------------
 bcd_subfrom:
-        sta     X16_T0
-        stx     X16_T1
+        sta     mos8(X16_T0)
+        stx     mos8(X16_T1)
         sed
         sec
         ldy     #0

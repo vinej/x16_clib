@@ -24,17 +24,17 @@
         .include        "macros.inc"
         .include        "x16zp.inc"
 
-; llvm-mos argument placement, measured on the machine:
-;   POINTERS take __rc pairs, in order: __rc2/__rc3, then __rc4/__rc5.
-;   INTEGER bytes fill A, then X, then whatever __rc bytes the pointers
-;   left free. So f(ptr, int, char) is ptr in __rc2/3, int in A/X, char in
-;   __rc4.
-; Returns: char in A; int in A/X; long in A/X/__rc2/__rc3; POINTER in
-; __rc2/__rc3.
+; (import dropped: popax)
+; (import dropped: pcm_rate); audio/pcm.s
+; (import dropped: irq_install); system/irq.s
+; (import dropped: irq_aflow_vec); ...where we hang the service
 
         .globl  x16_pcm_stream_start
         .globl  x16_pcm_stream_stop
         .globl  x16_pcm_stream_active
+
+        ; audio/zsm.s drives the streamer directly and owns the loop flag
+        .globl  pcm_stream_start, pcm_stream_stop, pcm_str_loop
 
         .section .text,"ax",@progbits
 
@@ -48,16 +48,14 @@
 ; t=0. A rate of 0 primes without playing. Installs the CINV hook itself;
 ; requires interrupts enabled.
 ; ---------------------------------------------------------------------
-; data is a pointer -> __rc2/__rc3. count is an int -> A/X. rate is a byte
-; and the pointer has taken __rc2/__rc3, so it lands in __rc4.
 x16_pcm_stream_start:
-        sta     X16_P2                  ; count lo
-        stx     X16_P3                  ; count hi
-        lda     __rc2
-        sta     X16_P0                  ; data lo
-        lda     __rc3
-        sta     X16_P1                  ; data hi
-        lda     __rc4                   ; A = rate
+        sta     mos8(X16_P2)            ; count arrives in A/X, and every
+        stx     mos8(X16_P3)            ; load below clobbers both
+        lda     mos8(__rc2)             ; data
+        sta     mos8(X16_P0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)             ; rate, in A for the fall-through
         ; fall through
 
 ; pcm_stream_start -- in: X16_P0/P1 = sample data (low RAM)
@@ -67,15 +65,19 @@ pcm_stream_start:
         pha
         jsr     pcm_stream_stop         ; quiesce a previous stream
 
-        lda     X16_P0                  ; patch the source into the refiller
+        lda     mos8(X16_P0)            ; patch the source into the refiller
         sta     src_lda+1
-        lda     X16_P1
+        sta     pcm_str_rsrc            ; ...and snapshot it, so a looping
+        lda     mos8(X16_P1)            ; stream can rewind to the start
         sta     src_lda+2
-        lda     X16_P2
+        sta     pcm_str_rsrc+1
+        lda     mos8(X16_P2)
         sta     pcm_str_rem
-        lda     X16_P3
+        sta     pcm_str_rlen
+        lda     mos8(X16_P3)
         sta     pcm_str_rem+1
-        ora     X16_P2
+        sta     pcm_str_rlen+1
+        ora     mos8(X16_P2)
         beq     .Lpcm_stream_start_nothing                ; zero bytes: nothing to play
 
         jsr     irq_install
@@ -124,7 +126,8 @@ pcm_stream_stop:
 ;   FIFO. What is in the FIFO may still be playing.
 ; ---------------------------------------------------------------------
 x16_pcm_stream_active:
-        lda     pcm_str_active          ; a char return is A alone
+        lda     pcm_str_active
+        ldx     #0                      ; high byte, for int-promoting callers
         rts
 
 ; ---------------------------------------------------------------------
@@ -168,7 +171,25 @@ psf_dec_low:
         bra     psf_loop
 
 psf_exhausted:
-        lda     #VERA_IRQ_AFLOW         ; out of data: stop the refill interrupt
+        ; Out of data. If the caller asked for a loop and the snapshot
+        ; is not empty, rewind to the start and keep feeding; the FIFO
+        ; never notices the seam.
+        lda     pcm_str_loop
+        beq     .Lpsf_exhausted_stop
+        lda     pcm_str_rlen
+        ora     pcm_str_rlen+1
+        beq     .Lpsf_exhausted_stop                   ; an empty snapshot cannot loop
+        lda     pcm_str_rsrc
+        sta     src_lda+1
+        lda     pcm_str_rsrc+1
+        sta     src_lda+2
+        lda     pcm_str_rlen
+        sta     pcm_str_rem
+        lda     pcm_str_rlen+1
+        sta     pcm_str_rem+1
+        bra     psf_loop
+.Lpsf_exhausted_stop:
+        lda     #VERA_IRQ_AFLOW         ; stop the refill interrupt
         trb     VERA_IEN                ; (leaving it enabled would storm: AFLOW
         stz     pcm_str_active          ; only clears by refilling the FIFO)
 psf_full:
@@ -178,3 +199,10 @@ psf_full:
 
 pcm_str_rem:    .zero  2                  ; bytes still to feed
 pcm_str_active: .zero  1
+
+; Caller-owned: nonzero means wrap to the start when the data runs out.
+; Set or clear it BEFORE pcm_stream_start; it survives a stop, because
+; the flag only matters at the moment the data is exhausted.
+pcm_str_loop:   .zero  1
+pcm_str_rsrc:   .zero  2                  ; rewind snapshot: source...
+pcm_str_rlen:   .zero  2                  ; ...and byte count

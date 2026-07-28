@@ -130,19 +130,19 @@ x16_bmx_lasterr:
 ;      len -> A, device -> X, vaddr -> __rc4..__rc7
 ; out: X16_P0/P1 = name, P2 = len, P3 = device, P4 = bank, P5/P6 = address
 file_marshal:
-        sta     X16_P2                  ; name length
-        stx     X16_P3                  ; device
-        lda     __rc2
-        sta     X16_P0                  ; name
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P5                  ; vaddr bits 0-7
-        lda     __rc5
-        sta     X16_P6                  ; vaddr bits 8-15
-        lda     __rc6
+        sta     mos8(X16_P2)            ; name length
+        stx     mos8(X16_P3)            ; device
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; name
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P5)            ; vaddr bits 0-7
+        lda     mos8(__rc5)
+        sta     mos8(X16_P6)            ; vaddr bits 8-15
+        lda     mos8(__rc6)
         and     #$01
-        sta     X16_P4                  ; vaddr bit 16 -> VRAM bank
+        sta     mos8(X16_P4)            ; vaddr bit 16 -> VRAM bank
         rts
 
 ; ---------------------------------------------------------------------
@@ -159,10 +159,10 @@ BMX_INFO_SIZE = 11
 ; `out` is a pointer -> __rc2/__rc3. bmx.s uses no T bytes, so T0/T1 is
 ; free to indirect through.
 x16_bmx_get_info:
-        lda     __rc2
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
         ldy     #BMX_INFO_SIZE - 1
 .Lx16_bmx_get_info_out:
         lda     bmx_width,y
@@ -172,10 +172,10 @@ x16_bmx_get_info:
         rts
 
 x16_bmx_set_info:
-        lda     __rc2
-        sta     X16_T0
-        lda     __rc3
-        sta     X16_T1
+        lda     mos8(__rc2)
+        sta     mos8(X16_T0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_T1)
         ldy     #BMX_INFO_SIZE - 1
 .Lx16_bmx_set_info_in:
         lda     (X16_T0),y
@@ -355,11 +355,11 @@ bmx_load:
 .Lbmx_load_rows_ahead:
 
         ; --- pixel rows, bmx_stride apart ----------------------------------
-        lda     X16_P5                  ; the walking VRAM address
+        lda     mos8(X16_P5)            ; the walking VRAM address
         sta     bmx_cur
-        lda     X16_P6
+        lda     mos8(X16_P6)
         sta     bmx_cur+1
-        lda     X16_P4
+        lda     mos8(X16_P4)
         and     #$01
         sta     bmx_cur+2
         jsr     row_bytes               ; bmx_row = width >> (3 - depth)
@@ -518,11 +518,11 @@ bmx_save:
 .Lbmx_save_pal_wrote:
 
         ; --- pixel rows -----------------------------------------------------
-        lda     X16_P5
+        lda     mos8(X16_P5)
         sta     bmx_cur
-        lda     X16_P6
+        lda     mos8(X16_P6)
         sta     bmx_cur+1
-        lda     X16_P4
+        lda     mos8(X16_P4)
         and     #$01
         sta     bmx_cur+2
         jsr     row_bytes
@@ -577,12 +577,12 @@ bmx_save:
 
 bmx_open_read:                          ; the bmx_hires.s alias
 open_read:
-        lda     X16_P2
-        ldx     X16_P0
-        ldy     X16_P1
+        lda     mos8(X16_P2)
+        ldx     mos8(X16_P0)
+        ldy     mos8(X16_P1)
         jsr     SETNAM
         lda     #2
-        ldx     X16_P3
+        ldx     mos8(X16_P3)
         ldy     #0                      ; sequential read, no header games
         jsr     SETLFS
         jsr     OPEN
@@ -594,12 +594,12 @@ open_read:
         rts
 
 open_write:
-        lda     X16_P2
-        ldx     X16_P0
-        ldy     X16_P1
+        lda     mos8(X16_P2)
+        ldx     mos8(X16_P0)
+        ldy     mos8(X16_P1)
         jsr     SETNAM
         lda     #2
-        ldx     X16_P3
+        ldx     mos8(X16_P3)
         ldy     #1                      ; write
         jsr     SETLFS
         jsr     OPEN

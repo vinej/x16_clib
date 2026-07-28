@@ -119,9 +119,9 @@ x16_atan2:
 ; ---------------------------------------------------------------------
 ; A = a, X = b, __rc2 = t.
 x16_lerp8:
-        sta     X16_P0                  ; a
-        stx     X16_P1                  ; b
-        lda     __rc2                   ; A = t
+        sta     mos8(X16_P0)            ; a
+        stx     mos8(X16_P1)            ; b
+        lda     mos8(__rc2)             ; A = t
         jmp     lerp8
 
 ; =====================================================================
@@ -291,22 +291,22 @@ ratio32:
 ; ---------------------------------------------------------------------
 lerp8:
         sta     lp_t
-        lda     X16_P1
-        cmp     X16_P0
+        lda     mos8(X16_P1)
+        cmp     mos8(X16_P0)
         bcc     .Llerp8_down
-        sbc     X16_P0                  ; carry set: a clean subtract
+        sbc     mos8(X16_P0)            ; carry set: a clean subtract
         jsr     scale_t
         clc
-        adc     X16_P0
+        adc     mos8(X16_P0)
         rts
 .Llerp8_down:
-        lda     X16_P0                  ; b < a: interpolate downwards
+        lda     mos8(X16_P0)            ; b < a: interpolate downwards
         sec
-        sbc     X16_P1
+        sbc     mos8(X16_P1)
         jsr     scale_t
         sta     lp_d
         sec
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sbc     lp_d
         rts
 

@@ -39,17 +39,17 @@
 ; which llvm-mos returns in __rc2/__rc3 -- not in A/X, where the
 ; internal routine leaves it.
 x16_tsc_decompress:
-        lda     __rc2
-        sta     X16_P0                  ; src
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P2                  ; dst
-        lda     __rc5
-        sta     X16_P3
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; src
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; dst
+        lda     mos8(__rc5)
+        sta     mos8(X16_P3)
         jsr     tsc_decompress          ; A = lo, X = hi
-        sta     __rc2                   ; ...but a pointer returns in __rc2/3
-        stx     __rc3
+        sta     mos8(__rc2)             ; ...but a pointer returns in __rc2/3
+        stx     mos8(__rc3)
         rts
 
 ; =====================================================================
@@ -66,9 +66,9 @@ tsc_decompress:
         ldy     #0
         lda     (X16_P0),y              ; the stream's first byte parameterises
         sta     tscrunch_optlen+1       ; the one-token zero-run length
-        inc     X16_P0
+        inc     mos8(X16_P0)
         bne     tsc2_entry
-        inc     X16_P1
+        inc     mos8(X16_P1)
 
 tsc2_entry:
         lda     (X16_P0),y              ; (LAX) token
@@ -88,20 +88,20 @@ tsc2_lit:
         txa                             ; carry is clear (cmp #$20 fell through)
         inx
 tsc2_bump_zp:
-        adc     X16_P2                  ; output += A (+ inherited carry)
-        sta     X16_P2
+        adc     mos8(X16_P2)            ; output += A (+ inherited carry)
+        sta     mos8(X16_P2)
         bcs     tsc2_put_hi
 tsc2_put_ok:
         txa
 tsc2_bump_get:
-        adc     X16_P0                  ; input += X
-        sta     X16_P0
+        adc     mos8(X16_P0)            ; input += X
+        sta     mos8(X16_P0)
         bcc     tsc2_entry
-        inc     X16_P1
+        inc     mos8(X16_P1)
         bcs     tsc2_entry
 
 tsc2_put_hi:
-        inc     X16_P3
+        inc     mos8(X16_P3)
         clc
         bcc     tsc2_put_ok
 
@@ -115,32 +115,32 @@ tsc2_rleorlz:
         beq     tsc2_optrun
         ldx     #2
         iny
-        sta     X16_T5                  ; run length
+        sta     mos8(X16_T5)            ; run length
         lda     (X16_P0),y              ; the byte to repeat
-        ldy     X16_T5
+        ldy     mos8(X16_T5)
 tsc2_run_start:
         sta     (X16_P2),y
 tsc2_rle_loop:
         dey
         sta     (X16_P2),y
         bne     tsc2_rle_loop
-        lda     X16_T5
+        lda     mos8(X16_T5)
         bcs     tsc2_bump_zp            ; always (carry survived untouched)
 
 tsc2_done:
-        lda     X16_P2                  ; the end of the output
-        ldx     X16_P3
+        lda     mos8(X16_P2)            ; the end of the output
+        ldx     mos8(X16_P3)
         rts
 
         ; --- LZ2: a two-byte match with a one-byte token -------------------
 tsc2_lz2:
         beq     tsc2_done               ; $20 is the end-of-stream marker
         ora     #$80                    ; carry is set: offset folds negative
-        adc     X16_P2
-        sta     X16_T6
-        lda     X16_P3
+        adc     mos8(X16_P2)
+        sta     mos8(X16_T6)
+        lda     mos8(X16_P3)
         sbc     #$00
-        sta     X16_T7
+        sta     mos8(X16_T7)
         lda     (X16_T6),y              ; y = 0
         sta     (X16_P2),y
         iny
@@ -156,15 +156,15 @@ tsc2_lz:
         lsr                             ; carry: short (1) or long (0) offset
         sta     tsc2_lzto+1             ; length - 1
         iny
-        lda     X16_P2
+        lda     mos8(X16_P2)
         bcc     tsc2_long
         sbc     (X16_P0),y              ; carry set: back = output - offset
-        sta     X16_T6
-        lda     X16_P3
+        sta     mos8(X16_T6)
+        lda     mos8(X16_P3)
         sbc     #$00
         ldx     #2
 tsc2_lz_put:
-        sta     X16_T7
+        sta     mos8(X16_T7)
         ldy     #0
         lda     (X16_T6),y              ; matches MUST copy forward
         sta     (X16_P2),y
@@ -189,19 +189,19 @@ tsc2_lzto:
 tsc2_optrun:
 tscrunch_optlen:
         ldy     #255                    ; operand = the stream's header byte
-        sty     X16_T5
+        sty     mos8(X16_T5)
         ldx     #1                      ; A = 0: a run of zeros
         bne     tsc2_run_start
 
         ; --- long LZ: 15-bit offset, one more length bit --------------------
 tsc2_long:
         adc     (X16_P0),y              ; carry clear, compensated by the encoder
-        sta     X16_T6
+        sta     mos8(X16_T6)
         iny
         lda     (X16_P0),y              ; (LAX)
         tax
         ora     #$80
-        adc     X16_P3                  ; the low add's carry ripples in here
+        adc     mos8(X16_P3)            ; the low add's carry ripples in here
         cpx     #$80                    ; offset bit 15 doubles as a length bit
         rol     tsc2_lzto+1
         ldx     #3

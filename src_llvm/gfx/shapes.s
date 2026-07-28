@@ -118,14 +118,14 @@ x16_gfx8l_disc:
         lda shp_mcol
         jmp shape_disc
 shp_marshal8:                           ; cx->A/X, cy->__rc2, r->__rc3, col->__rc4
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        stz X16_P3
-        lda __rc3
-        sta X16_P4
-        lda __rc4
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        stz mos8(X16_P3)
+        lda mos8(__rc3)
+        sta mos8(X16_P4)
+        lda mos8(__rc4)
         sta shp_mcol
         rts
 
@@ -141,26 +141,26 @@ x16_gfx2h_disc:
         lda shp_mcol
         jmp shape_disc
 shp_marshal2:                           ; cx->A/X, cy->__rc2/3, r->__rc4, col->__rc5
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        lda __rc3
-        sta X16_P3
-        lda __rc4
-        sta X16_P4
-        lda __rc5
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        lda mos8(__rc3)
+        sta mos8(X16_P3)
+        lda mos8(__rc4)
+        sta mos8(X16_P4)
+        lda mos8(__rc5)
         sta shp_mcol
         rts
 
 ; x16_gfx8l_flood(x:int, y:char, color:char)
 x16_gfx8l_flood:
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        stz X16_P3
-        lda __rc3
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        stz mos8(X16_P3)
+        lda mos8(__rc3)
         sta shp_mcol
         jsr shp_bind8
         lda shp_mcol
@@ -171,13 +171,13 @@ x16_gfx8l_flood:
         rts
 ; x16_gfx2h_flood(x:int, y:int, color:char)
 x16_gfx2h_flood:
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        lda __rc3
-        sta X16_P3
-        lda __rc4
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        lda mos8(__rc3)
+        sta mos8(X16_P3)
+        lda mos8(__rc4)
         sta shp_mcol
         jsr shp_bind2
         lda shp_mcol
@@ -199,16 +199,16 @@ x16_gfx8l_fellipse:
         lda shp_mcol
         jmp shape_fellipse
 shp_emarshal8:                          ; cx->A/X, cy->__rc2, rx->__rc3, ry->__rc4, col->__rc5
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        stz X16_P3
-        lda __rc3
-        sta X16_P4
-        lda __rc4
-        sta X16_P5
-        lda __rc5
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        stz mos8(X16_P3)
+        lda mos8(__rc3)
+        sta mos8(X16_P4)
+        lda mos8(__rc4)
+        sta mos8(X16_P5)
+        lda mos8(__rc5)
         sta shp_mcol
         rts
 
@@ -224,70 +224,70 @@ x16_gfx2h_fellipse:
         lda shp_mcol
         jmp shape_fellipse
 shp_emarshal2:                          ; cx->A/X, cy->__rc2/3, rx->__rc4, ry->__rc5, col->__rc6
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        lda __rc3
-        sta X16_P3
-        lda __rc4
-        sta X16_P4
-        lda __rc5
-        sta X16_P5
-        lda __rc6
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        lda mos8(__rc3)
+        sta mos8(X16_P3)
+        lda mos8(__rc4)
+        sta mos8(X16_P4)
+        lda mos8(__rc5)
+        sta mos8(X16_P5)
+        lda mos8(__rc6)
         sta shp_mcol
         rts
 
 ; --- v0.8.0 curve-shape marshals (llvm-mos: arg0 in A/X, rest in __rc2+) --
 shp_pmarshal8:                  ; polygon/arc/pie 8bpp: cx,cy8,r,p,p,col
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        stz X16_P3
-        lda __rc3
-        sta X16_P4
-        lda __rc4
-        sta X16_P5
-        lda __rc5
-        sta X16_P6
-        lda __rc6
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        stz mos8(X16_P3)
+        lda mos8(__rc3)
+        sta mos8(X16_P4)
+        lda mos8(__rc4)
+        sta mos8(X16_P5)
+        lda mos8(__rc5)
+        sta mos8(X16_P6)
+        lda mos8(__rc6)
         sta shp_mcol
         rts
 shp_pmarshal2:                  ; polygon/arc/pie 2bpp: cx,cy16,r,p,p,col
-        sta X16_P0
-        stx X16_P1
-        lda __rc2
-        sta X16_P2
-        lda __rc3
-        sta X16_P3
-        lda __rc4
-        sta X16_P4
-        lda __rc5
-        sta X16_P5
-        lda __rc6
-        sta X16_P6
-        lda __rc7
+        sta mos8(X16_P0)
+        stx mos8(X16_P1)
+        lda mos8(__rc2)
+        sta mos8(X16_P2)
+        lda mos8(__rc3)
+        sta mos8(X16_P3)
+        lda mos8(__rc4)
+        sta mos8(X16_P4)
+        lda mos8(__rc5)
+        sta mos8(X16_P5)
+        lda mos8(__rc6)
+        sta mos8(X16_P6)
+        lda mos8(__rc7)
         sta shp_mcol
         rts
 shp_rmarshal:                   ; rrect: x,y,w,h (16-bit), r, col
         sta rr_x
         stx rr_x+1
-        lda __rc2
+        lda mos8(__rc2)
         sta rr_y
-        lda __rc3
+        lda mos8(__rc3)
         sta rr_y+1
-        lda __rc4
+        lda mos8(__rc4)
         sta rr_w
-        lda __rc5
+        lda mos8(__rc5)
         sta rr_w+1
-        lda __rc6
+        lda mos8(__rc6)
         sta rr_h
-        lda __rc7
+        lda mos8(__rc7)
         sta rr_h+1
-        lda __rc8
+        lda mos8(__rc8)
         sta rr_r
-        lda __rc9
+        lda mos8(__rc9)
         sta shp_mcol
         rts
 shp_bmarshal:                   ; bezier: pts in __rc2/3 (pointer), col in A
@@ -426,15 +426,15 @@ shp_ddone:
 
 ; --- shared circle/disc machinery -------------------------------------
 shp_take_cxy:                       ; P -> locals; x = r, y = 0, err = 1 - r
-	lda X16_P0
+	lda mos8(X16_P0)
 	sta shp_cx
-	lda X16_P1
+	lda mos8(X16_P1)
 	sta shp_cx+1
-	lda X16_P2
+	lda mos8(X16_P2)
 	sta shp_cy
-	lda X16_P3
+	lda mos8(X16_P3)
 	sta shp_cy+1
-	lda X16_P4
+	lda mos8(X16_P4)
 	sta shp_x
 	lda #0
 	sta shp_y
@@ -502,38 +502,38 @@ shp_emit1:                          ; one pset at (cx sx? -a : +a, cy sy? -b : +
 	clc                         ; x = cx + a
 	lda shp_cx
 	adc shp_a
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda shp_cx+1
 	adc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 	bra shp_e1y
 shp_e1xm:
 	sec                         ; x = cx - a
 	lda shp_cx
 	sbc shp_a
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda shp_cx+1
 	sbc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 shp_e1y:
 	lda shp_sy
 	bne shp_e1ym
 	clc
 	lda shp_cy
 	adc shp_b
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda shp_cy+1
 	adc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 	bra shp_e1go
 shp_e1ym:
 	sec
 	lda shp_cy
 	sbc shp_b
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda shp_cy+1
 	sbc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 shp_e1go:
 	lda shp_col
 	jmp shp_do_pset
@@ -549,38 +549,38 @@ shp_espan:
 	sec                         ; x = cx - a
 	lda shp_cx
 	sbc shp_a
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda shp_cx+1
 	sbc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda shp_sy
 	bne shp_esym
 	clc
 	lda shp_cy
 	adc shp_b
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda shp_cy+1
 	adc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 	bra shp_esgo
 shp_esym:
 	sec
 	lda shp_cy
 	sbc shp_b
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda shp_cy+1
 	sbc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 shp_esgo:
 	lda shp_a                      ; len = 2a + 1
-	sta X16_P4
+	sta mos8(X16_P4)
 	lda #0
-	sta X16_P5
-	asl X16_P4
-	rol X16_P5
-	inc X16_P4
+	sta mos8(X16_P5)
+	asl mos8(X16_P4)
+	rol mos8(X16_P5)
+	inc mos8(X16_P4)
 	bne 2f
-	inc X16_P5
+	inc mos8(X16_P5)
 2:	lda shp_col
 	jmp shp_do_hline
 
@@ -610,17 +610,17 @@ shape_fellipse:
 	lda #1
 	sta shp_efl
 shp_etake:
-	lda X16_P0                  ; centre out of the P block
+	lda mos8(X16_P0)            ; centre out of the P block
 	sta shp_cx
-	lda X16_P1
+	lda mos8(X16_P1)
 	sta shp_cx+1
-	lda X16_P2
+	lda mos8(X16_P2)
 	sta shp_cy
-	lda X16_P3
+	lda mos8(X16_P3)
 	sta shp_cy+1
-	lda X16_P4
+	lda mos8(X16_P4)
 	sta shp_ew
-	lda X16_P5
+	lda mos8(X16_P5)
 	sta shp_eh
 
 	lda shp_eh                     ; shp_sq = ry^2
@@ -864,13 +864,13 @@ shape_flood:
 	clc                         ; (no overflow could have happened yet)
 	rts
 shp_fseed:
-	lda X16_P0                  ; push the seed
+	lda mos8(X16_P0)            ; push the seed
 	sta shp_qx
-	lda X16_P1
+	lda mos8(X16_P1)
 	sta shp_qx+1
-	lda X16_P2
+	lda mos8(X16_P2)
 	sta shp_qy
-	lda X16_P3
+	lda mos8(X16_P3)
 	sta shp_qy+1
 	jsr shp_push
 shp_floop:
@@ -938,23 +938,23 @@ shp_wrprobe:
 	bra shp_wright
 shp_wrdone:
 	lda shp_xl                     ; fill the span: hline(xl, y, xr-xl+1)
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda shp_xl+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda shp_qy
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda shp_qy+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	sec
 	lda shp_xr
 	sbc shp_xl
-	sta X16_P4
+	sta mos8(X16_P4)
 	lda shp_xr+1
 	sbc shp_xl+1
-	sta X16_P5
-	inc X16_P4
+	sta mos8(X16_P5)
+	inc mos8(X16_P4)
 	bne 3f
-	inc X16_P5
+	inc mos8(X16_P5)
 3:	lda shp_col
 	jsr shp_do_hline
 
@@ -1048,13 +1048,13 @@ shp_rd_p:                           ; read at the CALLER's P block (entry)
 	jmp shp_do_read
 shp_rd_q:                           ; read at (shp_qx, shp_qy)
 	lda shp_qx
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda shp_qx+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda shp_qy
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda shp_qy+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	jmp shp_do_read
 
 shp_push:                           ; (shp_qx,shp_qy) onto the stack, or drop + ovf
@@ -1157,7 +1157,7 @@ shape_fpolygon:
 	sta poly_efl
 	; fall through
 shp_poly_begin:
-	lda X16_P5                  ; clamp the side count to 3..POLY_MAX
+	lda mos8(X16_P5)            ; clamp the side count to 3..POLY_MAX
 	cmp #3
 	bcc shp_pg_bret                ; fewer than 3: not a polygon
 	cmp #(POLY_MAX + 1)
@@ -1165,18 +1165,18 @@ shp_poly_begin:
 	lda #POLY_MAX
 shp_pg_bnok:
 	sta poly_n
-	lda X16_P0
+	lda mos8(X16_P0)
 	sta poly_cx
-	lda X16_P1
+	lda mos8(X16_P1)
 	sta poly_cx+1
-	lda X16_P2
+	lda mos8(X16_P2)
 	sta poly_cy
-	lda X16_P3
+	lda mos8(X16_P3)
 	sta poly_cy+1
-	lda X16_P4
+	lda mos8(X16_P4)
 	sta poly_r
 	stz poly_acc                ; angle accumulator = rotation << 8
-	lda X16_P6
+	lda mos8(X16_P6)
 	sta poly_acc+1
 	jsr shp_poly_verts
 	lda poly_efl
@@ -1433,13 +1433,13 @@ shp_pg_ldyd:
 	sta poly_lerr+1
 shp_pg_lloop:
 	lda poly_lx0
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda poly_lx0+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda poly_ly0
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda poly_ly0+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda poly_col
 	jsr shp_do_pset
 	lda poly_lx0                ; reached the endpoint?
@@ -1561,23 +1561,23 @@ shp_pg_sldraw:
 	lda poly_found
 	beq shp_pg_slret
 	lda poly_xl                 ; span (xl .. xr) on row y
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda poly_xl+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda poly_y
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda poly_y+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	sec                         ; len = xr - xl + 1
 	lda poly_xr
 	sbc poly_xl
-	sta X16_P4
+	sta mos8(X16_P4)
 	lda poly_xr+1
 	sbc poly_xl+1
-	sta X16_P5
-	inc X16_P4
+	sta mos8(X16_P5)
+	inc mos8(X16_P4)
 	bne shp_pg_sllen
-	inc X16_P5
+	inc mos8(X16_P5)
 shp_pg_sllen:
 	lda poly_col
 	jmp shp_do_hline
@@ -1996,13 +1996,13 @@ shp_sl_dyd:
 	sta shl_err+1
 shp_sl_loop:
 	lda shl_x0
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda shl_x0+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda shl_y0
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda shl_y0+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda shl_col
 	jsr shp_do_pset
 	lda shl_x0                  ; reached the endpoint?
@@ -2224,35 +2224,35 @@ shp_rr_outline:
 	jsr shp_rr_corners             ; the four quarter-circle corners
 	; top edge: (cxl, y0) .. (cxr, y0)
 	lda rr_cxl
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_cxl+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda rr_y0
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_y0+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	jsr shp_rr_hspan               ; pset run from P0 to cxr on row P2/P3
 	; bottom edge: (cxl, y1) .. (cxr, y1)
 	lda rr_cxl
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_cxl+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda rr_y1
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_y1+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	jsr shp_rr_hspan
 	; left edge: column x0, rows cyt..cyb
 	lda rr_x0
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_x0+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	jsr shp_rr_vspan
 	; right edge: column x1, rows cyt..cyb
 	lda rr_x1
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_x1+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	jsr shp_rr_vspan
 	rts
 
@@ -2266,27 +2266,27 @@ shp_rr_hspan:
 	bvc 1f
 	eor #$80
 1:	bmi shp_rr_hsd
-	lda X16_P2                  ; hold the row (pset reloads P0..P3)
+	lda mos8(X16_P2)            ; hold the row (pset reloads P0..P3)
 	sta rr_ry
-	lda X16_P3
+	lda mos8(X16_P3)
 	sta rr_ry+1
 shp_rr_hsl:
 	lda rr_ry
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_ry+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda rr_col
 	jsr shp_do_pset
-	lda X16_P0                  ; at cxr ?
+	lda mos8(X16_P0)            ; at cxr ?
 	cmp rr_cxr
 	bne shp_rr_hsn
-	lda X16_P1
+	lda mos8(X16_P1)
 	cmp rr_cxr+1
 	beq shp_rr_hsd
 shp_rr_hsn:
-	inc X16_P0
+	inc mos8(X16_P0)
 	bne shp_rr_hsl
-	inc X16_P1
+	inc mos8(X16_P1)
 	bra shp_rr_hsl
 shp_rr_hsd:
 	rts
@@ -2301,31 +2301,31 @@ shp_rr_vspan:
 	bvc 1f
 	eor #$80
 1:	bmi shp_rr_vsd
-	lda X16_P0
+	lda mos8(X16_P0)
 	sta rr_rx
-	lda X16_P1
+	lda mos8(X16_P1)
 	sta rr_rx+1
 	lda rr_cyt
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_cyt+1
-	sta X16_P3
+	sta mos8(X16_P3)
 shp_rr_vsl:
 	lda rr_rx
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_rx+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda rr_col
 	jsr shp_do_pset
-	lda X16_P2                  ; at cyb ?
+	lda mos8(X16_P2)            ; at cyb ?
 	cmp rr_cyb
 	bne shp_rr_vsn
-	lda X16_P3
+	lda mos8(X16_P3)
 	cmp rr_cyb+1
 	beq shp_rr_vsd
 shp_rr_vsn:
-	inc X16_P2
+	inc mos8(X16_P2)
 	bne shp_rr_vsl
-	inc X16_P3
+	inc mos8(X16_P3)
 	bra shp_rr_vsl
 shp_rr_vsd:
 	rts
@@ -2368,65 +2368,65 @@ shp_rr_c4:
 	sec                         ; TL: (cxl - a, cyt - b)
 	lda rr_cxl
 	sbc rr_ca
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_cxl+1
 	sbc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 	sec
 	lda rr_cyt
 	sbc rr_cb
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_cyt+1
 	sbc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda rr_col
 	jsr shp_do_pset
 	clc                         ; TR: (cxr + a, cyt - b)
 	lda rr_cxr
 	adc rr_ca
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_cxr+1
 	adc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 	sec
 	lda rr_cyt
 	sbc rr_cb
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_cyt+1
 	sbc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda rr_col
 	jsr shp_do_pset
 	sec                         ; BL: (cxl - a, cyb + b)
 	lda rr_cxl
 	sbc rr_ca
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_cxl+1
 	sbc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 	clc
 	lda rr_cyb
 	adc rr_cb
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_cyb+1
 	adc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda rr_col
 	jsr shp_do_pset
 	clc                         ; BR: (cxr + a, cyb + b)
 	lda rr_cxr
 	adc rr_ca
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_cxr+1
 	adc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 	clc
 	lda rr_cyb
 	adc rr_cb
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_cyb+1
 	adc #0
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda rr_col
 	jmp shp_do_pset
 
@@ -2524,31 +2524,31 @@ shp_rr_inset:
 	sec                         ; P0 = left = cxl - ins
 	lda rr_cxl
 	sbc rr_ins
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda rr_cxl+1
 	sbc #0
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda rr_ry                   ; row
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda rr_ry+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	clc                         ; right = cxr + ins  -> T0
 	lda rr_cxr
 	adc rr_ins
-	sta X16_T0
+	sta mos8(X16_T0)
 	lda rr_cxr+1
 	adc rr_ins+1
-	sta X16_T0+1
+	sta mos8(X16_T0+1)
 	sec                         ; len = right - left + 1
-	lda X16_T0
-	sbc X16_P0
-	sta X16_P4
-	lda X16_T0+1
-	sbc X16_P1
-	sta X16_P5
-	inc X16_P4
+	lda mos8(X16_T0)
+	sbc mos8(X16_P0)
+	sta mos8(X16_P4)
+	lda mos8(X16_T0+1)
+	sbc mos8(X16_P1)
+	sta mos8(X16_P5)
+	inc mos8(X16_P4)
 	bne 1f
-	inc X16_P5
+	inc mos8(X16_P5)
 1:	lda rr_col
 	jmp shp_do_hline
 
@@ -2644,20 +2644,20 @@ ARC_STEP = 4                    ; byte-angle units between samples
 
 shape_arc:
 	sta shl_col                 ; shp_line draws in this colour
-	lda X16_P0
+	lda mos8(X16_P0)
 	sta arc_cx
-	lda X16_P1
+	lda mos8(X16_P1)
 	sta arc_cx+1
-	lda X16_P2
+	lda mos8(X16_P2)
 	sta arc_cy
-	lda X16_P3
+	lda mos8(X16_P3)
 	sta arc_cy+1
-	lda X16_P4
+	lda mos8(X16_P4)
 	sta arc_r
-	lda X16_P5
+	lda mos8(X16_P5)
 	sta arc_a0
 	sec                         ; span = (end - start) & 255; 0 -> 256
-	lda X16_P6
+	lda mos8(X16_P6)
 	sbc arc_a0
 	sta arc_span
 	stz arc_span+1
@@ -2842,20 +2842,20 @@ arc_t:    .zero 1
 
 shape_pie:
 	sta pie_col
-	lda X16_P0
+	lda mos8(X16_P0)
 	sta arc_cx
-	lda X16_P1
+	lda mos8(X16_P1)
 	sta arc_cx+1
-	lda X16_P2
+	lda mos8(X16_P2)
 	sta arc_cy
-	lda X16_P3
+	lda mos8(X16_P3)
 	sta arc_cy+1
-	lda X16_P4
+	lda mos8(X16_P4)
 	sta arc_r
-	lda X16_P5
+	lda mos8(X16_P5)
 	sta arc_a0
 	sec                         ; span = (end - start) & 255; 0 -> 256
-	lda X16_P6
+	lda mos8(X16_P6)
 	sbc arc_a0
 	sta arc_span
 	stz arc_span+1
@@ -3204,34 +3204,34 @@ shp_tf_emitrow:
 	sta tf_tmp+1
 	bpl shp_te_pos                 ; short >= long: left = long, len = diff+1
 	lda e_curx+2                ; short < long: left = short, len = -diff+1
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda e_curx+3
-	sta X16_P1
+	sta mos8(X16_P1)
 	sec
 	lda #0
 	sbc tf_tmp
-	sta X16_P4
+	sta mos8(X16_P4)
 	lda #0
 	sbc tf_tmp+1
-	sta X16_P5
+	sta mos8(X16_P5)
 	bra shp_te_len
 shp_te_pos:
 	lda e_curx
-	sta X16_P0
+	sta mos8(X16_P0)
 	lda e_curx+1
-	sta X16_P1
+	sta mos8(X16_P1)
 	lda tf_tmp
-	sta X16_P4
+	sta mos8(X16_P4)
 	lda tf_tmp+1
-	sta X16_P5
+	sta mos8(X16_P5)
 shp_te_len:
-	inc X16_P4                  ; len = |diff| + 1
+	inc mos8(X16_P4)            ; len = |diff| + 1
 	bne 1f
-	inc X16_P5
+	inc mos8(X16_P5)
 1:	lda tf_y
-	sta X16_P2
+	sta mos8(X16_P2)
 	lda tf_y+1
-	sta X16_P3
+	sta mos8(X16_P3)
 	lda pie_col
 	jsr shp_do_hline
 	rts

@@ -75,10 +75,10 @@ x16_psg_voice_ptr:
 ; ---------------------------------------------------------------------
 ; A = voice, X = freq lo, __rc2 = freq hi.
 x16_psg_set_freq:
-        stx     X16_P0                  ; freq lo
+        stx     mos8(X16_P0)            ; freq lo
         pha                             ; voice
-        lda     __rc2
-        sta     X16_P1                  ; freq hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P1)            ; freq hi
         plx                             ; X = voice
         jmp     psg_set_freq
 
@@ -101,7 +101,7 @@ x16_psg_set_wave:
 ; in:  A = voice, X = second argument, __rc2 = third argument
 ; out: X = voice, A = second argument, Y = third argument
 voice_marshal:
-        ldy     __rc2                   ; Y = pan / width
+        ldy     mos8(__rc2)             ; Y = pan / width
         pha                             ; voice
         txa                             ; A = vol / wave
         plx                             ; X = voice
@@ -129,14 +129,14 @@ x16_psg_note_off:
 ; sustain -> __rc3, release -> __rc4. psg_env_start wants A = voice and
 ; the rest in X16_P0..P3.
 x16_psg_env_start:
-        stx     X16_P0                  ; peak volume
+        stx     mos8(X16_P0)            ; peak volume
         pha                             ; voice
-        lda     __rc2
-        sta     X16_P1                  ; attack step
-        lda     __rc3
-        sta     X16_P2                  ; sustain ticks
-        lda     __rc4
-        sta     X16_P3                  ; release step
+        lda     mos8(__rc2)
+        sta     mos8(X16_P1)            ; attack step
+        lda     mos8(__rc3)
+        sta     mos8(X16_P2)            ; sustain ticks
+        lda     mos8(__rc4)
+        sta     mos8(X16_P3)            ; release step
         pla                             ; A = voice
         jmp     psg_env_start
 
@@ -164,7 +164,7 @@ x16_psg_env_tick:
 ;   in:  X = voice (0-15), A = byte offset within the voice (0-3)
 ; ---------------------------------------------------------------------
 psg_voice_ptr:
-        sta     X16_T2
+        sta     mos8(X16_T2)
         lda     #VERA_CTRL_ADDRSEL
         trb     VERA_CTRL
 
@@ -172,7 +172,7 @@ psg_voice_ptr:
         asl     a
         asl     a                       ; voice * 4, never carries (max 60)
         clc
-        adc     X16_T2
+        adc     mos8(X16_T2)
         clc
         adc     #<VRAM_PSG              ; $C0 + up to 63, may carry
         sta     VERA_ADDR_L
@@ -196,9 +196,9 @@ psg_set_freq:
         lda     VERA_ADDR_H
         ora     #VERA_ADDR_H_DECR       ; ...and walk backwards
         sta     VERA_ADDR_H
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     VERA_DATA0              ; high byte first
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     VERA_DATA0              ; then low, at offset 0
         rts
 
@@ -207,14 +207,14 @@ psg_set_freq:
 ; ---------------------------------------------------------------------
 psg_set_vol:
         and     #$3F
-        sta     X16_T3
+        sta     mos8(X16_T3)
         tya
         and     #PSG_PAN_BOTH
-        ora     X16_T3
-        sta     X16_T3
+        ora     mos8(X16_T3)
+        sta     mos8(X16_T3)
         lda     #2
         jsr     psg_voice_ptr
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     VERA_DATA0
         rts
 
@@ -224,14 +224,14 @@ psg_set_vol:
 ; ---------------------------------------------------------------------
 psg_set_wave:
         and     #PSG_WAVE_NOISE         ; keep bits 7:6
-        sta     X16_T3
+        sta     mos8(X16_T3)
         tya
         and     #$3F
-        ora     X16_T3
-        sta     X16_T3
+        ora     mos8(X16_T3)
+        sta     mos8(X16_T3)
         lda     #3
         jsr     psg_voice_ptr
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     VERA_DATA0
         rts
 
@@ -269,16 +269,16 @@ psg_note_off:
 psg_env_start:
         and     #$0F
         tax
-        lda     X16_P0
+        lda     mos8(X16_P0)
         and     #$3F
         sta     env_peak,x
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     env_astep,x
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     env_sus,x
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     env_rstep,x
-        lda     X16_P1
+        lda     mos8(X16_P1)
         beq     .Lpsg_env_start_instant
         stz     env_vol,x
         lda     #1                      ; stage 1: attack
@@ -329,10 +329,10 @@ psg_env_tick:
         ; --- release ---
         lda     env_rstep,x
         beq     .Lpsg_env_tick_next                   ; rstep 0: hold until psg_env_stop
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     env_vol,x
         sec
-        sbc     X16_T0
+        sbc     mos8(X16_T0)
         bcs     .Lpsg_env_tick_rel_ok
         lda     #0
 .Lpsg_env_tick_rel_ok:
@@ -382,10 +382,10 @@ env_write:
         lda     VERA_DATA0              ; the shadow's pan bits
         and     #PSG_PAN_BOTH
         ora     env_vol,x
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     #2
         jsr     psg_voice_ptr
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     VERA_DATA0
         rts
 

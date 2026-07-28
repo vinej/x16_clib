@@ -73,8 +73,8 @@
 ; llvm-mos hands a pointer over in the aligned pair __rc2/__rc3. The
 ; internal routines want A = low, Y = high.
 .macro  ptr_ax_to_ay
-        lda     __rc2
-        ldy     __rc3
+        lda     mos8(__rc2)
+        ldy     mos8(__rc3)
 .endm
 
 ; A holds a signed byte; give X its sign extension so the value survives
@@ -124,22 +124,22 @@ x16_d_from_s16:
         jmp     d_from_s16              ; v already arrives as A = low, X = high
 
 x16_d_from_s32:
-        sta     X16_P0                  ; v: A/X/__rc2/__rc3
-        stx     X16_P1
-        lda     __rc2
-        sta     X16_P2
-        lda     __rc3
-        sta     X16_P3
+        sta     mos8(X16_P0)            ; v: A/X/__rc2/__rc3
+        stx     mos8(X16_P1)
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P3)
         jmp     d_from_s32
 
 x16_d_to_s32:
         jsr     d_to_s32
-        lda     X16_P2
-        sta     __rc2
-        lda     X16_P3
-        sta     __rc3
-        lda     X16_P0
-        ldx     X16_P1
+        lda     mos8(X16_P2)
+        sta     mos8(__rc2)
+        lda     mos8(X16_P3)
+        sta     mos8(__rc3)
+        lda     mos8(X16_P0)
+        ldx     mos8(X16_P1)
         rts
 
 ; ---------------------------------------------------------------------
@@ -222,14 +222,14 @@ x16_d_tanh:
 ; ---------------------------------------------------------------------
 x16_d_from_str:
         tax                             ; X = length (A held it)
-        lda     __rc2                   ; A = address low
-        ldy     __rc3                   ; Y = address high
+        lda     mos8(__rc2)             ; A = address low
+        ldy     mos8(__rc3)             ; Y = address high
         jmp     d_from_str
 
 x16_d_to_str:
         jsr     d_to_str                ; answers A = low, X = high
-        sta     __rc2
-        stx     __rc3
+        sta     mos8(__rc2)
+        stx     mos8(__rc3)
         rts
 
 ; =====================================================================
@@ -292,15 +292,15 @@ d_abs:
 ; d_from_s16 -- in: A = low, X = high (signed 16-bit).  d_ac = value
 ; ---------------------------------------------------------------------
 d_from_s16:
-        sta     X16_P0
-        stx     X16_P1
+        sta     mos8(X16_P0)
+        stx     mos8(X16_P1)
         txa                             ; sign-extend into P2/P3
         and     #$80
         beq     double_dfs16_pos
         lda     #$FF
 double_dfs16_pos:
-        sta     X16_P2
-        sta     X16_P3
+        sta     mos8(X16_P2)
+        sta     mos8(X16_P3)
         ; fall through
 
 ; ---------------------------------------------------------------------
@@ -308,28 +308,28 @@ double_dfs16_pos:
 ;               d_ac = value (exact; 32 bits fit the 53-bit mantissa)
 ; ---------------------------------------------------------------------
 d_from_s32:
-        lda     X16_P3                  ; remember the sign, then take |value|
+        lda     mos8(X16_P3)            ; remember the sign, then take |value|
         and     #$80
         sta     dac_s
         beq     double_dfr_mag
         sec                             ; negate P0..P3
         lda     #0
-        sbc     X16_P0
-        sta     X16_P0
+        sbc     mos8(X16_P0)
+        sta     mos8(X16_P0)
         lda     #0
-        sbc     X16_P1
-        sta     X16_P1
+        sbc     mos8(X16_P1)
+        sta     mos8(X16_P1)
         lda     #0
-        sbc     X16_P2
-        sta     X16_P2
+        sbc     mos8(X16_P2)
+        sta     mos8(X16_P2)
         lda     #0
-        sbc     X16_P3
-        sta     X16_P3
+        sbc     mos8(X16_P3)
+        sta     mos8(X16_P3)
 double_dfr_mag:
-        lda     X16_P0
-        ora     X16_P1
-        ora     X16_P2
-        ora     X16_P3
+        lda     mos8(X16_P0)
+        ora     mos8(X16_P1)
+        ora     mos8(X16_P2)
+        ora     mos8(X16_P3)
         bne     double_dfr_nz
         jmp     double_d_zero_signed    ; +/- 0
 double_dfr_nz:
@@ -339,13 +339,13 @@ double_dfr_nz:
         stz     dac_m+1
         stz     dac_m+2
         stz     dac_m+3
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     dac_m+4
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     dac_m+5
-        lda     X16_P2
+        lda     mos8(X16_P2)
         sta     dac_m+6
-        lda     X16_P3
+        lda     mos8(X16_P3)
         sta     dac_m+7
         lda     #<(-32)
         sta     dac_e
@@ -374,10 +374,10 @@ d_to_s32:
         lda     dac_c
         cmp     #D_NORM
         beq     double_dto_norm
-        stz     X16_P0                  ; zero -> 0 ; inf/nan -> 0 + carry
-        stz     X16_P1
-        stz     X16_P2
-        stz     X16_P3
+        stz     mos8(X16_P0)            ; zero -> 0 ; inf/nan -> 0 + carry
+        stz     mos8(X16_P1)
+        stz     mos8(X16_P2)
+        stz     mos8(X16_P3)
         cmp     #D_ZERO
         beq     double_dto_okz
         sec
@@ -432,55 +432,55 @@ double_dto_sr:
         dex
         bne     double_dto_sr
         lda     d_work
-        sta     X16_P0                  ; low 32 bits are the integer
+        sta     mos8(X16_P0)            ; low 32 bits are the integer
         lda     d_work+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
         lda     d_work+2
-        sta     X16_P2
+        sta     mos8(X16_P2)
         lda     d_work+3
-        sta     X16_P3
+        sta     mos8(X16_P3)
         lda     dac_s
         bpl     double_dto_pos
         sec                             ; apply the sign
         lda     #0
-        sbc     X16_P0
-        sta     X16_P0
+        sbc     mos8(X16_P0)
+        sta     mos8(X16_P0)
         lda     #0
-        sbc     X16_P1
-        sta     X16_P1
+        sbc     mos8(X16_P1)
+        sta     mos8(X16_P1)
         lda     #0
-        sbc     X16_P2
-        sta     X16_P2
+        sbc     mos8(X16_P2)
+        sta     mos8(X16_P2)
         lda     #0
-        sbc     X16_P3
-        sta     X16_P3
+        sbc     mos8(X16_P3)
+        sta     mos8(X16_P3)
 double_dto_pos:
         clc
         rts
 double_dto_tiny:
-        stz     X16_P0
-        stz     X16_P1
-        stz     X16_P2
-        stz     X16_P3
+        stz     mos8(X16_P0)
+        stz     mos8(X16_P1)
+        stz     mos8(X16_P2)
+        stz     mos8(X16_P3)
         clc
         rts
 double_dto_over:
         lda     dac_s
         bmi     double_dto_oneg
         lda     #$FF
-        sta     X16_P0                  ; +2147483647
-        sta     X16_P1
-        sta     X16_P2
+        sta     mos8(X16_P0)            ; +2147483647
+        sta     mos8(X16_P1)
+        sta     mos8(X16_P2)
         lda     #$7F
-        sta     X16_P3
+        sta     mos8(X16_P3)
         sec
         rts
 double_dto_oneg:
-        stz     X16_P0                  ; -2147483648
-        stz     X16_P1
-        stz     X16_P2
+        stz     mos8(X16_P0)            ; -2147483648
+        stz     mos8(X16_P1)
+        stz     mos8(X16_P2)
         lda     #$80
-        sta     X16_P3
+        sta     mos8(X16_P3)
         sec
         rts
 
@@ -1505,9 +1505,9 @@ double_dex_norm:
         ldy     #>d_log2e
         jsr     d_mul
         jsr     d_to_s32                ; n = trunc(v)
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     d_tn16
-        lda     X16_P1
+        lda     mos8(X16_P1)
         sta     d_tn16+1
         jsr     d_from_s32              ; (double) n
         lda     #<d_ln2
@@ -1758,15 +1758,15 @@ double_dln_series_done:
         jsr     d_store                 ; ln(m)
         ; + e * ln2
         lda     d_tn16
-        sta     X16_P0
+        sta     mos8(X16_P0)
         lda     d_tn16+1
-        sta     X16_P1
+        sta     mos8(X16_P1)
         and     #$80
         beq     double_dln_epos
         lda     #$FF
 double_dln_epos:
-        sta     X16_P2
-        sta     X16_P3
+        sta     mos8(X16_P2)
+        sta     mos8(X16_P3)
         jsr     d_from_s32              ; (double) e
         lda     #<d_ln2
         ldy     #>d_ln2
@@ -2230,7 +2230,7 @@ double_dtr_neg:
         jsr     d_sub
 double_dtr_trunc:
         jsr     d_to_s32                ; n
-        lda     X16_P0
+        lda     mos8(X16_P0)
         and     #3
         sta     d_scq
         jsr     d_from_s32              ; (double) n
@@ -2700,12 +2700,12 @@ double_dts_extl:
         stx     dts_di
         jsr     d_to_s32
         ldx     dts_di
-        lda     X16_P0
+        lda     mos8(X16_P0)
         sta     dts_dig,x
         lda     #<dts_val
         ldy     #>dts_val
         jsr     d_store
-        lda     X16_P0
+        lda     mos8(X16_P0)
         ldx     #0
         jsr     d_from_s16
         lda     #<dts_digd

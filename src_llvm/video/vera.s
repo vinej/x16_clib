@@ -56,13 +56,13 @@ x16_vera_addr1:
 ; out: A = ADDR_L, X = ADDR_M, Y = ADDR_H
 addr_marshal:
         pha                             ; inc, for the DECR test below
-        stx     X16_T3                  ; addr bits 0-7
-        lda     __rc2
-        sta     X16_T4                  ; addr bits 8-15
+        stx     mos8(X16_T3)            ; addr bits 0-7
+        lda     mos8(__rc2)
+        sta     mos8(X16_T4)            ; addr bits 8-15
 
-        lda     __rc3                   ; addr bits 16-23
+        lda     mos8(__rc3)             ; addr bits 16-23
         and     #VERA_ADDR_H_BANK       ; ...only bit 16 exists
-        sta     X16_T5                  ; ADDR_H under construction
+        sta     mos8(X16_T5)            ; ADDR_H under construction
 
         pla                             ; A = inc | optional X16_DECR
         pha
@@ -71,18 +71,18 @@ addr_marshal:
         asl     a
         asl     a
         asl     a                       ; into ADDR_H bits 7:4
-        ora     X16_T5
-        sta     X16_T5
+        ora     mos8(X16_T5)
+        sta     mos8(X16_T5)
         pla
         and     #X16_DECR
         beq     .Laddr_ascending
         lda     #VERA_ADDR_H_DECR
-        ora     X16_T5
-        sta     X16_T5
+        ora     mos8(X16_T5)
+        sta     mos8(X16_T5)
 .Laddr_ascending:
-        lda     X16_T3
-        ldx     X16_T4
-        ldy     X16_T5
+        lda     mos8(X16_T3)
+        ldx     mos8(X16_T4)
+        ldy     mos8(X16_T5)
         rts
 
 ; ---------------------------------------------------------------------
@@ -91,7 +91,7 @@ addr_marshal:
 ; ---------------------------------------------------------------------
         .globl  x16_vera_fill
 x16_vera_fill:
-        ldy     __rc2                   ; count hi
+        ldy     mos8(__rc2)             ; count hi
         jmp     vera_fill               ; A = value, X = count lo already
 
 ; ---------------------------------------------------------------------
@@ -100,9 +100,9 @@ x16_vera_fill:
 ; ---------------------------------------------------------------------
         .globl  x16_vera_copy
 x16_vera_copy:
-        stx     X16_T3                  ; stash hi; X is about to be lo
+        stx     mos8(X16_T3)            ; stash hi; X is about to be lo
         tax                             ; X = count lo
-        ldy     X16_T3                  ; Y = count hi
+        ldy     mos8(X16_T3)            ; Y = count hi
         jmp     vera_copy
 
 ; ---------------------------------------------------------------------
@@ -160,21 +160,21 @@ vera_set_addr1:
 ; ---------------------------------------------------------------------
         .globl  vera_fill
 vera_fill:
-        sta     X16_T0                  ; value
-        stx     X16_T1                  ; count lo
-        sty     X16_T2                  ; count hi
+        sta     mos8(X16_T0)            ; value
+        stx     mos8(X16_T1)            ; count lo
+        sty     mos8(X16_T2)            ; count hi
 
         txa
-        ora     X16_T2
+        ora     mos8(X16_T2)
         beq     .Lfill_done             ; count == 0
 
-        ldx     X16_T1
-        ldy     X16_T2
+        ldx     mos8(X16_T1)
+        ldy     mos8(X16_T2)
         txa
         beq     .Lfill_full             ; low byte 0 -> exactly hi*256 bytes
         iny                             ; otherwise one extra partial page
 .Lfill_full:
-        lda     X16_T0
+        lda     mos8(X16_T0)
 .Lfill_loop:
         sta     VERA_DATA0
         dex
@@ -195,15 +195,15 @@ vera_fill:
 ; ---------------------------------------------------------------------
         .globl  vera_copy
 vera_copy:
-        stx     X16_T1
-        sty     X16_T2
+        stx     mos8(X16_T1)
+        sty     mos8(X16_T2)
 
         txa
-        ora     X16_T2
+        ora     mos8(X16_T2)
         beq     .Lcopy_done
 
-        ldx     X16_T1
-        ldy     X16_T2
+        ldx     mos8(X16_T1)
+        ldy     mos8(X16_T2)
         txa
         beq     .Lcopy_loop
         iny

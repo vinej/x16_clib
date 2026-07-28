@@ -75,12 +75,12 @@ CH_H      = $48
 ;   1 if the directory opened, 0 if not.
 ; ---------------------------------------------------------------------
 x16_dir_open:
-        sta     X16_P2                  ; len: the first integer byte, A
-        stx     X16_P3                  ; device: the next, X
-        lda     __rc2                   ; path: the pointer pair
-        sta     X16_P0
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; len: the first integer byte, A
+        stx     mos8(X16_P3)            ; device: the next, X
+        lda     mos8(__rc2)             ; path: the pointer pair
+        sta     mos8(X16_P0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         jsr     dir_open                ; carry set = could not open
         lda     #0
         ldx     #0
@@ -93,11 +93,11 @@ x16_dir_open:
 ;   1 if an entry was read, 0 at the end of the listing.
 ; ---------------------------------------------------------------------
 x16_dir_next:
-        sta     X16_P2                  ; size: the first integer byte, A
-        lda     __rc2                   ; buf: the pointer pair
-        sta     X16_P0
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; size: the first integer byte, A
+        lda     mos8(__rc2)             ; buf: the pointer pair
+        sta     mos8(X16_P0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         jsr     dir_next                ; carry SET = an entry was read
         lda     #0
         ldx     #0
@@ -134,19 +134,19 @@ x16_dir_close:
 ;   out: carry set if the directory could not be opened
 ; ---------------------------------------------------------------------
 dir_open:
-        lda     X16_P2
+        lda     mos8(X16_P2)
         bne     dir_named
         lda     #1                      ; no path given: just "$"
         ldx     #<dir_dollar
         ldy     #>dir_dollar
         bra     dir_setnam
 dir_named:
-        ldx     X16_P0
-        ldy     X16_P1
+        ldx     mos8(X16_P0)
+        ldy     mos8(X16_P1)
 dir_setnam:
         jsr     SETNAM
         lda     #DIR_LFN
-        ldx     X16_P3
+        ldx     mos8(X16_P3)
         ldy     #0                      ; secondary 0: the directory, not a file
         jsr     SETLFS
         jsr     OPEN
@@ -184,10 +184,10 @@ dir_next:
 
         jsr     dir_getb                ; link
         bcs     dir_no
-        sta     X16_T0
+        sta     mos8(X16_T0)
         jsr     dir_getb
         bcs     dir_no
-        ora     X16_T0
+        ora     mos8(X16_T0)
         beq     dir_no                  ; a zero link is the end of the listing
 
         jsr     dir_getb                ; the line number is the block count
@@ -197,37 +197,37 @@ dir_next:
         bcs     dir_no
         sta     dir_blk+1
 
-        stz     X16_T1                  ; name bytes stored so far
-        stz     X16_T2                  ; 0 before the name, 1 inside, 2 after
+        stz     mos8(X16_T1)            ; name bytes stored so far
+        stz     mos8(X16_T2)            ; 0 before the name, 1 inside, 2 after
 dir_text:
         jsr     dir_getb
         bcs     dir_endline             ; the file ended: keep what we have
         cmp     #0
         beq     dir_endline             ; and $00 ends the line properly
-        ldx     X16_T2
+        ldx     mos8(X16_T2)
         cpx     #1
         beq     dir_inname
         cpx     #2
         beq     dir_after
         cmp     #CH_QUOTE               ; before the name: find the quote
         bne     dir_text
-        inc     X16_T2
+        inc     mos8(X16_T2)
         bra     dir_text
 
 dir_inname:
         cmp     #CH_QUOTE               ; the closing quote ends the name
         beq     dir_closed
-        ldx     X16_T1
+        ldx     mos8(X16_T1)
         inx
-        cpx     X16_P2                  ; room for this byte AND a terminator?
+        cpx     mos8(X16_P2)            ; room for this byte AND a terminator?
         bcs     dir_text                ; no: drop it, but keep parsing the type
-        ldy     X16_T1                  ; CHRIN is free to clobber Y, so load it
+        ldy     mos8(X16_T1)            ; CHRIN is free to clobber Y, so load it
         sta     (X16_P0),y              ; here rather than holding it across
-        inc     X16_T1
+        inc     mos8(X16_T1)
         bra     dir_text
 dir_closed:
         lda     #2
-        sta     X16_T2
+        sta     mos8(X16_T2)
         bra     dir_text
 
 dir_after:
@@ -239,7 +239,7 @@ dir_after:
         bra     dir_text
 
 dir_endline:
-        ldy     X16_T1
+        ldy     mos8(X16_T1)
         lda     #0
         sta     (X16_P0),y              ; NUL-terminate within the buffer
         sec                             ; an entry was read
@@ -296,11 +296,11 @@ dir_close:
 ; one byte from the directory channel; carry set if the stream ended
 dir_getb:
         jsr     CHRIN
-        sta     X16_T3
+        sta     mos8(X16_T3)
         jsr     READST
         cmp     #0
         bne     dir_getb_end
-        lda     X16_T3
+        lda     mos8(X16_T3)
         clc
         rts
 dir_getb_end:

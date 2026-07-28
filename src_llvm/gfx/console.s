@@ -36,17 +36,17 @@ x16_con_init:
         pha                             ; A and X hold the first
         phx                             ; argument; the loads below
                                         ; clobber both, so park them
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     r3H
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     r3L                ; height (rightmost arg: A/X)
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     r2H
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     r2L                ; width
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     r1H
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     r1L                ; y
         plx
         pla
@@ -109,9 +109,9 @@ x16_con_disable_paging:
 x16_con_put_image:
         pha                             ; the width is in A/X and the
         phx                             ; loads below clobber both
-        lda     __rc5                   ; the height lives in __rc4/5,
+        lda     mos8(__rc5)             ; the height lives in __rc4/5,
         sta     r2H                     ; which IS r1 -- move it up to r2
-        lda     __rc4                   ; before the width lands there
+        lda     mos8(__rc4)             ; before the width lands there
         sta     r2L
         plx
         pla

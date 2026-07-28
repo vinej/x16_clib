@@ -74,15 +74,15 @@ x16_kbd_get_modifiers:
 ; interrupt in the middle is harmless.
 ; ---------------------------------------------------------------------
 x16_kbd_get_keymap:
-        lda     __rc2                   ; name buffer: the pointer pair
-        sta     X16_TPTR0
-        lda     __rc3
-        sta     X16_TPTR0+1
+        lda     mos8(__rc2)             ; name buffer: the pointer pair
+        sta     mos8(X16_TPTR0)
+        lda     mos8(__rc3)
+        sta     mos8(X16_TPTR0+1)
 
         sec
         jsr     KEYMAP                  ; A = index, X = name lo, Y = name hi
-        stx     X16_TPTR1
-        sty     X16_TPTR1+1
+        stx     mos8(X16_TPTR1)
+        sty     mos8(X16_TPTR1+1)
         pha                             ; park the index
 
         lda     RAM_BANK
@@ -117,8 +117,8 @@ x16_kbd_get_keymap:
 ; layout stays active.
 ; ---------------------------------------------------------------------
 x16_kbd_set_keymap:
-        ldx     __rc2                   ; KEYMAP wants X = lo, Y = hi
-        ldy     __rc3
+        ldx     mos8(__rc2)             ; KEYMAP wants X = lo, Y = hi
+        ldy     mos8(__rc3)
 
         clc
         jsr     KEYMAP                  ; carry set on unknown layout

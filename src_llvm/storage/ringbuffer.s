@@ -111,15 +111,15 @@ ring_init:
 ; ring_put -- enqueue one byte.  in: A = byte
 ; ---------------------------------------------------------------------
 ring_put:
-        sta     X16_T2
+        sta     mos8(X16_T2)
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     ring_bank
         sta     RAM_BANK
         jsr     ringbuffer_rhptr
-        lda     X16_T2
+        lda     mos8(X16_T2)
         sta     (X16_T0)                ; buffer[head] = value
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     RAM_BANK
         jsr     ringbuffer_inchead
         jsr     ringbuffer_fillinc
@@ -130,20 +130,20 @@ ring_put:
 ;   in: A = low, X = high
 ; ---------------------------------------------------------------------
 ring_putw:
-        sta     X16_T2
-        stx     X16_T4
+        sta     mos8(X16_T2)
+        stx     mos8(X16_T4)
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     ring_bank
         sta     RAM_BANK
         jsr     ringbuffer_rhptr
-        lda     X16_T2
+        lda     mos8(X16_T2)
         sta     (X16_T0)                ; buffer[head] = low
         jsr     ringbuffer_inchead
         jsr     ringbuffer_rhptr
-        lda     X16_T4
+        lda     mos8(X16_T4)
         sta     (X16_T0)                ; buffer[head] = high
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     RAM_BANK
         jsr     ringbuffer_inchead
         jsr     ringbuffer_fillinc
@@ -157,13 +157,13 @@ ring_get:
         jsr     ringbuffer_filldec
         jsr     ringbuffer_inctail
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     ring_bank
         sta     RAM_BANK
         jsr     ringbuffer_rtptr
         lda     (X16_T0)
         tay
-        lda     X16_T3
+        lda     mos8(X16_T3)
         sta     RAM_BANK
         tya
         rts
@@ -175,21 +175,21 @@ ring_getw:
         jsr     ringbuffer_filldec
         jsr     ringbuffer_filldec
         lda     RAM_BANK
-        sta     X16_T3
+        sta     mos8(X16_T3)
         lda     ring_bank
         sta     RAM_BANK
         jsr     ringbuffer_inctail
         jsr     ringbuffer_rtptr
         lda     (X16_T0)
-        sta     X16_T2                  ; low
+        sta     mos8(X16_T2)            ; low
         jsr     ringbuffer_inctail
         jsr     ringbuffer_rtptr
         lda     (X16_T0)
-        sta     X16_T4                  ; high
-        lda     X16_T3
+        sta     mos8(X16_T4)            ; high
+        lda     mos8(X16_T3)
         sta     RAM_BANK
-        lda     X16_T2
-        ldx     X16_T4
+        lda     mos8(X16_T2)
+        ldx     mos8(X16_T4)
         rts
 
 ; ---------------------------------------------------------------------
@@ -249,21 +249,21 @@ ringbuffer_notfull:
 ; T0/T1 = $A000 + ring_head
 ringbuffer_rhptr:
         lda     ring_head
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     ring_head+1
         clc
         adc     #$A0
-        sta     X16_T1
+        sta     mos8(X16_T1)
         rts
 
 ; T0/T1 = $A000 + ring_tail
 ringbuffer_rtptr:
         lda     ring_tail
-        sta     X16_T0
+        sta     mos8(X16_T0)
         lda     ring_tail+1
         clc
         adc     #$A0
-        sta     X16_T1
+        sta     mos8(X16_T1)
         rts
 
 ; head++, wrapping to 0 when it reaches RING_CAP (8192)

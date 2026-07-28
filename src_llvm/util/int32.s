@@ -62,28 +62,28 @@
 .macro  eax_to buf
         sta     \buf
         stx     \buf+1
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     \buf+2
-        lda     __rc3
+        lda     mos8(__rc3)
         sta     \buf+3
 .endm
 
 .macro  rc4_to buf
-        lda     __rc4
+        lda     mos8(__rc4)
         sta     \buf
-        lda     __rc5
+        lda     mos8(__rc5)
         sta     \buf+1
-        lda     __rc6
+        lda     mos8(__rc6)
         sta     \buf+2
-        lda     __rc7
+        lda     mos8(__rc7)
         sta     \buf+3
 .endm
 
 .macro  eax_from buf
         lda     \buf+2
-        sta     __rc2
+        sta     mos8(__rc2)
         lda     \buf+3
-        sta     __rc3
+        sta     mos8(__rc3)
         lda     \buf
         ldx     \buf+1
 .endm
@@ -201,10 +201,10 @@ x16_i32_cmps:
 x16_i32_divmod:
         eax_to  i32_a                   ; a: A/X/__rc2/__rc3
         rc4_to  i32_b                   ; b: __rc4..__rc7
-        lda     __rc8                   ; rem: __rc8/__rc9
-        sta     X16_T6
-        lda     __rc9
-        sta     X16_T7
+        lda     mos8(__rc8)             ; rem: __rc8/__rc9
+        sta     mos8(X16_T6)
+        lda     mos8(__rc9)
+        sta     mos8(X16_T7)
         jsr     i32_divmod
         bcs     .Lx16_i32_divmod_divzero                ; b was zero: *rem stays untouched
         ldy     #3
@@ -227,8 +227,8 @@ x16_i32_divmod:
 x16_i32_to_dec:
         eax_to  i32_a
         jsr     i32_to_dec              ; answers A = low, X = high
-        sta     __rc2                   ; llvm-mos returns a pointer in
-        stx     __rc3                   ; the aligned pair __rc2/__rc3
+        sta     mos8(__rc2)             ; llvm-mos returns a pointer in
+        stx     mos8(__rc3)             ; the aligned pair __rc2/__rc3
         rts
 
 ; =====================================================================

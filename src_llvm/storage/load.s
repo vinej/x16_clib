@@ -61,10 +61,10 @@ TOK_SYS  = $9E                          ; BASIC's SYS token
 ; name is a pointer -> __rc2/__rc3; len is the only integer -> A.
 x16_fs_setname:
         pha                             ; len
-        lda     __rc2
-        sta     X16_P0                  ; name
-        lda     __rc3
-        sta     X16_P1
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; name
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
         pla                             ; A = len
         jmp     fs_setname
 
@@ -82,22 +82,22 @@ x16_fs_setname:
 ; itself does not use those two, and they are adjacent, which is all an
 ; indirect store needs.
 x16_fs_load:
-        sta     X16_P2                  ; name length
-        stx     X16_P3                  ; device
-        lda     __rc2
-        sta     X16_P0                  ; name
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P4                  ; secondary address
-        lda     __rc6
-        sta     X16_P5                  ; dest
-        lda     __rc7
-        sta     X16_P6
-        lda     __rc8
-        sta     X16_T6                  ; end* (may be NULL)
-        lda     __rc9
-        sta     X16_T7
+        sta     mos8(X16_P2)            ; name length
+        stx     mos8(X16_P3)            ; device
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; name
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P4)            ; secondary address
+        lda     mos8(__rc6)
+        sta     mos8(X16_P5)            ; dest
+        lda     mos8(__rc7)
+        sta     mos8(X16_P6)
+        lda     mos8(__rc8)
+        sta     mos8(X16_T6)            ; end* (may be NULL)
+        lda     mos8(__rc9)
+        sta     mos8(X16_T7)
 
         jsr     fs_load                 ; carry + A = error, X/Y = end
         ; fall through
@@ -106,19 +106,19 @@ x16_fs_load:
 ;      X16_T6/T7 = end* or NULL
 ; out: A = 0 on success else the error code
 store_end_and_status:
-        stx     X16_T0                  ; neither store touches the flags
-        sty     X16_T1
+        stx     mos8(X16_T0)            ; neither store touches the flags
+        sty     mos8(X16_T1)
         php                             ; the carry is the only success signal
         pha
 
-        lda     X16_T6
-        ora     X16_T7
+        lda     mos8(X16_T6)
+        ora     mos8(X16_T7)
         beq     .Lstore_end_and_status_no_out                 ; end == NULL: caller does not want it
         ldy     #0
-        lda     X16_T0
+        lda     mos8(X16_T0)
         sta     (X16_T6),y
         iny
-        lda     X16_T1
+        lda     mos8(X16_T1)
         sta     (X16_T6),y
 .Lstore_end_and_status_no_out:
         pla                             ; A = KERNAL error code
@@ -139,20 +139,20 @@ store_end_and_status:
 ; end -> __rc6/__rc7. Nothing spoils a pair here, so the pointers land
 ; consecutively.
 x16_fs_save:
-        sta     X16_P2                  ; name length
-        stx     X16_P3                  ; device
-        lda     __rc2
-        sta     X16_P0                  ; name
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P5                  ; start
-        lda     __rc5
-        sta     X16_P6
-        lda     __rc6
-        sta     X16_T6                  ; end, exclusive
-        lda     __rc7
-        sta     X16_T7
+        sta     mos8(X16_P2)            ; name length
+        stx     mos8(X16_P3)            ; device
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; name
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P5)            ; start
+        lda     mos8(__rc5)
+        sta     mos8(X16_P6)
+        lda     mos8(__rc6)
+        sta     mos8(X16_T6)            ; end, exclusive
+        lda     mos8(__rc7)
+        sta     mos8(X16_T7)
 
         jsr     fs_save                 ; carry + A = error
         bcs     .Lx16_fs_save_failed
@@ -171,18 +171,18 @@ x16_fs_save:
 ; ---------------------------------------------------------------------
 ; name -> __rc2/__rc3, len -> A, device -> X, vaddr -> __rc4..__rc7.
 x16_fs_vload:
-        sta     X16_P2                  ; name length
-        stx     X16_P3                  ; device
-        lda     __rc2
-        sta     X16_P0                  ; name
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P5                  ; vaddr bits 0-7
-        lda     __rc5
-        sta     X16_P6                  ; vaddr bits 8-15
-        lda     __rc6
-        sta     X16_P4                  ; vaddr bit 16 -> VRAM bank
+        sta     mos8(X16_P2)            ; name length
+        stx     mos8(X16_P3)            ; device
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; name
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P5)            ; vaddr bits 0-7
+        lda     mos8(__rc5)
+        sta     mos8(X16_P6)            ; vaddr bits 8-15
+        lda     mos8(__rc6)
+        sta     mos8(X16_P4)            ; vaddr bit 16 -> VRAM bank
 
         jsr     fs_vload                ; carry + A = error
         bcs     .Lx16_fs_vload_failed
@@ -200,12 +200,12 @@ x16_fs_vload:
 ; name -> __rc2/__rc3, len -> A, device -> X. A 16-bit return goes back
 ; in A/X, low byte first, as x16_key_peek does.
 x16_fs_prg_entry:
-        sta     X16_P2                  ; name length
-        stx     X16_P3                  ; device
-        lda     __rc2
-        sta     X16_P0                  ; name
-        lda     __rc3
-        sta     X16_P1
+        sta     mos8(X16_P2)            ; name length
+        stx     mos8(X16_P3)            ; device
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; name
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
 
         jsr     fs_prg_entry            ; X = low, Y = high
         phy
@@ -221,8 +221,8 @@ x16_fs_prg_entry:
 ; fs_setname -- in: X16_P0/P1 = filename address, A = length
 ; ---------------------------------------------------------------------
 fs_setname:
-        ldx     X16_P0
-        ldy     X16_P1
+        ldx     mos8(X16_P0)
+        ldy     mos8(X16_P1)
         jmp     SETNAM
 
 ; ---------------------------------------------------------------------
@@ -241,18 +241,18 @@ fs_load:
 
 ; in: A = LOAD's destination code (0 RAM, 2/3 VRAM); rest as fs_load
 load_common:
-        sta     X16_T3
-        lda     X16_P2
+        sta     mos8(X16_T3)
+        lda     mos8(X16_P2)
         jsr     fs_setname
 
         lda     #1                      ; logical file number
-        ldx     X16_P3                  ; device
-        ldy     X16_P4                  ; secondary address
+        ldx     mos8(X16_P3)            ; device
+        ldy     mos8(X16_P4)            ; secondary address
         jsr     SETLFS
 
-        lda     X16_T3
-        ldx     X16_P5
-        ldy     X16_P6
+        lda     mos8(X16_T3)
+        ldx     mos8(X16_P5)
+        ldy     mos8(X16_P6)
         jmp     LOAD
 
 ; ---------------------------------------------------------------------
@@ -269,22 +269,22 @@ load_common:
 ; borrowed as the zero-page pointer KERNAL SAVE requires.
 ; ---------------------------------------------------------------------
 fs_save:
-        lda     X16_P2
+        lda     mos8(X16_P2)
         jsr     fs_setname
 
         lda     #1
-        ldx     X16_P3
+        ldx     mos8(X16_P3)
         ldy     #0                      ; secondary 0: no PRG-header relocation
         jsr     SETLFS
 
-        lda     X16_P5                  ; SAVE takes the start address through a
-        sta     X16_T4                  ; zero-page pointer, given by its address
-        lda     X16_P6
-        sta     X16_T5
+        lda     mos8(X16_P5)            ; SAVE takes the start address through a
+        sta     mos8(X16_T4)            ; zero-page pointer, given by its address
+        lda     mos8(X16_P6)
+        sta     mos8(X16_T5)
 
         lda     #<X16_T4                ; A = zero-page offset of the pointer
-        ldx     X16_T6                  ; X/Y = end address, exclusive
-        ldy     X16_T7
+        ldx     mos8(X16_T6)            ; X/Y = end address, exclusive
+        ldy     mos8(X16_T7)
         jmp     SAVE
 
 ; ---------------------------------------------------------------------
@@ -300,11 +300,11 @@ fs_save:
 ; is forced to 0 so the PRG header is skipped and X/Y is honoured.
 ; ---------------------------------------------------------------------
 fs_vload:
-        lda     X16_P4
+        lda     mos8(X16_P4)
         and     #$01
         clc
         adc     #2                      ; LOAD A: bank 0 -> 2, bank 1 -> 3
-        stz     X16_P4                  ; SETLFS SA = 0 (does not disturb A)
+        stz     mos8(X16_P4)            ; SETLFS SA = 0 (does not disturb A)
         bra     load_common
 
 ; ---------------------------------------------------------------------
@@ -333,13 +333,13 @@ fs_vload:
 FS_PRG_SKIP = 6                         ; load address, link, line number
 
 fs_prg_entry:
-        stz     X16_T0                  ; the result, built a digit at a time
-        stz     X16_T1
+        stz     mos8(X16_T0)            ; the result, built a digit at a time
+        stz     mos8(X16_T1)
 
-        lda     X16_P2
+        lda     mos8(X16_P2)
         jsr     fs_setname
         lda     #1                      ; logical file
-        ldx     X16_P3                  ; device
+        ldx     mos8(X16_P3)            ; device
         ldy     #2                      ; a plain data channel
         jsr     SETLFS
         jsr     OPEN
@@ -349,11 +349,11 @@ fs_prg_entry:
         bcs     prg_quit
 
         lda     #FS_PRG_SKIP            ; CHRIN is free to clobber Y, so the
-        sta     X16_T6                  ; count cannot live there
+        sta     mos8(X16_T6)            ; count cannot live there
 .Lfs_prg_entry_skip:
         jsr     prg_getb
         bcs     prg_quit
-        dec     X16_T6
+        dec     mos8(X16_T6)
         bne     .Lfs_prg_entry_skip
 
         jsr     prg_getb                ; the SYS token
@@ -374,32 +374,32 @@ fs_prg_entry:
 
         sec
         sbc     #CH_ZERO
-        sta     X16_T2
+        sta     mos8(X16_T2)
 
-        lda     X16_T0                  ; result = result * 10 + digit,
-        sta     X16_T3                  ; taking *10 as ((r * 4) + r) * 2
-        lda     X16_T1
-        sta     X16_T4
-        asl     X16_T0
-        rol     X16_T1
-        asl     X16_T0
-        rol     X16_T1
+        lda     mos8(X16_T0)            ; result = result * 10 + digit,
+        sta     mos8(X16_T3)            ; taking *10 as ((r * 4) + r) * 2
+        lda     mos8(X16_T1)
+        sta     mos8(X16_T4)
+        asl     mos8(X16_T0)
+        rol     mos8(X16_T1)
+        asl     mos8(X16_T0)
+        rol     mos8(X16_T1)
         clc
-        lda     X16_T0
-        adc     X16_T3
-        sta     X16_T0
-        lda     X16_T1
-        adc     X16_T4
-        sta     X16_T1
-        asl     X16_T0
-        rol     X16_T1
+        lda     mos8(X16_T0)
+        adc     mos8(X16_T3)
+        sta     mos8(X16_T0)
+        lda     mos8(X16_T1)
+        adc     mos8(X16_T4)
+        sta     mos8(X16_T1)
+        asl     mos8(X16_T0)
+        rol     mos8(X16_T1)
         clc
-        lda     X16_T0
-        adc     X16_T2
-        sta     X16_T0
-        lda     X16_T1
+        lda     mos8(X16_T0)
+        adc     mos8(X16_T2)
+        sta     mos8(X16_T0)
+        lda     mos8(X16_T1)
         adc     #0
-        sta     X16_T1
+        sta     mos8(X16_T1)
 
         jsr     prg_getb
         bcc     .Lfs_prg_entry_digit    ; ran out of file: keep what we have
@@ -408,18 +408,18 @@ prg_quit:
         jsr     CLRCHN
         lda     #1
         jsr     CLOSE
-        ldx     X16_T0
-        ldy     X16_T1
+        ldx     mos8(X16_T0)
+        ldy     mos8(X16_T1)
         rts
 
 ; one byte from the open channel; carry set if the file ended first
 prg_getb:
         jsr     CHRIN
-        sta     X16_T5
+        sta     mos8(X16_T5)
         jsr     READST
         cmp     #0
         bne     .Lprg_getb_end
-        lda     X16_T5
+        lda     mos8(X16_T5)
         clc
         rts
 .Lprg_getb_end:

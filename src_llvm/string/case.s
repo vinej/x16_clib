@@ -61,29 +61,29 @@ x16_str_upperchar_iso:
 ; s -> __rc2/__rc3; the asm wants it in A/X and answers in Y.
 ; ---------------------------------------------------------------------
 x16_str_lower:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_lower
         tya                             ; A = the length
         rts
 
 x16_str_lower_iso:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_lower_iso
         tya
         rts
 
 x16_str_upper:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_upper
         tya
         rts
 
 x16_str_upper_iso:
-        lda     __rc2
-        ldx     __rc3
+        lda     mos8(__rc2)
+        ldx     mos8(__rc3)
         jsr     str_upper_iso
         tya
         rts
@@ -96,21 +96,21 @@ x16_str_upper_iso:
 ; s1 -> __rc2/__rc3, s2 -> __rc4/__rc5.
 ; ---------------------------------------------------------------------
 x16_str_compare_nocase:
-        lda     __rc4
-        sta     X16_P0                  ; s2
-        lda     __rc5
-        sta     X16_P1
-        lda     __rc2                   ; A/X = s1
-        ldx     __rc3
+        lda     mos8(__rc4)
+        sta     mos8(X16_P0)            ; s2
+        lda     mos8(__rc5)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc2)             ; A/X = s1
+        ldx     mos8(__rc3)
         jmp     str_compare_nocase      ; A = $FF / 0 / 1
 
 x16_str_compare_nocase_iso:
-        lda     __rc4
-        sta     X16_P0                  ; s2
-        lda     __rc5
-        sta     X16_P1
-        lda     __rc2                   ; A/X = s1
-        ldx     __rc3
+        lda     mos8(__rc4)
+        sta     mos8(X16_P0)            ; s2
+        lda     mos8(__rc5)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc2)             ; A/X = s1
+        ldx     mos8(__rc3)
         jmp     str_compare_nocase_iso
 
 ; =====================================================================
@@ -165,8 +165,8 @@ str_upperchar_iso:
 ;   in: A = low, X = high.  out: Y = length
 ; ---------------------------------------------------------------------
 str_lower:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_lower_loop:
     lda (X16_T0),y
@@ -179,8 +179,8 @@ str_lower:
     rts
 
 str_lower_iso:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_lower_iso_loop:
     lda (X16_T0),y
@@ -193,8 +193,8 @@ str_lower_iso:
     rts
 
 str_upper:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_upper_loop:
     lda (X16_T0),y
@@ -207,8 +207,8 @@ str_upper:
     rts
 
 str_upper_iso:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_upper_iso_loop:
     lda (X16_T0),y
@@ -226,17 +226,17 @@ str_upper_iso:
 ;   out: A = $FF (-1) if string1 < string2, 0 if equal, 1 if greater
 ; ---------------------------------------------------------------------
 str_compare_nocase:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_compare_nocase_loop:
     lda (X16_T0),y
     beq .Lstr_compare_nocase_s1end
     jsr str_lowerchar
-    sta X16_T2
+    sta mos8(X16_T2)
     lda (X16_P0),y
     jsr str_lowerchar
-    cmp X16_T2
+    cmp mos8(X16_T2)
     bne .Lstr_compare_nocase_diff
     iny
     bne .Lstr_compare_nocase_loop
@@ -259,17 +259,17 @@ str_compare_nocase:
     rts
 
 str_compare_nocase_iso:
-    sta X16_T0
-    stx X16_T1
+    sta mos8(X16_T0)
+    stx mos8(X16_T1)
     ldy #0
 .Lstr_compare_nocase_iso_loop:
     lda (X16_T0),y
     beq .Lstr_compare_nocase_iso_s1end
     jsr str_lowerchar_iso
-    sta X16_T2
+    sta mos8(X16_T2)
     lda (X16_P0),y
     jsr str_lowerchar_iso
-    cmp X16_T2
+    cmp mos8(X16_T2)
     bne .Lstr_compare_nocase_iso_diff
     iny
     bne .Lstr_compare_nocase_iso_loop

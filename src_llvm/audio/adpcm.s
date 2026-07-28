@@ -60,7 +60,7 @@ adpcm_init:
 x16_adpcm_set_state:
         sta     adpcm_pred
         stx     adpcm_pred+1
-        lda     __rc2
+        lda     mos8(__rc2)
         sta     adpcm_index
         rts
 
@@ -91,16 +91,16 @@ x16_adpcm_nibble:
 ; src and dst are pointers (__rc2/__rc3, __rc4/__rc5); count is the only
 ; integer, so it takes A and X.
 x16_adpcm_block:
-        sta     X16_P4                  ; source count lo
-        stx     X16_P5                  ; source count hi
-        lda     __rc2
-        sta     X16_P0                  ; src
-        lda     __rc3
-        sta     X16_P1
-        lda     __rc4
-        sta     X16_P2                  ; dst
-        lda     __rc5
-        sta     X16_P3
+        sta     mos8(X16_P4)            ; source count lo
+        stx     mos8(X16_P5)            ; source count hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P0)            ; src
+        lda     mos8(__rc3)
+        sta     mos8(X16_P1)
+        lda     mos8(__rc4)
+        sta     mos8(X16_P2)            ; dst
+        lda     mos8(__rc5)
+        sta     mos8(X16_P3)
         jmp     adpcm_block
 
 ; =====================================================================
@@ -264,8 +264,8 @@ add_sh:
 ; ---------------------------------------------------------------------
 adpcm_block:
 .Ladpcm_block_loop:
-        lda     X16_P4
-        ora     X16_P5
+        lda     mos8(X16_P4)
+        ora     mos8(X16_P5)
         beq     .Ladpcm_block_done
 
         ldy     #0
@@ -280,15 +280,15 @@ adpcm_block:
         lsr     a
         jsr     emit
 
-        inc     X16_P0
+        inc     mos8(X16_P0)
         bne     .Ladpcm_block_next
-        inc     X16_P1
+        inc     mos8(X16_P1)
 .Ladpcm_block_next:
-        lda     X16_P4
+        lda     mos8(X16_P4)
         bne     .Ladpcm_block_declo
-        dec     X16_P5
+        dec     mos8(X16_P5)
 .Ladpcm_block_declo:
-        dec     X16_P4
+        dec     mos8(X16_P4)
         bra     .Ladpcm_block_loop
 .Ladpcm_block_done:
         rts
@@ -302,11 +302,11 @@ emit:
         iny
         sta     (X16_P2),y
         clc
-        lda     X16_P2
+        lda     mos8(X16_P2)
         adc     #2
-        sta     X16_P2
+        sta     mos8(X16_P2)
         bcc     .Lemit_ok
-        inc     X16_P3
+        inc     mos8(X16_P3)
 .Lemit_ok:
         rts
 

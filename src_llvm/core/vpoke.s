@@ -42,9 +42,9 @@
 ;   data -> A; addr -> X (lo), __rc2 (mid), __rc3 (hi), __rc4 (unused).
 vpoke:
         stz     VERA_CTRL               ; ADDRSEL = 0
-        ldy     __rc3                   ; addr byte 2: bank bit
+        ldy     mos8(__rc3)             ; addr byte 2: bank bit
         sty     VERA_ADDR_H
-        ldy     __rc2                   ; addr byte 1
+        ldy     mos8(__rc2)             ; addr byte 1
         sty     VERA_ADDR_M
         stx     VERA_ADDR_L             ; addr byte 0 -- the byte the
         sta     VERA_DATA0              ; SDK's version never reads
