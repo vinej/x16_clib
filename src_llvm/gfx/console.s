@@ -107,19 +107,17 @@ x16_con_disable_paging:
 ; oversized character. Fails the line if it cannot fit.
 ; ---------------------------------------------------------------------
 x16_con_put_image:
-        pha                             ; A and X hold the first
-        phx                             ; argument; the loads below
-                                        ; clobber both, so park them
-        lda     __rc5
-        sta     r2H
-        lda     __rc4
-        sta     r2L                ; height (rightmost arg: A/X)
-        lda     __rc3
-        sta     r1H
-        lda     __rc2
-        sta     r1L                ; width
+        pha                             ; the width is in A/X and the
+        phx                             ; loads below clobber both
+        lda     __rc5                   ; the height lives in __rc4/5,
+        sta     r2H                     ; which IS r1 -- move it up to r2
+        lda     __rc4                   ; before the width lands there
+        sta     r2L
         plx
         pla
-        sta     r0L                ; image
-        stx     r0H
+        sta     r1L                     ; width
+        stx     r1H
+                                        ; the image is a leading pointer,
+                                        ; so it never entered A/X: it is
+                                        ; already in __rc2/3, which IS r0
         jmp     CONSOLE_PUT_IMAGE
