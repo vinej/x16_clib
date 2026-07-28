@@ -63,6 +63,9 @@
 ; Cross-module: gfx/bitmap8l.s switches to bitmap mode through this.
         .export         screen_set_mode
 
+        ; ui/filepick.s needs the mode and charset it drew under
+        .export         screen_get_mode, screen_charset
+
         .segment        "CODE"
 
 ; ---------------------------------------------------------------------

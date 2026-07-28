@@ -24,6 +24,9 @@
         .export         _x16_key_wait
         .export         _x16_key_peek
 
+        ; ui/filepick.s polls the mouse while browsing
+        .export         mouse_get, mouse_hide
+
 ; What JOYSTICK_GET returns in Y. Mirrored as X16_JOY_PRESENT in the
 ; header, though C callers see the boolean the shim derives from it.
 JOY_PRESENT = $00

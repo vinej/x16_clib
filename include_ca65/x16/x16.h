@@ -67,6 +67,7 @@
 #include <x16/graph.h>          /* KERNAL GRAPH: lines, rects, ovals, text */
 #include <x16/fb.h>             /* KERNAL framebuffer driver: pixel cursor */
 #include <x16/console.h>        /* KERNAL console: wrap, paging, line input */
+#include <x16/filepick.h>       /* a full-screen file browser */
 #include <x16/spi.h>            /* VERA SPI master: select, clock, byte exchange */
 #include <x16/serial.h>         /* the serial / WiFi card's 16C550 UARTs */
 #include <x16/zimodem.h>        /* ZiModem: AT-command WiFi over the card */

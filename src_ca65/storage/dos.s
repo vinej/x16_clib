@@ -46,6 +46,9 @@ CH_ZERO  = $30                          ; '0'
         .export         _x16_dos_chdir
         .export         _x16_dos_rename
 
+        ; ui/filepick.s drives these directly
+        .export         dos_chdir, dos_mkdir, dos_rmdir, dos_delete, dos_rename
+
 DOS_MSG_MAX = 64
 DOS_CMD_MAX = 80
 
