@@ -63,6 +63,10 @@
 ; Cross-module: gfx/bitmap8l.s switches to bitmap mode through this.
         .globl  screen_set_mode
 
+; Cross-module: ui/filepick.s saves and restores the screen with these.
+        .globl  screen_charset
+        .globl  screen_get_mode
+
         .section .text,"ax",@progbits
 
 ; ---------------------------------------------------------------------

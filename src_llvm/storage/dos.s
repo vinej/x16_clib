@@ -52,6 +52,13 @@ CH_ZERO  = $30                          ; '0'
         .globl  x16_dos_chdir
         .globl  x16_dos_rename
 
+; Cross-module: ui/filepick.s runs its file operations through these.
+        .globl  dos_chdir
+        .globl  dos_delete
+        .globl  dos_mkdir
+        .globl  dos_rename
+        .globl  dos_rmdir
+
 DOS_MSG_MAX = 64
 DOS_CMD_MAX = 80
 

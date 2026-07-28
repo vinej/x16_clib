@@ -24,6 +24,10 @@
         .globl  x16_mouse_show
         .globl  x16_mouse_hide
         .globl  x16_mouse_get
+
+; Cross-module: ui/filepick.s hides and polls the mouse through these.
+        .globl  mouse_get
+        .globl  mouse_hide
         .globl  x16_key_get
         .globl  x16_key_wait
         .globl  x16_key_peek

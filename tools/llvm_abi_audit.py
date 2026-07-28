@@ -220,7 +220,27 @@ def main():
                          'leading pointer is in __rc2/3 (= r0) -- A/X hold '
                          'the NEXT argument' % hit))
 
-            # (3) A pure pass-through whose callee wants A/X, when the
+            # (3) The shim marshals -- it stores the A or X it was
+            # handed -- yet never reads a single one of the __rc slots
+            # the ABI actually put arguments in. That is a shim still
+            # written to cc65's rule that the argument arrives in A/X.
+            # x16_fp_filter was exactly this: `sta fp_filt / stx
+            # fp_filt+1`, storing whatever happened to be in A/X as the
+            # filter pointer, so the file browser matched nothing.
+            # __rc2/3 IS r0 here, so a shim marshalling into the KERNAL
+            # register block legitimately leaves a leading pointer where
+            # it already sits and only moves the later arguments.
+            unread = set(used)
+            if (args and args[0][0] == 'ptr'
+                    and re.search(r'^\s+st[axyz]\s+r\d+[LH]\b', code, re.M)):
+                unread -= {2, 3}
+            if unread and not seen and re.search(r'^\s+st[ax]\s+\w', code, re.M):
+                problems.append(
+                    (p, name, 'stores A/X but never reads %s, where the ABI '
+                     'put the argument(s)'
+                     % ', '.join('__rc%d' % r for r in sorted(unread))))
+
+            # (4) A pure pass-through whose callee wants A/X, when the
             # ABI put that argument in an __rc pair instead.
             stripped = [l for l in body if l.strip()
                         and not l.strip().startswith(';')]

@@ -114,6 +114,7 @@
 #include <x16/fileio.h>         /* OPEN/CHKIN/CHRIN: streamed channel I/O */
 #include <x16/iec.h>            /* raw IEC / serial bus control */
 #include <x16/dir.h>            /* walk a device directory */
+#include <x16/filepick.h>      /* the full-screen file browser */
 #include <x16/ringbuffer.h>     /* an 8 KB FIFO in a HIRAM bank */
 #include <x16/stack.h>          /* an 8 KB LIFO in a HIRAM bank */
 #include <x16/dos.h>            /* the DOS command channel: status, delete */
