@@ -70,6 +70,12 @@
 #include <x16/collide.h>        /* bounding-box overlap */
 #include <x16/clip.h>           /* Cohen-Sutherland line clipping */
 #include <x16/buffers.h>        /* a ring buffer and a stack */
-#include <x16/float.h>          /* the ROM's floating point library */
+#include <x16/float.h>
+#include <x16/string.h>
+#include <x16/sort.h>
+#include <x16/bcd.h>
+#include <x16/bits.h>
+#include <x16/number.h>
+#include <x16/tscrunch.h>          /* the ROM's floating point library */
 
 #endif /* X16_H */
