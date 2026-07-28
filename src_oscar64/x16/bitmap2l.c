@@ -145,8 +145,8 @@ void x16_gfx2l_init(void) {
         lda 0x9f25         // DCSEL = 0, keep ADDRSEL (VERA_CTRL)
         and #1                          // VERA_CTRL_ADDRSEL
         sta 0x9f25                      // VERA_CTRL
-        lda #0x80                        // the upstream module's scale
-        sta 0x9f2a                      // VERA_DC_HSCALE
+        lda #0x40                        // 64 = two output pixels per input:
+        sta 0x9f2a                      // VERA_DC_HSCALE (320x240 -> 640x480)
         sta 0x9f2b                      // VERA_DC_VSCALE
         lda #0
         sta 0x9f2c                      // VERA_DC_BORDER

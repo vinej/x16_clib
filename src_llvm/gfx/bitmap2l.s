@@ -230,7 +230,7 @@ blit_marshal:
 ; MSB-first (the leftmost pixel is bits 7:6), rows of 80 bytes,
 ; 19,200 bytes in all. A pixel byte is at y*80 + (x>>2); its position
 ; within the byte is x & 3. VERA renders it as layer-0 bitmap, 2bpp,
-; 320 wide, HSCALE = VSCALE = $80 -- gfx2l_init programs exactly that
+; 320 wide, HSCALE = VSCALE = $40 -- gfx2l_init programs exactly that
 ; (there is no KERNAL screen mode for it).
 ;
 ; Colours are 0-3 out of the first four palette entries. gfx2l_init
@@ -265,9 +265,9 @@ GFX2L_STRIDE = 80
 ; ---------------------------------------------------------------------
 gfx2l_init:
     vera_dcsel 0
-    lda #$80                    ; 1:1 scale -> 1:1 scale
-    sta VERA_DC_HSCALE
-    sta VERA_DC_VSCALE
+    lda #$40                    ; 64 = two output pixels per input pixel,
+    sta VERA_DC_HSCALE          ; so this 320x240 bitmap fills the 640x480
+    sta VERA_DC_VSCALE          ; display (128 would show 640 of its 320)
     stz VERA_DC_BORDER
 
     lda #(VERA_LAYER_BITMAP | VERA_LAYER_BPP_2)

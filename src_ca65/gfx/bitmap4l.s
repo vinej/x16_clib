@@ -296,15 +296,16 @@ GFX4L_STRIDE = 160
 ; ---------------------------------------------------------------------
 gfx4l_init:
     vera_dcsel 0
-    lda #$80
-    sta VERA_DC_HSCALE
-    sta VERA_DC_VSCALE
+    lda #$40                    ; 64 = two output pixels per input pixel,
+    sta VERA_DC_HSCALE          ; so this 320x240 bitmap fills the 640x480
+    sta VERA_DC_VSCALE          ; display (128 would show 640 of its 320)
     stz VERA_DC_BORDER
 
     lda #(VERA_LAYER_BITMAP | VERA_LAYER_BPP_4)
     sta VERA_L0_CONFIG
-    lda #$01
-    sta VERA_L0_TILEBASE
+    lda #$00                    ; bitmap base $00000, 320 pixels wide --
+    sta VERA_L0_TILEBASE        ; TILEBASE bit 0 picks 320 (0) or 640 (1),
+                                ; and every address here strides 160 bytes
     stz VERA_L0_HSCROLL_L
     stz VERA_L0_HSCROLL_H
     stz VERA_L0_VSCROLL_L
@@ -982,7 +983,7 @@ bitmap4l_gp4l_done:
 ; ---------------------------------------------------------------------
 ; gfx4l_line -- Bresenham, any direction
 ;   in:  X16_P0/P1 = x0, X16_P2 = y0
-;        X16_P4/P5 = x1, y1 in P6/P7?  (compatible with gfx4l_line macros)
+;        X16_P3/P4 = x1, X16_P5 = y1
 ;        X16_P6 = colour
 ; ---------------------------------------------------------------------
 gfx4l_line:

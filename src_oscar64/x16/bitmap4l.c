@@ -132,15 +132,15 @@ void x16_gfx4l_init(void) {
         lda 0x9f25         // DCSEL = 0, keep ADDRSEL (VERA_CTRL)
         and #1                          // VERA_CTRL_ADDRSEL
         sta 0x9f25                      // VERA_CTRL
-        lda #0x80                        // the upstream module's scale
-        sta 0x9f2a                      // VERA_DC_HSCALE
+        lda #0x40                        // 64 = two output pixels per input:
+        sta 0x9f2a                      // VERA_DC_HSCALE (320x240 -> 640x480)
         sta 0x9f2b                      // VERA_DC_VSCALE
         lda #0
         sta 0x9f2c                      // VERA_DC_BORDER
 
         lda #6                          // BITMAP|BPP_4
         sta 0x9f2d                      // VERA_L0_CONFIG
-        lda #1                          // the upstream module's TILEBASE
+        lda #0                          // base $00000, 320 pixels wide
         sta 0x9f2f                      // VERA_L0_TILEBASE
         lda #0
         sta 0x9f30                      // VERA_L0_HSCROLL_L

@@ -4097,13 +4097,18 @@ static void test_g2_bezier(void)
 #define P2L(x, y)   ((unsigned long)(y) * 80 + ((x) >> 2))
 #define L0_CONFIG   (*(volatile unsigned char *)0x9F2DU)
 #define L0_TILEBASE (*(volatile unsigned char *)0x9F2FU)
+#define DC_HSCALE   (*(volatile unsigned char *)0x9F2AU)
+#define DC_VSCALE   (*(volatile unsigned char *)0x9F2BU)
 
 static void test_g4l_init(void)
 {
     x16_gfx4l_init();
-    /* The TILEBASE value mirrors upstream bitmap4l exactly. */
+    /* 320-wide: TILEBASE bit 0 clear, and the scale doubles every
+    ** pixel so the framebuffer covers the whole 640x480 display.
+    */
     t_check(L0_CONFIG == 0x06 &&        /* bitmap | 4bpp */
-            L0_TILEBASE == 0x01,
+            L0_TILEBASE == 0x00 &&
+            DC_HSCALE == 0x40 && DC_VSCALE == 0x40,
             "G4L_INIT");
 }
 
@@ -4323,7 +4328,8 @@ static void test_g2l_init(void)
 {
     x16_gfx2l_init();
     t_check(L0_CONFIG == 0x05 &&        /* bitmap | 2bpp */
-            L0_TILEBASE == 0x00,        /* base $00000, 320 wide */
+            L0_TILEBASE == 0x00 &&      /* base $00000, 320 wide */
+            DC_HSCALE == 0x40 && DC_VSCALE == 0x40,
             "G2L_INIT");
 }
 

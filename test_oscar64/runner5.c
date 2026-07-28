@@ -66,9 +66,12 @@ const unsigned char imgm2[2] = { 0x3F, 0x40 };
 
 void test_g4l_init(void) {
     x16_gfx4l_init();
-    /* The TILEBASE value mirrors upstream bitmap4l exactly. */
+    /* 320-wide: TILEBASE bit 0 clear, and the scale doubles every
+     * pixel so the framebuffer covers the whole 640x480 display.
+     */
     t_check((*((char *)0x9f2d) == 0x06 &&        /* L0_CONFIG: bitmap|4bpp */
-            *((char *)0x9f2f) == 0x01) ? 1 : 0,
+            *((char *)0x9f2a) == 0x40 && *((char *)0x9f2b) == 0x40 &&
+            *((char *)0x9f2f) == 0x00) ? 1 : 0,
             "G4L_INIT");
 }
 
@@ -276,6 +279,7 @@ void test_g4l_blitm(void) {
 void test_g2l_init(void) {
     x16_gfx2l_init();
     t_check((*((char *)0x9f2d) == 0x05 &&        /* L0_CONFIG: bitmap|2bpp */
+            *((char *)0x9f2a) == 0x40 && *((char *)0x9f2b) == 0x40 &&
             *((char *)0x9f2f) == 0x00) ? 1 : 0,  /* base $00000, 320 wide */
             "G2L_INIT");
 }
