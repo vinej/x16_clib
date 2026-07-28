@@ -17,20 +17,20 @@ The same modules and the same API build under **cc65**, under
 any; they share no object code.
 
 ```
-include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      192 tests
-include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos   72 tests
-include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     153 tests
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   153 tests
-include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc       78 tests
+include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      539 tests
+include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  185 tests
+include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     266 tests
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   266 tests
+include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      196 tests
 examples/       doc/        emulator/      tools/             shared
 ```
 
 ```powershell
-.\build_ca65.ps1 -Test                 # cc65:     192/192
-.\build_llvm.ps1 -Test                 # llvm-mos:  72/72
-.\build_kickc.ps1 -Test                # KickC:    153/153
-.\build_oscar64.ps1 -Test              # Oscar64:  153/153
-.\build_vbcc.ps1  -Test -Source test_vbcc\runner.c   # vbcc: 78/78
+.\build_ca65.ps1 -Test                 # cc65:     539/539
+.\build_llvm.ps1 -Test                 # llvm-mos: 185/185
+.\build_kickc.ps1 -Test                # KickC:    266/266
+.\build_oscar64.ps1 -Test              # Oscar64:  266/266
+.\build_vbcc.ps1 -Test                 # vbcc:     196/196
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
@@ -95,8 +95,7 @@ to a single `jmp` into the assembly. Two things to know: a program that
 returns to BASIC must call `x16_irq_remove()` itself (vbcc has no exit
 destructors); and `-cbmascii` stores string literals in PETSCII, which is
 what you want on screen but means the test harness maps them back to
-ASCII on its way to stdout. The vbcc suite lives in one `test_vbcc\runner.c`,
-so run it with `-Source test_vbcc\runner.c`. For the full ABI -- register
+ASCII on its way to stdout. For the full ABI -- register
 placement, the `long`/soft-stack rules, and the shim pattern -- see the
 [porting notes below](#porting-notes-ca65-to-vbcc) and
 [include_vbcc/x16/x16.h](include_vbcc/x16/x16.h).
@@ -162,6 +161,15 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/spi.h` | **the VERA SPI master: select, clock, byte exchange, block moves** |
 | `x16/serial.h` | **the serial / WiFi card's 16C550 UARTs, polled** |
 | `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** |
+| `x16/int16.h` | 16-bit helpers: divmod with remainder, integer sqrt, sign-correct compares |
+| `x16/int32.h` | the same at 32 bits |
+| `x16/double.h` | **software IEEE-754 float64**: arithmetic, compares, transcendentals, string I/O |
+| `x16/audiorom.h` | **the AUDIO ROM: FM and PSG notes, play strings, four pitch spaces** |
+| `x16/wavfile.h` | **RIFF/WAV header parsing**, feeding the PCM streamer |
+| `x16/zsm.h` | **ZSM music streams** |
+| `x16/vdc.h` | **VERA's display composer**: scale, layers, border, active window |
+| `x16/filepick.h` | **a full-screen file browser**, bankable |
+| `x16/verafx_utils.h` | the raw VERA FX register knobs |
 
 Several of those are things the machine can do that nothing else exposes
 to C. `x16_mem_decompress()` is an **LZSA2 depacker sitting in ROM**, and
