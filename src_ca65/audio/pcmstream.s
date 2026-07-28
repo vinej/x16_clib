@@ -33,6 +33,9 @@
         .export         _x16_pcm_stream_stop
         .export         _x16_pcm_stream_active
 
+        ; audio/zsm.s drives the streamer directly and owns the loop flag
+        .export         pcm_stream_start, pcm_stream_stop, pcm_str_loop
+
         .segment        "CODE"
 
 ; ---------------------------------------------------------------------
@@ -65,12 +68,16 @@ pcm_stream_start:
 
         lda     X16_P0                  ; patch the source into the refiller
         sta     src_lda+1
-        lda     X16_P1
+        sta     pcm_str_rsrc            ; ...and snapshot it, so a looping
+        lda     X16_P1                  ; stream can rewind to the start
         sta     src_lda+2
+        sta     pcm_str_rsrc+1
         lda     X16_P2
         sta     pcm_str_rem
+        sta     pcm_str_rlen
         lda     X16_P3
         sta     pcm_str_rem+1
+        sta     pcm_str_rlen+1
         ora     X16_P2
         beq     @nothing                ; zero bytes: nothing to play
 
@@ -165,7 +172,25 @@ psf_dec_low:
         bra     psf_loop
 
 psf_exhausted:
-        lda     #VERA_IRQ_AFLOW         ; out of data: stop the refill interrupt
+        ; Out of data. If the caller asked for a loop and the snapshot
+        ; is not empty, rewind to the start and keep feeding; the FIFO
+        ; never notices the seam.
+        lda     pcm_str_loop
+        beq     @stop
+        lda     pcm_str_rlen
+        ora     pcm_str_rlen+1
+        beq     @stop                   ; an empty snapshot cannot loop
+        lda     pcm_str_rsrc
+        sta     src_lda+1
+        lda     pcm_str_rsrc+1
+        sta     src_lda+2
+        lda     pcm_str_rlen
+        sta     pcm_str_rem
+        lda     pcm_str_rlen+1
+        sta     pcm_str_rem+1
+        bra     psf_loop
+@stop:
+        lda     #VERA_IRQ_AFLOW         ; stop the refill interrupt
         trb     VERA_IEN                ; (leaving it enabled would storm: AFLOW
         stz     pcm_str_active          ; only clears by refilling the FIFO)
 psf_full:
@@ -175,3 +200,10 @@ psf_full:
 
 pcm_str_rem:    .res 2                  ; bytes still to feed
 pcm_str_active: .res 1
+
+; Caller-owned: nonzero means wrap to the start when the data runs out.
+; Set or clear it BEFORE pcm_stream_start; it survives a stop, because
+; the flag only matters at the moment the data is exhausted.
+pcm_str_loop:   .res 1
+pcm_str_rsrc:   .res 2                  ; rewind snapshot: source...
+pcm_str_rlen:   .res 2                  ; ...and byte count

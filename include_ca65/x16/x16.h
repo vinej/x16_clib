@@ -83,6 +83,10 @@
 #include <x16/bmx.h>            /* the X16's native bitmap file format */
 #include <x16/zx0.h>            /* ZX0 depacking, tighter than LZSA2 */
 #include <x16/adpcm.h>          /* IMA ADPCM: 4:1 compressed audio */
+#include <x16/audiorom.h>       /* the AUDIO ROM: FM/PSG notes, play strings */
+#include <x16/wavfile.h>        /* RIFF/WAV parsing and playback */
+#include <x16/zsm.h>            /* ZSM music streams */
+#include <x16/vdc.h>            /* VERA's display composer: scale, border, window */
 #include <x16/fixed.h>          /* 8.8 fixed point, 16x16 multiply */
 #include <x16/math.h>           /* PRNG, sine tables, atan2, lerp */
 #include <x16/collide.h>        /* bounding-box overlap */
