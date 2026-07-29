@@ -73,9 +73,14 @@
 #include <x16/irq.h>            /* VSYNC, raster and collision interrupts */
 #include <x16/clock.h>          /* the jiffy timer and the RTC date/time */
 #include <x16/bank.h>           /* banked RAM, and a whole-bank allocator */
+#include <x16/ringbuffer.h>     /* an 8 KB FIFO in a HIRAM bank */
+#include <x16/stack.h>          /* an 8 KB LIFO in a HIRAM bank */
 #include <x16/i2c.h>            /* the I2C bus: the SMC and the RTC NVRAM */
 #include <x16/mem.h>            /* KERNAL block ops, incl. LZSA2 depacking */
 #include <x16/load.h>           /* load and save, including into VRAM */
+#include <x16/fileio.h>         /* the KERNAL channel verbs, OPEN through CLOSE */
+#include <x16/iec.h>            /* raw IEC bus control and the block movers */
+#include <x16/dir.h>            /* walk a device directory entry by entry */
 #include <x16/dos.h>            /* the DOS command channel: status, delete */
 #include <x16/bmx.h>            /* the X16's native bitmap file format */
 #include <x16/zx0.h>            /* ZX0 depacking, tighter than LZSA2 */
