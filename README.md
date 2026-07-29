@@ -17,27 +17,28 @@ under **Oscar64** and under **vbcc**. Pick any; they share no object code.
 
 **cc65 and llvm-mos are level; the other three are catching up.** Both
 carry all 740 entry points across 62 headers. KickC, Oscar64 and vbcc
-now have the seven KERNAL-wrapper modules too (keyboard, mouse, clock,
-i2c, graph, fb, console); the 16 modules still marked
-*cc65 + llvm-mos* in the table below are the remaining gap. Those three
+now have the seven KERNAL-wrapper modules and the five storage ones
+too (keyboard, mouse, clock, i2c, graph, fb, console, ringbuffer, stack,
+fileio, iec, dir); the 11 modules still marked *cc65 + llvm-mos* in the
+table below are the remaining gap. Those three
 trees stay identical to each other, and their shared API is a strict
 subset -- so code written against them compiles everywhere.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      539 tests
 include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  419 tests
-include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     296 tests
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   295 tests
-include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      226 tests
+include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   317 tests
+include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests
 examples/       doc/        emulator/      tools/             shared
 ```
 
 ```powershell
 .\build_ca65.ps1 -Test                 # cc65:     539/539
 .\build_llvm.ps1 -Test                 # llvm-mos: 419/419
-.\build_kickc.ps1 -Test                # KickC:    296/296
-.\build_oscar64.ps1 -Test              # Oscar64:  295/295
-.\build_vbcc.ps1 -Test                 # vbcc:     226/226
+.\build_kickc.ps1 -Test                # KickC:    318/318
+.\build_oscar64.ps1 -Test              # Oscar64:  317/317
+.\build_vbcc.ps1 -Test                 # vbcc:     250/250
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
@@ -153,11 +154,11 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/bits.h` | masked bit set/clear/put/test, nibble helpers |
 | `x16/number.h` | **decimal, hex and binary rendering, and decimal parsing** |
 | `x16/tscrunch.h` | **TSCrunch depacking, faster than ZX0** |
-| `x16/fileio.h` | **the KERNAL channel verbs: OPEN through CLOSE, plus named-open conveniences** *(cc65 + llvm-mos)* |
-| `x16/iec.h` | **raw IEC bus control: LISTEN/TALK, channels, and the block movers** *(cc65 + llvm-mos)* |
-| `x16/dir.h` | **walk a device directory entry by entry** *(cc65 + llvm-mos)* |
-| `x16/ringbuffer.h` | **an 8 KB FIFO living in a HIRAM bank** *(cc65 + llvm-mos)* |
-| `x16/stack.h` | **an 8 KB LIFO living in a HIRAM bank** *(cc65 + llvm-mos)* |
+| `x16/fileio.h` | **the KERNAL channel verbs: OPEN through CLOSE, plus named-open conveniences** |
+| `x16/iec.h` | **raw IEC bus control: LISTEN/TALK, channels, and the block movers** |
+| `x16/dir.h` | **walk a device directory entry by entry** |
+| `x16/ringbuffer.h` | **an 8 KB FIFO living in a HIRAM bank** |
+| `x16/stack.h` | **an 8 KB LIFO living in a HIRAM bank** |
 | `x16/keyboard.h` | **keyboard buffer injection, modifiers, keymap get/set** |
 | `x16/mouse.h` | **raw mouse config, scan, and the wheel** |
 | `x16/clock.h` | **the jiffy timer and the RTC's date and time** |

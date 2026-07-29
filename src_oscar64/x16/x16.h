@@ -76,6 +76,11 @@
 #include <x16/bcd.h>
 #include <x16/bits.h>
 #include <x16/number.h>
+#include <x16/ringbuffer.h>
+#include <x16/stack.h>
+#include <x16/fileio.h>
+#include <x16/iec.h>
+#include <x16/dir.h>
 #include <x16/clock.h>
 #include <x16/keyboard.h>
 #include <x16/mouse.h>
