@@ -188,6 +188,15 @@ def convert(text, drop_kernal_regs=False):
         code = re.sub(r'\b(b\w\w|jmp)\s+:\+', r'\1 +', code)
         code = re.sub(r'\b(b\w\w|jmp)\s+:-',  r'\1 -', code)
 
+        # --- ca65's absolute-addressing prefix ------------------------------
+        # `lda a:sym,y` tells ca65 "use the three-byte form". vasm has no
+        # such prefix and does NOT reject it: it reads the operand as `a`
+        # and discards the rest, leaving only warning 2002 (trailing
+        # garbage in operand) behind. Since vasm already picks absolute
+        # whenever no zero-page form of the instruction exists, dropping
+        # the prefix is both correct and what the ca65 line meant.
+        code = re.sub(r'(?<=[\s,(])a:(?=[A-Za-z_])', '', code)
+
         # --- macro parameters ---------------------------------------------
         # ca65 references a named macro arg by its name; vasm oldstyle uses
         # \1 \2 ... positionally.  Map each named param to its index.

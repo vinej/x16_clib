@@ -49,6 +49,9 @@
 
 #include <x16/vera.h>           /* VRAM data ports: fill, copy, FX probe */
 #include <x16/screen.h>         /* screen mode, text output, cursor */
+#include <x16/console.h>        /* the KERNAL console: wrapping, paging, line input */
+#include <x16/graph.h>          /* the KERNAL GRAPH API: lines, rects, ovals, fonts */
+#include <x16/fb.h>             /* the KERNAL framebuffer driver: cursor, spans, filters */
 #include <x16/palette.h>        /* 256 entries of 12-bit colour */
 #include <x16/tile.h>           /* tilemap cells, layer config, scroll */
 #include <x16/sprite.h>         /* 128 hardware sprites */
@@ -65,8 +68,12 @@
 #include <x16/ym.h>             /* YM2151 FM */
 #include <x16/pcm.h>            /* PCM FIFO, and AFLOW streaming */
 #include <x16/input.h>          /* joystick, mouse, keyboard */
+#include <x16/keyboard.h>       /* keyboard buffer injection, modifiers, keymap */
+#include <x16/mouse.h>          /* raw mouse config, scan, and the wheel */
 #include <x16/irq.h>            /* VSYNC, raster and collision interrupts */
+#include <x16/clock.h>          /* the jiffy timer and the RTC date/time */
 #include <x16/bank.h>           /* banked RAM, and a whole-bank allocator */
+#include <x16/i2c.h>            /* the I2C bus: the SMC and the RTC NVRAM */
 #include <x16/mem.h>            /* KERNAL block ops, incl. LZSA2 depacking */
 #include <x16/load.h>           /* load and save, including into VRAM */
 #include <x16/dos.h>            /* the DOS command channel: status, delete */
