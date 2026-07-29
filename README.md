@@ -34,10 +34,10 @@ examples/       doc/        emulator/      tools/             shared
 
 ```powershell
 .\build_ca65.ps1 -Test                 # cc65:     539/539
-.\build_llvm.ps1 -Test                 # llvm-mos: 185/185
-.\build_kickc.ps1 -Test                # KickC:    266/266
-.\build_oscar64.ps1 -Test              # Oscar64:  266/266
-.\build_vbcc.ps1 -Test                 # vbcc:     196/196
+.\build_llvm.ps1 -Test                 # llvm-mos: 419/419
+.\build_kickc.ps1 -Test                # KickC:    296/296
+.\build_oscar64.ps1 -Test              # Oscar64:  295/295
+.\build_vbcc.ps1 -Test                 # vbcc:     226/226
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
