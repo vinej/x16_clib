@@ -24,6 +24,13 @@
  * and then silently spills a __zp global to main memory -- where
  * (ptr),y assembles to garbage.
  *
+ * $7C-$7F doubles as the four bytes MOUSE_GET fills. input.c pins it as
+ * a variable; mouse.c, which wraps the same call and is never live at
+ * the same time, names the address NUMERICALLY instead. Two __address()
+ * blocks would be worse than redundant: KickC rejects overlapping ones
+ * outright, and two blocks at DIFFERENT addresses make KickAssembler
+ * emit a PRG that scribbles zero page while it is still loading.
+ *
  * This leaves KickC 84 bytes of the 94 cc65 gets. If your program wants
  * to gamble on more, you know where these lines live.
  *

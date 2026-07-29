@@ -9,8 +9,15 @@
 #include <x16/input.h>
 
 // MOUSE_GET writes the four position bytes to zero page starting at
-// the address in X -- a one-byte base, so this scratch MUST be zp.
-__address(0x7c) volatile char x16__in_mpos[4];
+// the address in X -- a one-byte base, so the area MUST be zp. $7C-$7F
+// is the library's, reserved in x16/zpsafe.h.
+//
+// NAMED NUMERICALLY, not declared as an __address() variable. KickC
+// turns such a variable into a second LOAD BLOCK (`.pc = $7c`), and a
+// PRG holds exactly one contiguous block: the loader then writes those
+// bytes over zero page while the program is still loading, and the
+// machine is dead before main() runs. Nothing caught it because no test
+// had ever called this function.
 
 // Out-param pointers, pinned in zero page (KickC ignores __zp on
 // parameters; see x16/zpsafe.h).
@@ -77,18 +84,18 @@ unsigned char x16_mouse_get(unsigned int *xp, unsigned int *yp) {
     x16__in_p0 = (char*)xp;
     x16__in_p1 = (char*)yp;
     asm {
-        ldx #<x16__in_mpos
+        ldx #$7c                        // the scratch area; see above
         jsr $ff6b /*MOUSE_GET*/         // A = buttons
         sta r
         ldy #0
-        lda x16__in_mpos
+        lda $7c
         sta (x16__in_p0),y
-        lda x16__in_mpos+2
+        lda $7e
         sta (x16__in_p1),y
         iny
-        lda x16__in_mpos+1
+        lda $7d
         sta (x16__in_p0),y
-        lda x16__in_mpos+3
+        lda $7f
         sta (x16__in_p1),y
     }
     return r;

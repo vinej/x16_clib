@@ -15,18 +15,20 @@ that say what the hardware actually does.
 The same API builds under **cc65**, under **llvm-mos**, under **KickC**,
 under **Oscar64** and under **vbcc**. Pick any; they share no object code.
 
-**cc65 and llvm-mos are level; the other three run behind.** Both carry
-all 740 entry points across 62 headers. KickC, Oscar64 and vbcc are
-still missing the 23 modules marked *cc65 + llvm-mos* in the table
-below. Those three are identical to each other, and their shared API is
-a strict subset -- so code written against them compiles everywhere.
+**cc65 and llvm-mos are level; the other three are catching up.** Both
+carry all 740 entry points across 62 headers. KickC, Oscar64 and vbcc
+now have the seven KERNAL-wrapper modules too (keyboard, mouse, clock,
+i2c, graph, fb, console); the 16 modules still marked
+*cc65 + llvm-mos* in the table below are the remaining gap. Those three
+trees stay identical to each other, and their shared API is a strict
+subset -- so code written against them compiles everywhere.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      539 tests
 include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  419 tests
-include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     266 tests
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   266 tests
-include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      196 tests
+include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     296 tests
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   295 tests
+include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      226 tests
 examples/       doc/        emulator/      tools/             shared
 ```
 
@@ -156,13 +158,13 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/dir.h` | **walk a device directory entry by entry** *(cc65 + llvm-mos)* |
 | `x16/ringbuffer.h` | **an 8 KB FIFO living in a HIRAM bank** *(cc65 + llvm-mos)* |
 | `x16/stack.h` | **an 8 KB LIFO living in a HIRAM bank** *(cc65 + llvm-mos)* |
-| `x16/keyboard.h` | **keyboard buffer injection, modifiers, keymap get/set** *(cc65 + llvm-mos)* |
-| `x16/mouse.h` | **raw mouse config, scan, and the wheel** *(cc65 + llvm-mos)* |
-| `x16/clock.h` | **the jiffy timer and the RTC's date and time** *(cc65 + llvm-mos)* |
-| `x16/i2c.h` | **the I2C bus: the SMC and the RTC's NVRAM** *(cc65 + llvm-mos)* |
-| `x16/graph.h` | **the KERNAL GRAPH API: lines, rects, ovals, images, fonts** *(cc65 + llvm-mos)* |
-| `x16/fb.h` | **the KERNAL framebuffer driver: pixel cursor, spans, filters** *(cc65 + llvm-mos)* |
-| `x16/console.h` | **the KERNAL console: wrapping, paging, line input** *(cc65 + llvm-mos)* |
+| `x16/keyboard.h` | **keyboard buffer injection, modifiers, keymap get/set** |
+| `x16/mouse.h` | **raw mouse config, scan, and the wheel** |
+| `x16/clock.h` | **the jiffy timer and the RTC's date and time** |
+| `x16/i2c.h` | **the I2C bus: the SMC and the RTC's NVRAM** |
+| `x16/graph.h` | **the KERNAL GRAPH API: lines, rects, ovals, images, fonts** |
+| `x16/fb.h` | **the KERNAL framebuffer driver: pixel cursor, spans, filters** |
+| `x16/console.h` | **the KERNAL console: wrapping, paging, line input** |
 | `x16/spi.h` | **the VERA SPI master: select, clock, byte exchange, block moves** *(cc65 + llvm-mos)* |
 | `x16/serial.h` | **the serial / WiFi card's 16C550 UARTs, polled** *(cc65 + llvm-mos)* |
 | `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** *(cc65 + llvm-mos)* |

@@ -76,6 +76,13 @@
 #include <x16/bcd.h>
 #include <x16/bits.h>
 #include <x16/number.h>
+#include <x16/clock.h>
+#include <x16/keyboard.h>
+#include <x16/mouse.h>
+#include <x16/i2c.h>
+#include <x16/console.h>
+#include <x16/graph.h>
+#include <x16/fb.h>
 #include <x16/tscrunch.h>          /* the ROM's floating point library */
 
 #endif /* X16_H */

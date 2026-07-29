@@ -28,23 +28,23 @@
 // which crashes before main() is even reached.
 // The four bytes copied out of that zero-page area, so C can read them
 // without KickC deciding to re-place anything.
-__mem volatile unsigned char x16__ms_copy[4];
+volatile unsigned char x16__ms_copy[4];
 
-__mem volatile unsigned char x16__ms_btn;
-__mem volatile unsigned char x16__ms_wheel;
+volatile unsigned char x16__ms_btn;
+volatile unsigned char x16__ms_wheel;
 
 // ---------------------------------------------------------------------
 // Show or hide the pointer and set its bounding box, in units of 8
 // pixels. show = 0 hides it, 1 shows it.
 // ---------------------------------------------------------------------
-void x16_mse_config(__mem unsigned char show,
-                    __mem unsigned char width8,
-                    __mem unsigned char height8) {
-    asm {
+void x16_mse_config(unsigned char show,
+                    unsigned char width8,
+                    unsigned char height8) {
+    __asm {
         lda show
         ldx width8
         ldy height8
-        jsr $ff68 /*MOUSE_CONFIG*/
+        jsr 0xff68                      // MOUSE_CONFIG
     }
 }
 
@@ -53,8 +53,8 @@ void x16_mse_config(__mem unsigned char show,
 // call it yourself only if you have taken the interrupt over.
 // ---------------------------------------------------------------------
 void x16_mse_scan(void) {
-    asm {
-        jsr $ff71 /*MOUSE_SCAN*/
+    __asm {
+        jsr 0xff71                      // MOUSE_SCAN
     }
 }
 
@@ -66,18 +66,18 @@ signed char x16_mse_get(unsigned int *x,
                         unsigned int *y,
                         unsigned char *buttons) {
     unsigned char *xb;
-    asm {
-        ldx #$7c                        // the shared scratch; see above
-        jsr $ff6b /*MOUSE_GET*/         // A = buttons, X = wheel delta
+    __asm {
+        ldx #0x7c                        // the shared scratch; see above
+        jsr 0xff6b         // A = buttons, X = wheel delta (MOUSE_GET)
         sta x16__ms_btn
         stx x16__ms_wheel
-        lda $7c
+        lda 0x7c
         sta x16__ms_copy+0
-        lda $7d
+        lda 0x7d
         sta x16__ms_copy+1
-        lda $7e
+        lda 0x7e
         sta x16__ms_copy+2
-        lda $7f
+        lda 0x7f
         sta x16__ms_copy+3
     }
     /* Byte stores, not `*x = lo | hi << 8`: KickC has no fragment for
