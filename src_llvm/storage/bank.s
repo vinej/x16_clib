@@ -102,8 +102,8 @@ x16_bank_poke:
 x16_mem_to_bank:
         sta     mos8(X16_P2)            ; bank
         stx     mos8(X16_P3)            ; offset lo
-        lda     mos8(__rc4)
-        sta     mos8(X16_P4)            ; offset hi
+        lda     mos8(__rc4)             ; offset hi: the leading pointer
+        sta     mos8(X16_P4)            ; took __rc2/3, so it starts here
         lda     mos8(__rc5)
         sta     mos8(X16_P5)            ; count lo
         lda     mos8(__rc6)
@@ -124,16 +124,16 @@ x16_mem_to_bank:
 x16_bank_to_mem:
         sta     mos8(X16_P0)            ; bank
         stx     mos8(X16_P1)            ; offset lo
-        lda     mos8(__rc4)
-        sta     mos8(X16_P2)            ; offset hi
-        lda     mos8(__rc5)
+        lda     mos8(__rc2)             ; offset hi -- the pointer below
+        sta     mos8(X16_P2)            ; took the aligned pair __rc4/5,
+        lda     mos8(__rc4)             ; so `dst` is NOT in __rc2/3 and
+        sta     mos8(X16_P3)            ; the count is split either side
+        lda     mos8(__rc5)             ; of it. Measured, not inferred.
+        sta     mos8(X16_P4)            ; dst
+        lda     mos8(__rc3)
         sta     mos8(X16_P5)            ; count lo
         lda     mos8(__rc6)
         sta     mos8(X16_P6)            ; count hi
-        lda     mos8(__rc2)
-        sta     mos8(X16_P3)            ; dst
-        lda     mos8(__rc3)
-        sta     mos8(X16_P4)
         jmp     bank_to_mem
 
 ; ---------------------------------------------------------------------

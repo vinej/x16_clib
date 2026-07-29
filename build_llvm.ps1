@@ -151,7 +151,9 @@ if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
                 'test_llvm\runner4.c', 'test_llvm\runner5.c',
                 'test_llvm\runner6.c', 'test_llvm\runner7.c',
                 'test_llvm\runner8.c', 'test_llvm\runner9.c',
-                'test_llvm\runner10.c', 'test_llvm\runner11.c')
+                'test_llvm\runner10.c', 'test_llvm\runner11.c',
+                'test_llvm\runner12.c', 'test_llvm\runner13.c',
+                'test_llvm\runner14.c')
 } else {
     $suites = @($Source)
 }

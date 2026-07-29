@@ -16,7 +16,9 @@ The same API builds under **cc65**, under **llvm-mos**, under **KickC**,
 under **Oscar64** and under **vbcc**. Pick any; they share no object code.
 
 **cc65 and llvm-mos are level; the other three are catching up.** Both
-carry all 740 entry points across 62 headers. KickC, Oscar64 and vbcc
+carry all 740 entry points across 62 headers, and llvm-mos now runs
+every test cc65 does -- all 545 names -- plus 71 of its own that exist
+only to pin the ABI down. KickC, Oscar64 and vbcc
 now have the seven KERNAL-wrapper modules and the five storage ones
 too (keyboard, mouse, clock, i2c, graph, fb, console, ringbuffer, stack,
 fileio, iec, dir); the 11 modules still marked *cc65 + llvm-mos* in the
@@ -26,7 +28,7 @@ subset -- so code written against them compiles everywhere.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      539 tests
-include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  419 tests
+include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  655 tests
 include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests
 src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   317 tests
 include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests
@@ -35,7 +37,7 @@ examples/       doc/        emulator/      tools/             shared
 
 ```powershell
 .\build_ca65.ps1 -Test                 # cc65:     539/539
-.\build_llvm.ps1 -Test                 # llvm-mos: 419/419
+.\build_llvm.ps1 -Test                 # llvm-mos: 655/655
 .\build_kickc.ps1 -Test                # KickC:    318/318
 .\build_oscar64.ps1 -Test              # Oscar64:  317/317
 .\build_vbcc.ps1 -Test                 # vbcc:     250/250
@@ -504,7 +506,7 @@ next deep call; the wrapper copies it into yours before returning.
 ```powershell
 .\build_ca65.ps1 -Test           # cc65:     539 across 11 suites, 19 skipped
 .\build_ca65.ps1 -Test -Windowed # ...with video, so the raster tests run too
-.\build_llvm.ps1 -Test           # llvm-mos: 419 across 11 suites, 11 skipped
+.\build_llvm.ps1 -Test           # llvm-mos: 655 across 14 suites, 24 skipped
 .\build_kickc.ps1 -Test          # KickC:    266 in seven PRGs
 .\build_oscar64.ps1 -Test        # Oscar64:  the same 266
 .\build_vbcc.ps1 -Test           # vbcc:     196 across 5 suites
