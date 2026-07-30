@@ -450,7 +450,14 @@ static void test_primary(void)
     };
     unsigned char ret, prim;
 
-    x16_fp_filter("*.*");
+    /* "*.bin;*.txt" rather than ca65's "*.*". The point of this test is
+    ** that PRIMARIES SORT BEFORE DATA, and a two-pattern filter shows
+    ** that just as well -- while "*.*" also lists whatever else the
+    ** shared fsroot happens to hold, which lands between the two files
+    ** this test owns and makes counting keystrokes meaningless. The
+    ** listing dump that found this is described in filepick.c.
+    */
+    x16_fp_filter("*.bin;*.txt");
     x16_fp_primary("*.bin");
     x16_fp_start_dir("/");
 

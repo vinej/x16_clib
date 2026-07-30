@@ -1,41 +1,42 @@
 // =====================================================================
 // x16clib :: x16/filepick.c -- a file browser on a panel
 // =====================================================================
-// UNFINISHED. NOT wired into <x16/x16.h>, NOT in the README's supported
-// set, and test_oscar64/runner14.c is NOT in build_oscar64.ps1's suite
-// list -- on purpose. It compiles and 14 of the 16 ported checks pass.
-// Run it with
+// ONE CHECK SHORT. 15 of the 16 ported checks pass. Not wired into
+// <x16/x16.h>, not in the README's supported set, and runner14.c is not
+// in build_oscar64.ps1's suite list until it is 16/16. Run it with
 //
-//      .uild_oscar64.ps1 -Test -Source test_oscar64unner14.c
+//      build_oscar64.ps1 -Test -Source test_oscar64/runner14.c
 //
-// FP_PRIM_FILE -- NOT A MODULE BUG. Dumping the listing cache from the
-//   test (read $12000, 32 bytes an entry) settled it: with a "*.*"
-//   filter the panel lists FIVE OR MORE entries, not the three the ca65
-//   scripts were written against. Entry 0 is ".", entry 1 is another
-//   DIRECTORY that is neither "." nor SUBDIR, and entry 4 is non-empty.
-//   So the fsroot this suite runs against carries directories and files
-//   the scripts do not account for, and every Down-count lands
-//   somewhere else. ca65's runner11 gets away with it because its suite
-//   leaves different things behind and it runs last.
+// FP_DRAW is the one. row_has_ink(3) reads all spaces across the panel's
+// span of the header row, so no TEXT is landing -- while the row FILLS
+// clearly do, which is why FP_SAVEUNDER's "covered" check passes (a body
+// row painted with spaces over the test's sentinel). Every fp_puts_at()
+// call is suspect and every fp_fill_row() call is fine.
 //
-//   THE FIX IS IN THE TEST, not here: either have the fixture delete
-//   every stray directory too (clear_strays already sweeps every file
-//   type -- widened from ca65's PRG/SEQ-only version, which was not
-//   enough), or stop counting keystrokes and navigate by NAME. Confirm
-//   with the cache dump before trusting either.
+// TWO HYPOTHESES RULED OUT, each by changing the code and re-running:
+//   * that __asm cannot address a C local (the trap that cost nine tests
+//     in double.c). The four VRAM cache accessors did read a block-scope
+//     local from asm; they are plain volatile C now and the failure
+//     survived.
+//   * that the screen-code staging buffer being a LOCAL ARRAY broke the
+//     pointer handed to x16_screen_blit(). It is a module buffer now and
+//     the failure survived that too.
 //
-// FP_DRAW -- row_has_ink(3) reads all spaces across the panel's span of
-//   the header row. Drawing DOES reach the text map: FP_SAVEUNDER's
-//   "covered" check passes only because a body row was painted with
-//   spaces over the test's sentinel, which proves the blits land at
-//   $1B000. So the header row specifically comes out blank -- suspect
-//   fp_puts_at's screen-code conversion or the header's column
-//   arithmetic, not the addressing.
+// So look at fp_puts_at itself next: whether x16_screen_scode() is
+// returning what is expected for lowercase ASCII (the heading is "files
+// in "), and whether x16_screen_blit() writes where x16_screen_addr()
+// pointed. Prove it from the TEST first -- call screen_addr + blit
+// directly on a known row and vpeek it -- so the answer does not depend
+// on anything this module does.
 //
-//   RULED OUT: that __asm cannot address a C local (the trap that cost
-//   nine tests in double.c). The four VRAM cache accessors did read a
-//   block-scope local from asm; they are plain volatile C now, which is
-//   better code either way, and both failures survived the change.
+// FP_PRIM_FILE: FIXED, and it was never a module bug. Dumping the
+// listing cache ($12000, 32 bytes an entry) showed the panel listing
+// five or more entries under a "*.*" filter -- entry 0 is ".", entry 1
+// another directory, entry 4 non-empty -- because this suite's fsroot
+// carries strays ca65's does not, which lands extra files BETWEEN the
+// two the test owns and makes counting keystrokes meaningless. The test
+// now filters "*.bin;*.txt", which shows primaries-before-data just as
+// well and cannot be shifted by a stray.
 //
 // =====================================================================
 // Written in C over this tree's own modules -- dir.c for the listing,
@@ -337,22 +338,27 @@ static void fp_scan(void) {
 // Drawing. Everything goes through screen.c's text-map blitter, which
 // writes character/colour pairs at the address x16_screen_addr() set.
 // =====================================================================
+// The screen-code staging buffer is a MODULE global, not a local. It is
+// handed to x16_screen_blit() as a pointer, and a pointer into Oscar64's
+// stack frame is not something the library's inline asm can walk -- the
+// same trap that cost nine tests in double.c, one step removed.
+static char fp_sc[96];
+
 static void fp_puts_at(unsigned char row, unsigned char col,
                        const char *s, unsigned char max,
                        unsigned char color) {
     unsigned char i;
-    char sc[96];
     unsigned char n = 0;
 
     for (i = 0; i < max && s[i] != 0; ++i) {
-        sc[n] = (char)x16_screen_scode((unsigned char)s[i]);
+        fp_sc[n] = (char)x16_screen_scode((unsigned char)s[i]);
         ++n;
     }
     if (n == 0) {
         return;
     }
     x16_screen_addr(row, col);
-    x16_screen_blit(sc, n, color);
+    x16_screen_blit(fp_sc, n, color);
 }
 
 static void fp_fill_row(unsigned char row, unsigned char color) {
