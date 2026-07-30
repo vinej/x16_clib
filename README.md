@@ -31,10 +31,10 @@ examples/       doc/        emulator/      tools/             shared
 ```
 
 ```powershell
-.uild_ca65.ps1 -Test                 # cc65:     543/543
-.uild_llvm.ps1 -Test                 # llvm-mos: 659/659
-.uild_oscar64.ps1 -Test              # Oscar64:  460/460
-.uild_llvm.ps1 -Source examplesounce.c -Run
+.\build_ca65.ps1 -Test                 # cc65:     543/543
+.\build_llvm.ps1 -Test                 # llvm-mos: 659/659
+.\build_oscar64.ps1 -Test              # Oscar64:  460/460
+.\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
 
 The trees hold the *same* assembly for the internal routines --
