@@ -54,4 +54,5 @@ unsigned int x16_i2c_batch_write (unsigned char device,
 
 /* pulls the implementation in with this header */
 #pragma compile("i2c.c")
-
+
+#endif /* X16_I2C_H */

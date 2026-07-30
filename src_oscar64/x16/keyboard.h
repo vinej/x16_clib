@@ -53,4 +53,5 @@ unsigned char x16_kbd_set_keymap (const char *name);
 
 /* pulls the implementation in with this header */
 #pragma compile("keyboard.c")
-
+
+#endif /* X16_KEYBOARD_H */

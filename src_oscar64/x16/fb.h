@@ -95,4 +95,5 @@ void x16_fb_move_pixels (unsigned int sx, unsigned int sy,
 
 /* pulls the implementation in with this header */
 #pragma compile("fb.c")
-
+
+#endif /* X16_FB_H */

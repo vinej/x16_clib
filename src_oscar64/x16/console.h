@@ -59,4 +59,5 @@ void x16_con_put_image (const unsigned char *image,
 
 /* pulls the implementation in with this header */
 #pragma compile("console.c")
-
+
+#endif /* X16_CONSOLE_H */

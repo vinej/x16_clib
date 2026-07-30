@@ -49,4 +49,5 @@ signed char x16_mse_get (unsigned int *x, unsigned int *y,
 
 /* pulls the implementation in with this header */
 #pragma compile("mouse.c")
-
+
+#endif /* X16_MOUSE_H */

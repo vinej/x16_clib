@@ -49,4 +49,5 @@ unsigned char x16_stack_isfull (void);  /* 1 if no room for a word */
 
 /* pulls the implementation in with this header */
 #pragma compile("stack.c")
-
+
+#endif /* X16_STACK_H */

@@ -73,4 +73,5 @@ void x16_iec_talk_channel (unsigned char device,
 
 /* pulls the implementation in with this header */
 #pragma compile("iec.c")
-
+
+#endif /* X16_IEC_H */

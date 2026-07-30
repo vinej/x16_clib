@@ -62,4 +62,5 @@ void x16_dir_close (void);
 
 /* pulls the implementation in with this header */
 #pragma compile("dir.c")
-
+
+#endif /* X16_DIR_H */

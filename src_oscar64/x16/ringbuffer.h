@@ -48,4 +48,5 @@ unsigned char x16_ring_isfull (void);   /* 1 if no room for a word */
 
 /* pulls the implementation in with this header */
 #pragma compile("ringbuffer.c")
-
+
+#endif /* X16_RINGBUFFER_H */

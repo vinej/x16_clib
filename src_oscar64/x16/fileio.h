@@ -105,4 +105,5 @@ void x16_fio_close_named (unsigned char lfn);
 
 /* pulls the implementation in with this header */
 #pragma compile("fileio.c")
-
+
+#endif /* X16_FILEIO_H */

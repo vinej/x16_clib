@@ -44,4 +44,5 @@ void x16_clock_set_date_time (const x16_date_time *dt);
 
 /* pulls the implementation in with this header */
 #pragma compile("clock.c")
-
+
+#endif /* X16_CLOCK_H */

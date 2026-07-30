@@ -116,4 +116,5 @@ unsigned char x16_graph_put_char (unsigned int *x,
 
 /* pulls the implementation in with this header */
 #pragma compile("graph.c")
-
+
+#endif /* X16_GRAPH_H */
