@@ -41,6 +41,25 @@ CORE_FROM = 237                 # after the ca65 C entry shims
 
 EQUATES = []
 
+# Branches the stz expansion pushes out of ±127. Each becomes the
+# inverted branch over a jmp, which has unlimited reach.
+#
+# The stz rule below trades three bytes for nine, so a routine with
+# several of them can grow past a branch's range. Oscar64 says so and
+# refuses to assemble -- which is the good outcome: the llvm-mos tree hit
+# THIS EXACT BRANCH, `bmi double_dto_over` in d_to_s32, and its
+# assembler truncated it silently instead. That is why x16_d_to_s32()
+# returned 0 there instead of clamping, and why tools/llvm_branch_check.py
+# exists. Add to this list when the assembler names another one.
+LONG_BRANCHES = {
+    ('bmi', 'double_dto_over'),
+}
+
+INVERSE = {'bmi': 'bpl', 'bpl': 'bmi', 'beq': 'bne', 'bne': 'beq',
+           'bcc': 'bcs', 'bcs': 'bcc', 'bvc': 'bvs', 'bvs': 'bvc'}
+
+_long_seq = [0]
+
 
 def hexlit(m):
     return '0x' + m.group(1)
@@ -104,6 +123,16 @@ def convert(line):
     m = re.match(r'^bra\s+(\S+)$', s)
     if m:
         s = 'jmp ' + m.group(1)
+
+    # a branch the expansion put out of reach: invert it over a jmp
+    m = re.match(r'^(b[a-z]{2})\s+(\S+)$', s)
+    if m and (m.group(1), m.group(2)) in LONG_BRANCHES:
+        op, tgt = m.group(1), m.group(2)
+        _long_seq[0] += 1
+        skip = 'x16__d_far%d' % _long_seq[0]
+        return ('    %s %s\n    jmp %s\n%s:'
+                % (INVERSE[op], skip, tgt, skip)
+                + ('        /*' + comment + ' */' if comment.strip() else ''))
 
     # stz -> a flag- and A-transparent sequence (see the module note)
     m = re.match(r'^stz\s+(\S.*)$', s)

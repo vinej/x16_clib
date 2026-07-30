@@ -107,11 +107,14 @@
 
 #include <x16/x16zp.h>             /* the zero-page diagnostic */
 
-/* NOT here, and not in this build at all: <x16/double.h>. The cc65 and
-** llvm-mos trees carry a software IEEE-754 binary64 -- 8 bytes, ~15
-** significant digits. Oscar64 has no `double` type to bind it to (only a
-** 32-bit float), so that module has no port yet. Use <x16/float.h> for
-** the ROM's 5-byte float, or <x16/fixed.h> for scaled integers.
+/* NOT pulled in by this umbrella, and deliberately: <x16/double.h>.
+** The software IEEE-754 binary64 works here (see double.c and
+** test_oscar64/runner15.c) but it claims FOUR of the nine bytes in
+** Oscar64's zero-page region, and input.c, load.c and pcm.c already
+** claim eight between them. Whole-program compilation means a program
+** only pays for what it calls -- so include <x16/double.h> yourself when
+** you want it, rather than have this header spend that zero page on
+** every program that asks for anything.
 */
 
 #endif /* X16_H */

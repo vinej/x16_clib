@@ -214,7 +214,9 @@ double_dto_norm:
     bvc     double_dto_v1
     eor     #0x80
 double_dto_v1:
-    bmi     double_dto_over
+    bpl x16__d_far1
+    jmp double_dto_over
+x16__d_far1:
     /* shift > 63  -> 0  (signed compare d_cnt vs 64) */
     lda     d_cnt
     cmp     #64

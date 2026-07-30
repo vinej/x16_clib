@@ -25,26 +25,22 @@ land in the three supported trees only, so do not read a gap in
 62 headers, and llvm-mos runs every test cc65 does plus its own that
 exist only to pin the ABI down.
 
-**Oscar64 is nearly there: 698 of those 744.** Two modules are still
-missing, both for reasons worth stating rather than hiding in a table:
+**Oscar64 now carries all 744 too**, including the software IEEE-754
+binary64 of `<x16/double.h>`. Two notes on it:
 
-- `<x16/filepick.h>` (22 entries) -- ported but unfinished: it compiles
-  and passes 14 of its 16 checks, so it is committed and left unwired
-  rather than advertised. See the banner in `src_oscar64/x16/filepick.c`.
-- `<x16/double.h>` (25 entries) -- the software IEEE-754 binary64. Oscar64
-  has no `double` type, so the C entries cannot be a thin binding the way
-  they are elsewhere; the arithmetic itself is self-contained assembly
-  and ports whole. Until it lands, use `<x16/float.h>` for the ROM's
-  5-byte float or `<x16/fixed.h>` for scaled integers.
-
-Everything else is present and tested there, so code that avoids those
-two headers compiles on all three.
+- `<x16/double.h>` is NOT pulled in by `<x16/x16.h>` -- include it
+  yourself. It claims four of the nine bytes in Oscar64's zero-page
+  region, and three other modules already claim eight between them, so
+  the umbrella header does not spend that on every program.
+- `<x16/filepick.h>` compiles and passes 14 of its 16 checks, so it is
+  committed but left unwired rather than advertised as done. See the
+  banner in `src_oscar64/x16/filepick.c`.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      543 tests
 include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  659 tests
 include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests  (frozen)
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   430 tests
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   444 tests
 include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests  (frozen)
 examples/       doc/        emulator/      tools/             shared
 ```
@@ -53,7 +49,7 @@ examples/       doc/        emulator/      tools/             shared
 .\build_ca65.ps1 -Test                 # cc65:     543/543
 .\build_llvm.ps1 -Test                 # llvm-mos: 659/659
 .\build_kickc.ps1 -Test                # KickC:    318/318
-.\build_oscar64.ps1 -Test              # Oscar64:  430/430
+.\build_oscar64.ps1 -Test              # Oscar64:  444/444
 .\build_vbcc.ps1 -Test                 # vbcc:     250/250
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
@@ -187,7 +183,7 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** |
 | `x16/int16.h` | 16-bit helpers: divmod with remainder, integer sqrt, sign-correct compares |
 | `x16/int32.h` | the same at 32 bits |
-| `x16/double.h` | **software IEEE-754 float64**: arithmetic, compares, transcendentals, string I/O *(cc65 + llvm-mos only)* |
+| `x16/double.h` | **software IEEE-754 float64**: arithmetic, compares, transcendentals, string I/O |
 | `x16/audiorom.h` | **the AUDIO ROM: FM and PSG notes, play strings, four pitch spaces** |
 | `x16/wavfile.h` | **RIFF/WAV header parsing**, feeding the PCM streamer |
 | `x16/zsm.h` | **ZSM music streams** |
