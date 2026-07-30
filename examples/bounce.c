@@ -57,10 +57,10 @@
 
 /* Position in 8.8, held as a pixel word plus a fraction byte. The full
 ** 8.8 value needs 17 bits (the play area is 640 wide), and a `long`
-** would carry it -- but KickC 0.8.6 has no code fragments for runtime
-** 32-bit shifts, so the fields are kept apart and every operation stays
-** on int-sized types, which all three toolchains compile. The pixel is
-** simply the word; no shift needed at the point of use.
+** would carry it -- but keeping the fields apart holds every operation
+** on int-sized types, which is both smaller and faster on a 6502 than
+** dragging a 32-bit shift in. The pixel is simply the word; no shift
+** needed at the point of use.
 */
 static int pos_x = 64;                  /* pixel part */
 static int pos_y = 48;
@@ -233,8 +233,9 @@ static void build_sprite_image(void)
 
 /* Three decimal digits, always. printf would cost more zero page than
 ** this whole program has to spare on llvm-mos. Subtraction rather than
-** division, because KickC has no runtime divide at all -- and for one
-** byte twice a second, repeated subtraction is no slower anyway.
+** division, because a runtime divide is a library call this program
+** otherwise never needs -- and for one byte twice a second, repeated
+** subtraction is no slower anyway.
 */
 static void put_u8(unsigned char v)
 {

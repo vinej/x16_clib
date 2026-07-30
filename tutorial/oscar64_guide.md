@@ -1,12 +1,12 @@
 # C on the Commander X16 with Oscar64 — language, library, and CPU guide
 
-This is the Oscar64 quarter of the toolchain guides; cc65 is covered by
-[ca65_guide.md](ca65_guide.md), llvm-mos by [llvm_guide.md](llvm_guide.md)
-and KickC by [kickc_guide.md](kickc_guide.md). The library API itself is
-in [userguide.md](userguide.md). Everything here was learned porting
-x16clib's 27 modules to Oscar64 1.32.272 and getting the same 119-test
-suite green that the KickC port runs, so each claim traces to a compile
-error, a listing, or an instruction-level emulator trace.
+This is the Oscar64 third of the toolchain guides; cc65 is covered by
+[ca65_guide.md](ca65_guide.md) and llvm-mos by
+[llvm_guide.md](llvm_guide.md). The library API itself is in
+[userguide.md](userguide.md). Everything here was learned porting
+x16clib's modules to Oscar64 1.32.272 and getting its 460-test suite
+green, so each claim traces to a compile error, a listing, or an
+instruction-level emulator trace.
 
 Oscar64 (https://github.com/drmortalwombat/oscar64) is a single native
 Windows/Linux executable, no runtime dependencies. Unzip a release and:
@@ -26,13 +26,13 @@ One flag deserves its own warning. **Do not add `-O2`.** Oscar64
 Error... at location 0x00007ff7...") compiling some translation units
 of this library's test suite at `-O2`; the default optimization with
 `-n` compiles everything and is already competitive (`bounce.prg` is
-2455 bytes — smaller than both the cc65 and KickC builds). If a future
+2455 bytes — smaller than the cc65 build). If a future
 Oscar64 fixes it, `-O2` is worth retrying; nothing in the library
 depends on avoiding it.
 
 ## 1. The C language Oscar64 compiles
 
-Real C99, and then some. After KickC's dialect this feels like a
+Real C99, and then some. For a 6502 compiler this feels like a
 different sport: `long` and `float` exist, division and modulo exist,
 32-bit shifts exist, `bool` converts, initializers can be expressions,
 and most of C++ (templates, lambdas, namespaces, constexpr) is
@@ -54,7 +54,7 @@ mean it.
 
 ### One program, no linker
 
-Like KickC, Oscar64 compiles the whole program in one pass and strips
+Oscar64 compiles the whole program in one pass and strips
 every function it can prove unreachable; there are no object files and
 no archives. What replaces the archive is built into the language:
 
@@ -104,13 +104,13 @@ Two things in that example are load-bearing:
 
 Pointer parameters live in zero page, so `lda (src),y` against a
 parameter assembles and works — no copying into pinned slots, which is
-what let this port delete every `__address()` pin the KickC build
+what let this port drop every hand-pinned zero-page slot the earlier
 needed. Walking a parameter (`inc src`) inside the asm block is fine as
 long as no C code reads it afterwards.
 
 ## 3. The inline assembler: NMOS only, one per line
 
-Oscar64's `__asm` blocks are the same shape as KickC's — labels are
+Oscar64's `__asm` blocks read much like any 6502 assembler — labels are
 local to the block, C symbols resolve by name, `symbol+1` arithmetic
 works — with four rules of its own:
 
@@ -175,15 +175,15 @@ $F7–$FF (151 bytes) around C callbacks for exactly that reason.
 Oscar64 string and char literals stay ASCII unless told otherwise —
 the right default for the X16 KERNAL after `x16_screen_mode()`, and the
 reason the test harness needed no `#pragma encoding` dance. `'S'` is
-$53. (cc65's `-t cx16` and KickC's default both PETSCII-ify literals;
+$53. (cc65's `-t cx16` PETSCII-ifies literals by default;
 this port inherits their explicit-hex habit anyway so the four trees
 match byte for byte.)
 
 ## 6. The standard library Oscar64 ships
 
 Full `<stdio.h>` (printf with floats), `<stdlib.h>`, `<string.h>`,
-`<math.h>` — `examples\numbers.c`, the printf tour that KickC could not
-build at all, compiles unchanged. C64-shaped hardware headers also
+`<math.h>` — `examples\numbers.c`, the printf tour, compiles
+unchanged. C64-shaped hardware headers also
 ship; ignore them on the X16 and use this library's `<x16/*.h>`.
 
 One warning from the feasibility check: the SDK-shipped X16 VERA
@@ -216,16 +216,16 @@ helpers were not trustworthy in this version — the library's own
   .\build_oscar64.ps1 -Test -Windowed    # with live video and IRQs
   ```
 
-- The suite is split into three programs to stay line-for-line
-  comparable with the KickC suite (which needed the split for zero
-  page; Oscar64 does not).
+- The suite is split into one program per module group: a single PRG
+  holding every test plus the whole library does not fit in program
+  RAM, and the split triages a failure to its own group.
 - A C interrupt callback may call anything, including other `x16_*`
   routines: the dispatcher parks $02–$8F and $F7–$FF (151 bytes, ~2.5%
   of a frame) around it, and only when a callback is installed.
 - Programs that return to BASIC must call `x16_irq_remove()` first if
-  they hooked interrupts — no exit destructors here, same as KickC.
-- The sizes, for the curious: `bounce.prg` is 2455 bytes under Oscar64,
-  2576 under KickC, ~4300 under cc65 and llvm-mos.
+  they hooked interrupts — there are no exit destructors here.
+- The sizes, for the curious: `bounce.prg` is 2455 bytes under Oscar64
+  against ~4300 under cc65 and llvm-mos.
 
 ## 9. Gotcha checklist
 

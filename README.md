@@ -5,117 +5,74 @@ re-deriving the machine's hardware surface every time.
 
 This is a routine-by-routine port of [x16lib](../x16_library), an ACME
 assembly library, to a C library: a linkable archive under cc65 and
-llvm-mos, a compile-in source tree under KickC and Oscar64. The assembly is
+llvm-mos, a compile-in source tree under Oscar64. The assembly is
 preserved, not rewritten: every hot loop is the same hand-written 6502.
 What is new is a thin shim in front of each routine, and a set of headers
 that say what the hardware actually does.
 
-## Three supported toolchains, and two frozen ones
+## Three toolchains
 
 The same API builds under **cc65**, under **llvm-mos** and under
 **Oscar64**. Pick any; they share no object code.
 
-**KickC and vbcc are FROZEN.** Their trees still build and still pass
-their own suites, and they are kept in the repository for anyone already
-using them -- but they stay at the module set they have now. New modules
-land in the three supported trees only, so do not read a gap in
-`include_kickc/` or `include_vbcc/` as work in progress.
+**All three carry all 744 entry points across 62 headers.** llvm-mos runs
+every test cc65 does plus its own that exist only to pin the ABI down.
 
-**cc65 and llvm-mos are level.** Both carry all 744 entry points across
-62 headers, and llvm-mos runs every test cc65 does plus its own that
-exist only to pin the ABI down.
-
-**Oscar64 now carries all 744 too**, including the software IEEE-754
-binary64 of `<x16/double.h>` and the file browser of
-`<x16/filepick.h>`. One note: `<x16/double.h>` is NOT pulled in by
-`<x16/x16.h>` -- include it yourself. It claims four of the nine bytes in
-Oscar64's zero-page region, and three other modules already claim eight
-between them, so the umbrella header does not spend that on every
-program.
+One Oscar64 note: `<x16/double.h>` is NOT pulled in by `<x16/x16.h>` --
+include it yourself. It claims four of the nine bytes in Oscar64's
+zero-page region, and three other modules already claim eight between
+them, so the umbrella header does not spend that on every program.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      543 tests
 include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  659 tests
-include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests  (frozen)
 src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   460 tests
-include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests  (frozen)
 examples/       doc/        emulator/      tools/             shared
 ```
 
 ```powershell
-.\build_ca65.ps1 -Test                 # cc65:     543/543
-.\build_llvm.ps1 -Test                 # llvm-mos: 659/659
-.\build_kickc.ps1 -Test                # KickC:    318/318
-.\build_oscar64.ps1 -Test              # Oscar64:  460/460
-.\build_vbcc.ps1 -Test                 # vbcc:     250/250
-.\build_llvm.ps1 -Source examples\bounce.c -Run
+.uild_ca65.ps1 -Test                 # cc65:     543/543
+.uild_llvm.ps1 -Test                 # llvm-mos: 659/659
+.uild_oscar64.ps1 -Test              # Oscar64:  460/460
+.uild_llvm.ps1 -Source examplesounce.c -Run
 ```
 
 The trees hold the *same* assembly for the internal routines --
-`tools/ca65_to_llvm.py`, `tools/ca65_to_kickc.py` and
-`tools/ca65_to_vbcc.py` translate the mechanical half from the assembly,
-and `tools/kickc_to_oscar64.py` derived the Oscar64 tree from the KickC
-one -- and completely different C entry points, because the calling
-conventions have nothing in common:
+`tools/ca65_to_llvm.py` translates the mechanical half from the
+assembly, and `tools/oscar64_double_gen.py` converts a whole
+self-contained module into an Oscar64 global `__asm` block -- and
+completely different C entry points, because the calling conventions have
+nothing in common:
 
-|  | cc65 | llvm-mos | KickC | Oscar64 | vbcc |
-|---|---|---|---|---|---|
-| arguments | rightmost in `A`/`X`; the rest pushed on a software stack | assigned left to right into `A`, `X`, `__rc2`, `__rc3`, … | each a named memory cell the inline asm reads directly | each a named zero-page cell the inline asm reads directly | `__reg()`-pinned into `r0..r7` (a `char` takes the next **even** slot), then `btmp0`/`btmp1` for `long`, then a soft stack |
-| pointers | two bytes like anything else | a whole aligned `__rc` **pair** | pinned zero-page slots the library manages itself | zero-page parameters, indirected as `(name),y` | a register **pair** `rN/rN+1` |
-| `char` return | `A`, plus `ldx #0` for int promotion | `A` alone | `A` alone | the `accu` zero-page slot | `A` alone |
-| pointer return | `A`/`X` | **`__rc2`/`__rc3`** | `A`/`X` | `accu`/`accu+1` | `A`/`X` (`long` in `btmp0`) |
-| declaration | `__fastcall__` | nothing | nothing | nothing | `__reg("…")` per argument |
+|  | cc65 | llvm-mos | Oscar64 |
+|---|---|---|---|
+| arguments | rightmost in `A`/`X`; the rest pushed on a software stack | assigned left to right into `A`, `X`, `__rc2`, `__rc3`, … | each a named zero-page cell the inline asm reads directly |
+| pointers | two bytes like anything else | a whole aligned `__rc` **pair** | zero-page parameters, indirected as `(name),y` |
+| `char` return | `A`, plus `ldx #0` for int promotion | `A` alone | the `accu` zero-page slot |
+| pointer return | `A`/`X` | **`__rc2`/`__rc3`** | `accu`/`accu+1` |
+| declaration | `__fastcall__` | nothing | nothing |
 
-**KickC and Oscar64 are source distributions.** Neither has a linker or
-an archive format: both compile the whole program at once and strip
-every function you do not call, so `src_kickc\` and `src_oscar64\`
-*are* the library --
+**Oscar64 is a source distribution.** It has no linker and no archive
+format: it compiles the whole program at once and strips every function
+you do not call, so `src_oscar64\` *is* the library --
 
 ```
-kickc -p cx16 -a -I include_kickc -L src_kickc yourprog.c
 oscar64 -tm=x16 -n -i=src_oscar64 -o=YOURPROG.PRG yourprog.c
 ```
 
--- and there is no `dist_kickc\` or `dist_oscar64\` because there is
-nothing to prebuild. The two trees differ in shape: KickC pairs
-`include_kickc\` headers with `-L`-path sources, while Oscar64 keeps
-headers and implementations side by side in one tree, each header
-ending in a `#pragma compile("foo.c")` that pulls its implementation
-in. Notes for both: a program that returns to BASIC must call
-`x16_irq_remove()` itself -- neither has exit destructors. KickC also
-needs `include_kickc/x16/zpsafe.h` (pulled in by every header) to
-reserve the KERNAL's zero page; Oscar64's x16 target stays clear of it
-by itself. The `examples\numbers.c` printf tour builds under cc65,
-llvm-mos and Oscar64 (KickC has no stdio). For each dialect -- what the
-compiler accepts, what it lacks, and the bugs these ports found and
-work around -- see [tutorial/kickc_guide.md](tutorial/kickc_guide.md)
-and [tutorial/oscar64_guide.md](tutorial/oscar64_guide.md).
+-- and there is no `dist_oscar64\` because there is nothing to
+prebuild. Headers and implementations sit side by side in the one tree,
+each header ending in a `#pragma compile("foo.c")` that pulls its
+implementation in. A program that returns to BASIC must call
+`x16_irq_remove()` itself: Oscar64 has no exit destructors. For what the
+compiler accepts, what it lacks, and the bugs this port found and works
+around, see [tutorial/oscar64_guide.md](tutorial/oscar64_guide.md).
 
 **Under llvm-mos, compile with `-mreserve-zp=16`** (`build_llvm.ps1` does).
 The cx16 target leaves only ninety bytes of zero page, clang's LTO claims
 as many as it likes, and this library reserves sixteen for its argument
 block. Without the flag the link fails outright with `section '.zp.bss'
 will not fit in region 'zp'`. See [include_llvm/x16/x16.h](include_llvm/x16/x16.h).
-
-**vbcc uses its own native `+x16` target** -- `vc +x16` drives
-`vbcc6502`, `vasm6502_oldstyle` and `vlink`. Like cc65 and llvm-mos it is
-an archive build, so `dist_vbcc\libx16c.a` is prebuilt and you link
-against it:
-
-```
-vc +x16 -Iinclude_vbcc yourprog.c dist_vbcc\libx16c.a -o YOURPROG.PRG
-```
-
-Every prototype pins its arguments to the zero-page pseudo-registers the
-hand-written routine already reads, with `__reg()`, so most calls compile
-to a single `jmp` into the assembly. Two things to know: a program that
-returns to BASIC must call `x16_irq_remove()` itself (vbcc has no exit
-destructors); and `-cbmascii` stores string literals in PETSCII, which is
-what you want on screen but means the test harness maps them back to
-ASCII on its way to stdout. For the full ABI -- register
-placement, the `long`/soft-stack rules, and the shim pattern -- see the
-[porting notes below](#porting-notes-ca65-to-vbcc) and
-[include_vbcc/x16/x16.h](include_vbcc/x16/x16.h).
 
 ## What it gives you that cc65 does not
 
@@ -186,7 +143,6 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/zsm.h` | **ZSM music streams** |
 | `x16/vdc.h` | **VERA's display composer**: scale, layers, border, active window |
 | `x16/filepick.h` | **a full-screen file browser**, bankable |
-| `x16/verafx_utils.h` | the raw VERA FX register knobs |
 
 Several of those are things the machine can do that nothing else exposes
 to C. `x16_mem_decompress()` is an **LZSA2 depacker sitting in ROM**, and
@@ -224,26 +180,24 @@ demos.
 
 **To just use the library, nothing needs rebuilding.** The finished
 archives are committed -- `dist_ca65\x16c.lib` and `dist_llvm\libx16c.a`
--- along with the headers in `include_ca65\` and `include_llvm\`. KickC
-and Oscar64 have no archives at all: their source trees as committed
-*are* their distributions. A compiler for *your* program is all you need:
+-- along with the headers in `include_ca65\` and `include_llvm\`. Oscar64
+has no archive at all: its source tree as committed *is* its
+distribution. A compiler for *your* program is all you need:
 
 ```
 cl65 -t cx16 -O -I include_ca65 -o PROG.PRG prog.c dist_ca65\x16c.lib
-kickc -p cx16 -a -I include_kickc -L src_kickc prog.c
 oscar64 -tm=x16 -n -i=src_oscar64 -o=PROG.PRG prog.c
 ```
 
 To rebuild the library itself, or run its test suite, read on.
 
-Five third-party things are expected but **not** committed:
+Four third-party things are expected but **not** committed:
 
 | Path | What | Where from |
 |---|---|---|
 | `ca65\` (or any cc65 install) | one compiler | <https://cc65.github.io/> (a Windows snapshot zip) |
 | `llvm-mos\` | another | <https://github.com/llvm-mos/llvm-mos-sdk/releases> (the combined `llvm-mos-windows.7z`, not the compiler-only build) |
-| `kickc\` | the third (plus a Java 8+ runtime on PATH) | <https://gitlab.com/camelot/kickc/-/releases> (the 0.8.6 binary zip; it bundles its own KickAssembler) |
-| `oscar64\` | the fourth (a single native exe) | <https://github.com/drmortalwombat/oscar64/releases> (see the licensing note below) |
+| `oscar64\` | the third (a single native exe) | <https://github.com/drmortalwombat/oscar64/releases> (see the licensing note below) |
 | `emulator\x16emu.exe` + `rom.bin` | X16 emulator r49 | <https://github.com/X16Community/x16-emulator>, ROM from <https://github.com/X16Community/x16-rom> |
 
 You need only the toolchain you intend to use.
@@ -251,21 +205,18 @@ You need only the toolchain you intend to use.
 `build_ca65.ps1` finds cc65 through the repo-local `.\ca65\bin` first,
 then `%CC65_HOME%\bin`, then `C:\Emulator\cc65\bin`, then `C:\cc65\bin`,
 then `PATH`. `build_llvm.ps1` finds llvm-mos through `%LLVM_MOS_HOME%\bin`,
-then `.\llvm-mos\bin`, then `C:\llvm-mos\bin`. `build_kickc.ps1` finds
-KickC through the repo-local `.\kickc\`, then `%KICKC_HOME%`, then
-`C:\kickc`; it invokes the jar directly, so only `java` needs to be on
-PATH. `build_oscar64.ps1` finds Oscar64 through the repo-local
+then `.\llvm-mos\bin`, then `C:\llvm-mos\bin`. `build_oscar64.ps1` finds
+Oscar64 through the repo-local
 `.\oscar64\bin`, then `%OSCAR64_HOME%`, then `C:\oscar64`.
 
 One licensing caution, for Oscar64 only: the compiler and its bundled
 runtime sources are GPL-3.0 with (as of this writing) no runtime
 exception, and Oscar64 compiles its runtime *into* every PRG it builds.
-The other three toolchains carry permissive or exception-carrying
-runtime licenses. Nothing in this repository is affected -- x16clib
-ships only its own code -- but what that means for *your* program's
-binaries is between you and the GPL until upstream clarifies. cc65
-(zlib), llvm-mos (Apache-2.0 with LLVM exceptions) and KickC (MIT) have
-no such wrinkle.
+The other two toolchains carry permissive or exception-carrying runtime
+licenses. Nothing in this repository is affected -- x16clib ships only
+its own code -- but what that means for *your* program's binaries is
+between you and the GPL until upstream clarifies. cc65 (zlib) and
+llvm-mos (Apache-2.0 with LLVM exceptions) have no such wrinkle.
 
 ### Recompiling the library
 
@@ -297,16 +248,15 @@ force everything from scratch. Intermediates stay in the gitignored
 `build_ca65\`; the finished archive lands in the committed
 `dist_ca65\`, so expect git to see `dist_ca65\x16c.lib` as modified
 after a rebuild. `build_llvm.ps1` does the same with `build_llvm\` and
-`dist_llvm\libx16c.a`. There is nothing to recompile for KickC or
-Oscar64 -- their build scripts compile the library sources into every
-program they build, and `build_kickc\`/`build_oscar64\` hold only PRGs
-and test transcripts.
+`dist_llvm\libx16c.a`. There is nothing to recompile for Oscar64 -- its
+build script compiles the library sources into every program it builds,
+and `build_oscar64\` holds only PRGs and test transcripts.
 
 Use the **r49** emulator and ROM: the constants in `src_ca65/core/` and
-`src_llvm/core/` are transcribed from the r49 ROM sources (KickC and
-Oscar64 have no `core/` -- the same constants are inlined as literals,
-each carrying its name in a comment), and all four test suites assert
-against r49 behaviour.
+`src_llvm/core/` are transcribed from the r49 ROM sources (Oscar64 has
+no `core/` -- the same constants are inlined as literals, each carrying
+its name in a comment), and all three test suites assert against r49
+behaviour.
 
 ## Quick start
 
@@ -317,17 +267,15 @@ against r49 behaviour.
 .\build_ca65.ps1 -Test                   # the headless regression suite
 ```
 
-Swap `build_ca65.ps1` for `build_llvm.ps1`, `build_kickc.ps1` or
-`build_oscar64.ps1` to do the same with the other toolchains; `hello.c`
-and `bounce.c` build unchanged under all four. (`numbers.c` builds
-everywhere but KickC, which has no stdio.)
+Swap `build_ca65.ps1` for `build_llvm.ps1` or `build_oscar64.ps1` to do
+the same with the other toolchains; `hello.c`, `bounce.c` and
+`numbers.c` build unchanged under all three.
 
 For a function-by-function guide to the whole API -- every routine, its
 parameters, and a small example of each -- see
 [tutorial/userguide.md](tutorial/userguide.md). Each toolchain also has a
 language-and-traps guide: [ca65_guide.md](tutorial/ca65_guide.md),
 [llvm_guide.md](tutorial/llvm_guide.md),
-[kickc_guide.md](tutorial/kickc_guide.md),
 [oscar64_guide.md](tutorial/oscar64_guide.md).
 
 `-Run` runs the emulator **windowed**. `-Test` is headless and raises no
@@ -367,12 +315,6 @@ mos-cx16-clang -Os -mreserve-zp=16 -I include_llvm \
     -o PROG.PRG prog.c dist_llvm\libx16c.a
 ```
 
-...or, with KickC (`-a`, or the output is assembler text, not a PRG):
-
-```
-kickc -p cx16 -a -I include_kickc -L src_kickc prog.c
-```
-
 ...or, with Oscar64 (`-n`, or the output runs as interpreted bytecode,
 roughly an order of magnitude slower):
 
@@ -381,9 +323,9 @@ oscar64 -tm=x16 -n -i=src_oscar64 -o=PROG.PRG prog.c
 ```
 
 `<x16/x16.h>` pulls in everything, and costs nothing at run time: ld65
-links only the library modules your program actually calls, and the
-whole-program passes of KickC and Oscar64 strip every function they do
-not. That is what
+links only the library modules your program actually calls, and
+Oscar64's whole-program pass strips every function it does not. That is
+what
 replaced the assembly library's `X16_USE_*` gates -- ACME has no linker
 and could not strip dead code, so the modules had to be selected by hand.
 
@@ -397,8 +339,8 @@ is llvm-mos's `vpoke()`, which is broken in the SDK and which this
 library therefore replaces — see the end of this file.)
 
 **All entry points are `__fastcall__`**, cc65's default. (Only there:
-llvm-mos and KickC express their conventions in the compiler, and their
-headers carry no keyword.)
+llvm-mos and Oscar64 express their conventions in the compiler, and
+their headers carry no keyword.)
 
 **Errors** come back as a value, not a flag: `0` for failure where a
 boolean makes sense (`x16_screen_set_mode`, `x16_ym_init`), or the KERNAL
@@ -482,11 +424,10 @@ virtual registers `r0`-`r15` at `$02-$21` are another 32, clobbered by any
 KERNAL call the handler makes. cc65's interruptor mechanism saves none of
 the three. So this library saves all 74 bytes, only when a callback is
 installed. That is what lets a raster handler be written in C, and call
-any `x16_*` routine, rather than being usually-correct. (The KickC build
-makes the same promise by saving `$02-$7F` whole -- 126 bytes -- since
-KickC allocates anywhere in the user window; the Oscar64 build saves
-`$02-$8F` plus `$F7-$FF`, 151 bytes, covering its register file with
-margin and its `__zeropage` region.)
+any `x16_*` routine, rather than being usually-correct. (The Oscar64
+build makes the same promise by saving `$02-$8F` plus `$F7-$FF`, 151
+bytes, covering its register file with margin and its `__zeropage`
+region.)
 
 **`OPEN` succeeds for a file that does not exist.** CBM DOS reports
 `62,FILE NOT FOUND` on the command channel, and the KERNAL only surfaces
@@ -514,9 +455,7 @@ next deep call; the wrapper copies it into yours before returning.
 .\build_ca65.ps1 -Test           # cc65:     543 across 11 suites, 19 skipped
 .\build_ca65.ps1 -Test -Windowed # ...with video, so the raster tests run too
 .\build_llvm.ps1 -Test           # llvm-mos: 659 across 14 suites, 24 skipped
-.\build_kickc.ps1 -Test          # KickC:    266 in seven PRGs
-.\build_oscar64.ps1 -Test        # Oscar64:  the same 266
-.\build_vbcc.ps1 -Test           # vbcc:     196 across 5 suites
+.\build_oscar64.ps1 -Test        # Oscar64:  460 across 15 suites, 12 skipped
 ```
 
 **The suite is two programs.** All 30 library modules plus 190-odd test
@@ -526,13 +465,9 @@ compiles twice: `test_ca65/runner2.c` is three lines that set `SUITE` to 2 and
 `#include` it, and the groups behind `#if SUITE == 2` move to the second
 PRG, which then links only the modules its half reaches. `build_ca65.ps1` runs
 both and sums the results. Each half is self-contained, so
-`-Source test\runner2.c` runs it alone. The KickC suite is **three**
-programs for a different scarcity: not program RAM but zero page -- KickC
-never coalesces a variable that inline assembly references, and one
-program holding every test plus the whole library overflows the `$22-$7F`
-user window (past which KickC allocates into the KERNAL's zero page,
-silently). The Oscar64 suite keeps the same three-way split, not from
-any scarcity but so the two suites stay line-for-line comparable.
+`-Source test\runner2.c` runs it alone. The llvm-mos and Oscar64 suites
+split further still, one program per module group, for the same reason:
+a single PRG holding every test plus the whole library does not fit.
 
 Every test drives the library one way and verifies through an
 **independent path** -- write through a library call on port 0, read back
@@ -610,10 +545,10 @@ test_ca65/       runner.c, runner2.c, testlib.h, fsroot/
 build_ca65/      objects, PRGs, transcripts             (gitignored)
 dist_ca65/       x16c.lib, the finished archive         (committed)
 src_llvm/ include_llvm/ test_llvm/ build_llvm/ dist_llvm/   the llvm-mos build
-src_kickc/ include_kickc/ test_kickc/ build_kickc/            the KickC build
 src_oscar64/ test_oscar64/ build_oscar64/     the Oscar64 build (headers live in src_oscar64/x16/)
-src_vbcc/ include_vbcc/ test_vbcc/ build_vbcc/ dist_vbcc/     the vbcc build
-tools/    ca65_to_llvm.py, ca65_to_kickc.py, kickc_to_oscar64.py, ca65_to_vbcc.py
+tools/    ca65_to_llvm.py, ca65_shim_to_llvm.py, oscar64_double_gen.py,
+          oscar64_audiorom_gen.py, llvm_abi_audit.py, llvm_branch_check.py,
+          llvm_zp_narrow.py
 ```
 
 Each `.s` holds the ported routine under its original bare label plus an
@@ -719,121 +654,53 @@ KERNAL's `r0`–`r15`, so `$02`–`$25` is one contiguous run covering all
 thirty-two imaginary registers and all sixteen KERNAL registers at once:
 36 bytes, plus our 16.
 
-## Porting notes: ca65 to KickC
+## Porting notes: ca65 to Oscar64
 
-`tools/ca65_to_kickc.py` does the mechanical half of a module: `;`
-comments to `//`, cheap locals to parent-prefixed plain labels, `asl a`
-to bare `asl` -- and, because KickC's preprocessor does not reach inside
-`asm {}` blocks, every symbolic constant from `core/const_*.inc` inlined
-as a hex literal with its name in a comment (`$9f25 /*VERA_CTRL*/`).
-Like its llvm sibling it refuses to guess at anything convention-shaped:
-cc65 ABI lines, data directives, macros and zero-page references come
-out tagged `TODO`, because each becomes part of a hand-written C
-function around the assembly.
+Oscar64 wants C functions whose bodies are inline asm reading parameters
+by name, so a module is not a translated `.s` but a rewrite with ca65's
+`.s` as the semantic reference. The balance is plain C for logic, `__asm`
+only where the hardware demands exact instructions: a `BIT`/`BMI` poll an
+optimiser must not hoist, a YM register write that needs `sei` and three
+cycles of settling, the three inline bytes of a JSRFAR.
 
-The shape of a ported module is different here. KickC's inline assembly
-cannot `jsr` another function or name its labels, so an internal routine
-shared by two entry points becomes an internal C function (`x16__`
-prefix, do not call), module state lives in `__mem` globals, and every
-pointer the assembly indirects through is pinned to a fixed zero-page
-slot with `__address()` -- `$76-$7F`, reserved for the library by
-`include_kickc/x16/zpsafe.h`. The five headline traps, each found the
-hard way and each documented where it bit:
-
-- KickC's cx16 target reserves almost none of the KERNAL's zero page;
-  `zpsafe.h` (no include guard, deliberately -- pragma state is
-  per-file) reserves `$02-$21` and `$76-$FB` in every compile.
-- `__zp` and `__mem` are silently ignored on *parameters*, and when
-  zero page fills, KickC spills pointers to main memory where `(ptr),y`
-  assembles to garbage. Hence the pinned slots.
-- A hardware-side-effect read the optimizer thinks is dead (`lda
-  VERA_ISR` with the value unused) is deleted -- or crashes the
-  compiler. `bit` performs the same bus read and survives.
-- No runtime division and no runtime 32-bit shifts exist at all; the
-  port keeps hot state in 16-bit pieces.
-- `kickc` pairs `x16/foo.h` with `x16/foo.c` and nothing else, which is
-  why `pcmstream` lives inside `pcm.c` and `bankalloc` inside `bank.c`
-  -- dead-code elimination makes the merge free.
-
-The full list -- reserved identifiers, the `bool` rules, missing code
-fragments -- is in [tutorial/kickc_guide.md](tutorial/kickc_guide.md).
-
-## Porting notes: KickC to Oscar64
-
-**This route applied to the modules KickC has.** The nine that landed in
-the 2026-07 resync were written straight into Oscar64's idiom instead,
-because KickC -- now frozen -- never had them, so the converter had no
-input. ca65's `.s` was the semantic reference, and the balance shifted:
-plain C for logic, `__asm` only where the hardware demands exact
-instructions (a `BIT`/`BMI` poll an optimiser must not hoist, a YM
-register write that needs `sei` and three cycles of settling, the
-three inline bytes of a JSRFAR).
-
-For the earlier modules, the tree is derived from the KickC one, not from
-the assembly: that port had already turned every module into C functions
-whose bodies are inline asm reading parameters by name, which is exactly
-Oscar64's shape. `tools/kickc_to_oscar64.py` does the mechanical half
--- `$9f25` to `0x9f25`, `.byte` to `byt`, one instruction per line,
-`/*name*/` comment folding -- and downgrades the 65C02 to NMOS, because
-**Oscar64's inline assembler is NMOS-6502 only**: `stz`/`bra`/`trb`/
-`tsb`/`phx` are compile errors, and (worse) a bare `inc` or an
+**Oscar64's inline assembler is NMOS-6502 only.** `stz`/`bra`/`trb`/
+`tsb`/`phx` are compile errors, and -- worse -- a bare `inc` or an
 unindexed `lda (zp)` compiles silently into garbage bytes. Every `stz`
-became `lda #0`+`sta` behind a liveness audit (a handful needed
-reordering, where the original relied on `stz` leaving the flags
-alone), and every `(zp)` became `(zp),y` with Y proven free.
+becomes `lda #0`+`sta` behind a liveness audit (some need reordering,
+where the original relied on `stz` leaving the flags alone) and every
+`(zp)` becomes `(zp),y` with Y proven free. It has no equate directive
+and no word directive at all -- `wor`, `word` and `dc.w` are all
+rejected -- but it does take the `<` and `>` byte selectors, so a jump
+table is `byt <(label-1), >(label-1)`.
 
-Where KickC needed pinned zero-page slots, Oscar64's parameters are
-already zero page, so the pins came *out*: the asm indirects straight
-through `(seg),y`, `(src),y`, `(xp),y`. Three things still need real
-zero page and live in Oscar64's nine-byte `__zeropage` region
-(`$F7-$FF`); the bank window and the ROM-float string walker went back
-to what the ACME original did all along -- self-modifying operands.
-Results leave through `return __asm { ... sta accu }`, because an
-assembly write to a C local is silently discarded -- the KickC
-`char r; asm{sta r} return r;` idiom returns garbage under Oscar64.
+Parameters are already zero page, so the asm indirects straight through
+`(seg),y`, `(src),y`, `(xp),y`. Only a handful of things need *pinned*
+zero page, and they live in Oscar64's nine-byte `__zeropage` region
+(`$F7-$FF`); the bank window and the ROM-float string walker went back to
+what the ACME original did all along -- self-modifying operands.
+
+**Assembly cannot address a C local.** Oscar64 puts locals on its stack
+frame, so `char r; __asm { sta r } return r;` returns garbage and a
+pointer to a local array is not something the library's own asm can walk.
+Results leave through `return __asm { ... sta accu }`, and anything asm
+must write goes to a module global. This is the single most expensive
+trap in the tree: it cost nine failing tests in `double.c` and, one step
+removed, the whole panel text in `filepick.c`.
+
+A self-contained assembly module can skip all of this and go in **whole**.
+Oscar64 takes assembly at global scope -- `__asm name { ... }` -- with
+internal labels the same block can `jsr`; only the block's own name is
+visible from outside, so one entry point plus a selector byte and an
+RTS-trick vector reaches every routine.
+`tools/oscar64_double_gen.py` does exactly that with the 3,128-line
+binary64 module, and `tools/oscar64_audiorom_gen.py` generates 57 JSRFAR
+wrappers from a table rather than having anyone type 57 ROM addresses.
 
 Two compiler bugs shape the build: `-O2` crashes Oscar64 1.32.272
 outright on parts of the suite (the build script ships the default
-optimization, which with `-n` is already the smallest of the four
-builds), and `//` comments inside `__asm` blocks break the parser.
-The full list is in [tutorial/oscar64_guide.md](tutorial/oscar64_guide.md).
-
-## Porting notes: ca65 to vbcc
-
-`tools/ca65_to_vbcc.py` translates the mechanical half of each `.s` into
-`vasm6502_oldstyle` syntax -- `.segment "CODE"` to `section text`,
-`.res`/`.byte`/`.word` to `reserve`/`byte`/`word`, `.export`/`.importzp` to
-`global`/`zpage`, ca65's `@local` and `:+`/`:-` to vasm's `.local` and
-`+`/`-` -- and leaves cc65's `popa`/`popax` **in place** so any C shim not
-yet rewritten by hand fails loudly at link, never silently. What it does
-NOT translate is the entry points: vbcc's ABI shares nothing with cc65's,
-and a plausible-looking automatic conversion would be wrong in ways a test
-might not catch.
-
-The ABI, spike-verified against the compiler and then on the emulator:
-vbcc lays arguments left to right into the zero-page pseudo-registers
-`r0..r7`; a 16-bit value takes an **aligned pair** (`r0/r1`, `r2/r3`, …),
-and a `char` takes the next **even** register (`r0`, `r2`, `r4`, `r6` --
-the odd ones are skipped). A 32-bit `long` or far pointer rides `btmp0`
-(a second one `btmp1`, as `x16_fx_copy` needs); anything past `r0..r7`
-spills to the C soft stack, which a frameless asm entry reads at `(sp),y`.
-Returns: `char` in `A`, int/near-pointer in `A`/`X`, `long` in `btmp0`.
-Each header pins its arguments with `__reg("rN/rN+1")` so vbcc places them
-exactly where the hand-written routine already reads -- most shims are one
-`jmp`.
-
-Three things the ca65 source assumes had to be rebuilt rather than
-translated. The KERNAL block-op routines (`mem`, `bank`, `load`) reference
-the half-register names `r0L`/`r0H`/… which vbcc does not provide, so the
-converter keeps ca65's `rNL`/`rNH` definitions while dropping the plain
-`rN` ones that would clash with vbcc's own. ca65's `^x` byte-2 operator
-has no vasm equivalent, so the `vera_addr` macro uses `(x) >> 16`. And
-`system/irq.s`, which saved cc65's runtime zero page around a C callback,
-now saves vbcc's -- `r0..r31`, `sp` and `btmp0..btmp3` -- and drops the
-`.destructor` auto-unhook vbcc cannot emit, so a program that installs a
-handler must call `x16_irq_remove()` itself. Every hand-written shim is
-covered by an ABI test proven to go red under a deliberately transposed
-argument.
+optimization, which with `-n` is already competitive), and `//` comments
+inside `__asm` blocks break the parser. The full list is in
+[tutorial/oscar64_guide.md](tutorial/oscar64_guide.md).
 
 ## A bug in llvm-mos-sdk v23.0.1, and the fix
 

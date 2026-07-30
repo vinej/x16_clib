@@ -4,7 +4,7 @@ This guide covers the **llvm-mos** half of x16clib: what dialect of C
 (and C++) the compiler accepts, what the SDK's libc actually contains
 on the cx16 target, and the traps a 65C02 target sets for C code. The
 other toolchains are covered by [ca65_guide.md](ca65_guide.md),
-[kickc_guide.md](kickc_guide.md) and [oscar64_guide.md](oscar64_guide.md);
+[oscar64_guide.md](oscar64_guide.md);
 the library API itself by
 [userguide.md](userguide.md).
 

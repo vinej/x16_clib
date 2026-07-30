@@ -3,13 +3,13 @@
     Compile a C program against the x16clib Oscar64 port, and optionally
     run it or the regression suite.
 
-    This is the Oscar64 quarter of the library; build_ca65.ps1,
-    build_llvm.ps1 and build_kickc.ps1 are the other three. Oscar64
-    compiles the whole program at once and has no archive step, so like
-    the KickC script there is no library build here: src_oscar64\ IS the
-    library. Each header ends in `#pragma compile("...")`, which pulls
-    its implementation into any program that includes it, and unused
-    functions are stripped by the whole-program pass.
+    This is the Oscar64 third of the library; build_ca65.ps1 and
+    build_llvm.ps1 are the other two. Oscar64 compiles the whole program
+    at once and has no archive step, so unlike those two there is no
+    library build here: src_oscar64\ IS the library. Each header ends in
+    `#pragma compile("...")`, which pulls its implementation into any
+    program that includes it, and unused functions are stripped by the
+    whole-program pass.
 
 .EXAMPLE
     .\build_oscar64.ps1                             # compile examples\hello.c
@@ -97,10 +97,10 @@ function Build-Prg([string]$srcRel) {
     return $prg
 }
 
-# -Test with no explicit -Source runs the whole suite: the same three
-# programs as the KickC suite. Oscar64 has none of KickC's zero-page
-# scarcity -- the split is kept so the two suites stay line-for-line
-# comparable, and failures triage to a third of the tests.
+# -Test with no explicit -Source runs the whole suite. It is split into
+# one program per module group rather than one big PRG: a single program
+# holding every test plus the whole library does not fit in the X16's
+# program RAM, and a split also triages a failure to its own group.
 $suites = @()
 if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
     $suites = @('test_oscar64\runner.c', 'test_oscar64\runner2.c', 'test_oscar64\runner3.c',
