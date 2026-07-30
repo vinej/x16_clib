@@ -1,31 +1,41 @@
 // =====================================================================
 // x16clib :: x16/filepick.c -- a file browser on a panel
 // =====================================================================
-// UNFINISHED. This module is NOT wired into <x16/x16.h>, NOT listed in
-// the README's supported set, and test_oscar64/runner14.c is NOT in
-// build_oscar64.ps1's suite list -- on purpose. It compiles and 14 of
-// the 16 ported checks pass; two do not, and until they do this must
-// not be advertised as parity. Run it with
+// UNFINISHED. NOT wired into <x16/x16.h>, NOT in the README's supported
+// set, and test_oscar64/runner14.c is NOT in build_oscar64.ps1's suite
+// list -- on purpose. It compiles and 14 of the 16 ported checks pass.
+// Run it with
 //
-//      .\build_oscar64.ps1 -Test -Source test_oscar64\runner14.c
+//      .uild_oscar64.ps1 -Test -Source test_oscar64unner14.c
+//
+// FP_PRIM_FILE -- NOT A MODULE BUG. Dumping the listing cache from the
+//   test (read $12000, 32 bytes an entry) settled it: with a "*.*"
+//   filter the panel lists FIVE OR MORE entries, not the three the ca65
+//   scripts were written against. Entry 0 is ".", entry 1 is another
+//   DIRECTORY that is neither "." nor SUBDIR, and entry 4 is non-empty.
+//   So the fsroot this suite runs against carries directories and files
+//   the scripts do not account for, and every Down-count lands
+//   somewhere else. ca65's runner11 gets away with it because its suite
+//   leaves different things behind and it runs last.
+//
+//   THE FIX IS IN THE TEST, not here: either have the fixture delete
+//   every stray directory too (clear_strays already sweeps every file
+//   type -- widened from ca65's PRG/SEQ-only version, which was not
+//   enough), or stop counting keystrokes and navigate by NAME. Confirm
+//   with the cache dump before trusting either.
 //
 // FP_DRAW -- row_has_ink(3) reads all spaces across the panel's span of
 //   the header row. Drawing DOES reach the text map: FP_SAVEUNDER's
-//   "covered" check only passes because a body row was painted with
-//   spaces over the test's sentinel, which is proof the blits land at
-//   $1B000. So the panel is painting, and the header row specifically is
-//   coming out blank -- suspect fp_puts_at's screen-code conversion or
-//   the header's column arithmetic, not the addressing.
+//   "covered" check passes only because a body row was painted with
+//   spaces over the test's sentinel, which proves the blits land at
+//   $1B000. So the header row specifically comes out blank -- suspect
+//   fp_puts_at's screen-code conversion or the header's column
+//   arithmetic, not the addressing.
 //
-// FP_PRIM_FILE -- with filter "*.*" and primary "*.bin", five Downs then
-//   one Up should select PICKA.BIN. FP_PRIM_DATA passes, so the LAST
-//   entry really is PICKB.TXT and the clamp works; the entry above it is
-//   not what the test expects. Either the listing carries an entry the
-//   scripts do not account for (a host-filesystem name clear_strays
-//   skips, since it only deletes PRG and SEQ), or the three-pass group
-//   ordering puts something between the primary and the data file. DUMP
-//   THE LISTING before theorising -- name and kind for every index --
-//   rather than reasoning about what readdir ought to return.
+//   RULED OUT: that __asm cannot address a C local (the trap that cost
+//   nine tests in double.c). The four VRAM cache accessors did read a
+//   block-scope local from asm; they are plain volatile C now, which is
+//   better code either way, and both failures survived the change.
 //
 // =====================================================================
 // Written in C over this tree's own modules -- dir.c for the listing,
@@ -219,24 +229,26 @@ static void fp_ent_seek(unsigned char idx) {
     x16_vera_addr0(X16_INC_1, fp_cachev + (unsigned long)idx * FP_ENT_SIZE);
 }
 
+// VERA's data port 0. A volatile pointer rather than __asm: the byte
+// being moved is a block-scope local, and __asm cannot address a C
+// local -- Oscar64 puts one on its stack frame, so `lda c` does not
+// read `c`. That trap cost nine tests in double.c before it was
+// understood; there is no reason to expose this module to it when
+// ordinary C says the same thing.
+#define FP_VDATA (*(volatile unsigned char *)0x9F23)
+
 static void fp_ent_put(unsigned char idx, unsigned char kind,
                        unsigned char primary, const char *name) {
     unsigned char i;
 
     fp_ent_seek(idx);
-    __asm {
-        lda kind
-        sta 0x9f23                      /* VERA_DATA0, auto-incrementing */
-        lda primary
-        sta 0x9f23
-    }
+    FP_VDATA = kind;                    // the port auto-increments
+    FP_VDATA = primary;
+
     for (i = 0; i < FP_NAME_MAX; ++i) {
         unsigned char c = (unsigned char)name[i];
 
-        __asm {
-            lda c
-            sta 0x9f23
-        }
+        FP_VDATA = c;
         if (c == 0) {
             break;                      // the rest of the entry is stale
         }
@@ -245,18 +257,12 @@ static void fp_ent_put(unsigned char idx, unsigned char kind,
 
 static unsigned char fp_ent_kind(unsigned char idx) {
     fp_ent_seek(idx);
-    return __asm {
-        lda 0x9f23
-        sta accu
-    };
+    return FP_VDATA;
 }
 
 static unsigned char fp_ent_primary(unsigned char idx) {
     x16_vera_addr0(X16_INC_1, fp_cachev + (unsigned long)idx * FP_ENT_SIZE + 1);
-    return __asm {
-        lda 0x9f23
-        sta accu
-    };
+    return FP_VDATA;
 }
 
 static void fp_ent_name(unsigned char idx, char *dest) {
@@ -264,10 +270,7 @@ static void fp_ent_name(unsigned char idx, char *dest) {
 
     x16_vera_addr0(X16_INC_1, fp_cachev + (unsigned long)idx * FP_ENT_SIZE + 2);
     for (i = 0; i < FP_NAME_MAX; ++i) {
-        c = __asm {
-            lda 0x9f23
-            sta accu
-        };
+        c = FP_VDATA;
         dest[i] = (char)c;
         if (c == 0) {
             return;

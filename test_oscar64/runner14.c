@@ -195,9 +195,17 @@ static void clear_strays(void)
         return;
     }
     while (x16_dir_next(entry, 32)) {
-        if (x16_dir_type() != X16_DIR_TYPE_PRG &&
-            x16_dir_type() != X16_DIR_TYPE_SEQ) {
-            continue;                   /* leave SUBDIR alone */
+        /* Delete every FILE this test does not own, whatever its type.
+        ** ca65's version of this only swept PRG and SEQ, which was
+        ** enough for the order ITS suite runs in; this suite leaves
+        ** different things behind, and with a "*.*" filter the picker
+        ** lists all of them -- which shifts every navigation the scripts
+        ** below depend on. Directories are still left alone: SUBDIR is
+        ** part of the fixture.
+        */
+        if (x16_dir_type() == X16_DIR_TYPE_DIR ||
+            x16_dir_type() == X16_DIR_TYPE_NONE) {
+            continue;
         }
         if (t_streq(entry, "PICKA.BIN") || t_streq(entry, "PICKB.TXT")) {
             continue;                   /* the two files this test owns */
