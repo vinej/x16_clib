@@ -142,9 +142,29 @@ void x16__pcm_stream_isr(void);
 // The refiller's walking source pointer -- see the header comment.
 __zeropage volatile const char* x16__pcm_sp;
 
-volatile char x16__pcm_rem0 = 0;  // bytes still to feed
+volatile char x16__pcm_rem0 = 0;  // bytes still to feed (24-bit)
 volatile char x16__pcm_rem1 = 0;
+volatile char x16__pcm_rem2 = 0;
 volatile char x16__pcm_active = 0;
+
+// Caller-owned: nonzero means wrap to the start when the data runs out.
+// Set or clear it BEFORE a stream_start; it survives a stop, because the
+// flag only matters at the moment the data is exhausted. audio/zsm.c
+// drives it for looping instruments.
+volatile char x16__pcm_loop = 0;
+
+volatile char x16__pcm_mode = 0;  // 0 = low RAM source, 1 = banked RAM
+volatile char x16__pcm_bank = 0;  // the bank being read now (mode 1)
+
+// The rewind snapshot a looping stream returns to.
+volatile char x16__pcm_rsrc0 = 0;
+volatile char x16__pcm_rsrc1 = 0;
+volatile char x16__pcm_rbank = 0;
+volatile char x16__pcm_rlen0 = 0;
+volatile char x16__pcm_rlen1 = 0;
+volatile char x16__pcm_rlen2 = 0;
+
+volatile char x16__pcm_svbk = 0;  // the interrupted code's RAM_BANK
 
 // The ISR's address, reachable from install code as data.
 volatile x16_irq_handler x16__pcm_isr_ptr = &x16__pcm_stream_isr;
@@ -159,19 +179,30 @@ volatile x16_irq_handler x16__pcm_isr_ptr = &x16__pcm_stream_isr;
 void x16__pcm_stream_isr(void) {
     __asm {
         lda x16__pcm_active
-        bne psf_loop
+        bne psf_enter
         lda 0x9f26  /*VERA_IEN*/
         and #0xf7
         sta 0x9f26
-        jmp psf_out
+        jmp psf_ret
+
+    psf_enter:
+        lda x16__pcm_mode
+        beq psf_loop
+        lda 0x00                        /* RAM_BANK: map the source bank in, */
+        sta x16__pcm_svbk               /* and put the interrupted code's */
+        lda x16__pcm_bank               /* bank back before returning */
+        sta 0x00
 
     psf_loop:
         lda x16__pcm_rem0
         ora x16__pcm_rem1
+        ora x16__pcm_rem2
         beq psf_exhausted
         bit 0x9f3b   /* bit 7: FIFO full (VERA_AUDIO_CTRL) */
-        bmi psf_out
+        bpl psf_feed
+        jmp psf_out
 
+    psf_feed:
         ldy #0
         lda (x16__pcm_sp),y
         sta 0x9f3d                      /* VERA_AUDIO_DATA */
@@ -179,21 +210,68 @@ void x16__pcm_stream_isr(void) {
         inc x16__pcm_sp                 /* advance the source */
         bne psf_dec
         inc x16__pcm_sp+1
+        lda x16__pcm_mode
+        beq psf_dec
+        lda x16__pcm_sp+1               /* banked: roll $C000 -> $A000, */
+        cmp #0xc0                       /* bank + 1 */
+        bne psf_dec
+        lda #0xa0
+        sta x16__pcm_sp+1
+        inc x16__pcm_bank
+        lda x16__pcm_bank
+        sta 0x00                        /* RAM_BANK */
     psf_dec:
-        lda x16__pcm_rem0               /* 16-bit decrement */
+        lda x16__pcm_rem0               /* 24-bit decrement */
         bne psf_dec_low
+        lda x16__pcm_rem1
+        bne psf_dec_mid
+        dec x16__pcm_rem2
+    psf_dec_mid:
         dec x16__pcm_rem1
     psf_dec_low:
         dec x16__pcm_rem0
         jmp psf_loop
 
     psf_exhausted:
+        /* Out of data. If the caller asked for a loop and the snapshot is
+        ** not empty, rewind and keep feeding; the FIFO never notices the
+        ** seam. */
+        lda x16__pcm_loop
+        beq psf_stop
+        lda x16__pcm_rlen0
+        ora x16__pcm_rlen1
+        ora x16__pcm_rlen2
+        beq psf_stop                    /* an empty snapshot cannot loop */
+        lda x16__pcm_rsrc0
+        sta x16__pcm_sp
+        lda x16__pcm_rsrc1
+        sta x16__pcm_sp+1
+        lda x16__pcm_rlen0
+        sta x16__pcm_rem0
+        lda x16__pcm_rlen1
+        sta x16__pcm_rem1
+        lda x16__pcm_rlen2
+        sta x16__pcm_rem2
+        lda x16__pcm_mode
+        beq psf_rewound
+        lda x16__pcm_rbank              /* ...including the starting bank */
+        sta x16__pcm_bank
+        sta 0x00                        /* RAM_BANK */
+    psf_rewound:
+        jmp psf_loop
+
+    psf_stop:
         lda 0x9f26  /*VERA_IEN*/          /* interrupt (leaving it on storms: */
         and #0xf7
         sta 0x9f26
         lda #0                          /* AFLOW only clears by refilling) */
         sta x16__pcm_active
     psf_out:
+        lda x16__pcm_mode
+        beq psf_ret
+        lda x16__pcm_svbk               /* the interrupted code's bank back */
+        sta 0x00                        /* RAM_BANK */
+    psf_ret:
     }
 }
 
@@ -203,20 +281,16 @@ void x16__pcm_stream_isr(void) {
 // underrun at t=0. A rate of 0 primes without playing. Installs the
 // CINV hook itself; requires interrupts enabled.
 // ---------------------------------------------------------------------
-void x16_pcm_stream_start(const void *data, unsigned int count,
-                          unsigned char rate) {
-    x16_pcm_stream_stop();              // quiesce a previous stream
+// The tail both entry points share: snapshot for the loop, hook, prime,
+// arm AFLOW if data remains, then start the DAC.
+static void pcm_stream_go(unsigned char rate) {
+    x16__pcm_rsrc0 = (char)((unsigned int)x16__pcm_sp & 0xFF);
+    x16__pcm_rsrc1 = (char)((unsigned int)x16__pcm_sp >> 8);
+    x16__pcm_rbank = x16__pcm_bank;
+    x16__pcm_rlen0 = x16__pcm_rem0;
+    x16__pcm_rlen1 = x16__pcm_rem1;
+    x16__pcm_rlen2 = x16__pcm_rem2;
 
-    if (count == 0) {
-        return;                         // zero bytes: nothing to play
-    }
-    x16__pcm_sp = (char*)data;
-    __asm {
-        lda count
-        sta x16__pcm_rem0
-        lda count+1
-        sta x16__pcm_rem1
-    }
     x16_irq_install();
     x16__pcm_active = 1;
     x16__pcm_stream_isr();              // prime before playback starts
@@ -236,6 +310,50 @@ void x16_pcm_stream_start(const void *data, unsigned int count,
         }
     }
     x16_pcm_rate(rate);                 // ...and start the DAC
+}
+
+void x16_pcm_stream_start(const void *data, unsigned int count,
+                          unsigned char rate) {
+    x16_pcm_stream_stop();              // quiesce a previous stream
+
+    if (count == 0) {
+        return;                         // zero bytes: nothing to play
+    }
+    x16__pcm_mode = 0;                  // low RAM
+    x16__pcm_bank = 0;
+    x16__pcm_sp = (char*)data;
+    __asm {
+        lda count
+        sta x16__pcm_rem0
+        lda count+1
+        sta x16__pcm_rem1
+        lda #0                          /* a low-RAM buffer cannot reach */
+        sta x16__pcm_rem2               /* 64 KB, so the top byte is 0 */
+    }
+    pcm_stream_go(rate);
+}
+
+// ---------------------------------------------------------------------
+// The same, for a sample living in banked RAM. `offset` is 0-8191 within
+// the window; `count` is a 24-bit byte total, so its top byte is ignored.
+// The refiller maps banks in as it goes and always restores the
+// interrupted code's RAM_BANK.
+// ---------------------------------------------------------------------
+void x16_pcm_stream_start_bank(unsigned int offset, unsigned long count,
+                               unsigned char bank, unsigned char rate) {
+    x16_pcm_stream_stop();
+
+    if ((count & 0x00FFFFFFUL) == 0) {
+        return;                         // zero bytes: nothing to play
+    }
+    x16__pcm_mode = 1;                  // banked RAM
+    x16__pcm_bank = (char)bank;
+    x16__pcm_sp = (const char *)(0xA000 + offset);
+    x16__pcm_rem0 = (char)(count & 0xFF);
+    x16__pcm_rem1 = (char)((count >> 8) & 0xFF);
+    x16__pcm_rem2 = (char)((count >> 16) & 0xFF);
+
+    pcm_stream_go(rate);
 }
 
 // ---------------------------------------------------------------------
