@@ -40,6 +40,18 @@ unsigned char x16_gfx8l_init (void);
 
 void x16_gfx8l_clear (unsigned char color);
 
+/* Point VERA data port 0 at (x,y) with the given increment index
+** (X16_INC_*). The packed planes hand back x's position within the
+** byte; at 8bpp a pixel IS a byte, so there is nothing to return.
+** Unclipped. The escape hatch for custom inner loops.
+*/
+void x16_gfx8l_setptr (unsigned char inc, unsigned int x, unsigned char y);
+
+/* The colour at (x,y). Unlike the packed planes' read(), off-screen
+** coordinates are not rejected -- they read the wrapped address.
+*/
+unsigned char x16_gfx8l_read (unsigned int x, unsigned char y);
+
 /* Clipped. */
 void x16_gfx8l_pset (unsigned int x, unsigned char y,
                                 unsigned char color);

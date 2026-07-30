@@ -88,6 +88,30 @@
 #include <x16/console.h>
 #include <x16/graph.h>
 #include <x16/fb.h>
-#include <x16/tscrunch.h>          /* the ROM's floating point library */
+#include <x16/tscrunch.h>          /* TSCrunch depacker */
+
+/* --- the comms wave ------------------------------------------------- */
+#include <x16/spi.h>               /* VERA's SPI master */
+#include <x16/serial.h>            /* the serial/WiFi card's UARTs */
+#include <x16/zimodem.h>           /* ZiModem AT commands over UART 0 */
+
+/* --- audio and video ------------------------------------------------ */
+#include <x16/audiorom.h>          /* the AUDIO ROM bank's own API */
+#include <x16/wavfile.h>           /* parse a WAV/RIFF header */
+#include <x16/zsm.h>               /* ZSM music stream player */
+#include <x16/vdc.h>               /* VERA's display composer */
+
+/* --- integer arithmetic --------------------------------------------- */
+#include <x16/int16.h>             /* 16-bit helpers and composites */
+#include <x16/int32.h>             /* 32-bit helpers and composites */
+
+#include <x16/x16zp.h>             /* the zero-page diagnostic */
+
+/* NOT here, and not in this build at all: <x16/double.h>. The cc65 and
+** llvm-mos trees carry a software IEEE-754 binary64 -- 8 bytes, ~15
+** significant digits. Oscar64 has no `double` type to bind it to (only a
+** 32-bit float), so that module has no port yet. Use <x16/float.h> for
+** the ROM's 5-byte float, or <x16/fixed.h> for scaled integers.
+*/
 
 #endif /* X16_H */

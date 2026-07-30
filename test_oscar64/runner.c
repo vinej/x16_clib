@@ -624,6 +624,51 @@ void test_gfx8l_pset(void) {
     t_check((t_vpeek(0, PX(10, 5)) == 0x42) ? 1 : 0, "GFX8L_PSET");
 }
 
+/* read() against the independent t_vpeek path. y > 127 matters: y is a
+** single byte here, and a sign-extended one would land on the wrong row.
+*/
+void test_gfx8l_read(void) {
+    t_vpoke(0, PX(50, 11), 0x5A);
+    t_vpoke(0, PX(319, 200), 0xC3);             /* 200*320+319 = $FB3F,
+                                                ** still inside bank 0 */
+
+    t_check((x16_gfx8l_read(50, 11) == 0x5A &&
+            x16_gfx8l_read(319, 200) == 0xC3) ? 1 : 0, "GFX8L_READ");
+}
+
+/* setptr leaves the data port walking from (x,y) at the increment asked
+** for, which is what a custom inner loop wants. Reading VERA_DATA0 by
+** hand must then see consecutive pixels -- and with X16_INC_320 the port
+** steps a column instead of a row.
+*/
+void test_gfx8l_setptr(void) {
+    unsigned char a, b, c, d;
+
+    t_vpoke(0, PX(40, 9), 0x11);
+    t_vpoke(0, PX(41, 9), 0x22);
+    t_vpoke(0, PX(42, 9), 0x33);
+    t_vpoke(0, PX(40, 10), 0x44);
+
+    x16_gfx8l_setptr(X16_INC_1, 40, 9);
+    a = *((volatile unsigned char *)0x9F23);    /* VERA_DATA0 */
+    b = *((volatile unsigned char *)0x9F23);
+    c = *((volatile unsigned char *)0x9F23);
+    t_check((a == 0x11 && b == 0x22 && c == 0x33) ? 1 : 0, "GFX8L_SETPTR");
+
+    x16_gfx8l_setptr(X16_INC_320, 40, 9);
+    a = *((volatile unsigned char *)0x9F23);
+    d = *((volatile unsigned char *)0x9F23);
+    t_check((a == 0x11 && d == 0x44) ? 1 : 0, "GFX8L_SETPTR_INC");
+}
+
+/* The zero-page diagnostic. This build has no shared scratch block, so
+** the contract is only that it answers with the base of the library's
+** zero-page footprint -- inside page zero, and nothing depends on it.
+*/
+void test_zp_base(void) {
+    t_check((x16_zp_base() >= 0xF7) ? 1 : 0, "ZP_BASE");
+}
+
 /* ------------------------------------------------------------------ */
 /* 8bpp patterns and blits -- parity with the 2bpp engine              */
 /* ------------------------------------------------------------------ */
@@ -1305,6 +1350,9 @@ int main(void) {
 
     test_gfx8l_clear();
     test_gfx8l_pset();
+    test_gfx8l_read();
+    test_gfx8l_setptr();
+    test_zp_base();
     test_g8_pattern();
     test_g8_blit();
     test_g8_blitm();

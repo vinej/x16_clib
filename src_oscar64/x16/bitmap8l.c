@@ -530,3 +530,22 @@ void x16_gfx8l_blitm(unsigned int x, unsigned int y, unsigned char w,
         h--;
     }
 }
+
+// ---------------------------------------------------------------------
+// The two public escape hatches, over the internals above: aim the data
+// port, and read one pixel back. Both unclipped -- the caller keeps
+// (x,y) on screen.
+//
+// The packed planes' setptr() returns x's position within the byte; at
+// 8bpp a pixel IS a byte, so there is nothing to hand back and this is
+// void.
+// ---------------------------------------------------------------------
+void x16_gfx8l_setptr(unsigned char inc, unsigned int x, unsigned char y) {
+    x16__gp_x = x;
+    x16__gp_y = y;
+    x16__gfx8l_setptr(inc);
+}
+
+unsigned char x16_gfx8l_read(unsigned int x, unsigned char y) {
+    return x16__gfx8l_read8(x, y);
+}
