@@ -10,28 +10,40 @@ preserved, not rewritten: every hot loop is the same hand-written 6502.
 What is new is a thin shim in front of each routine, and a set of headers
 that say what the hardware actually does.
 
-## Five toolchains
+## Three supported toolchains, and two frozen ones
 
-The same API builds under **cc65**, under **llvm-mos**, under **KickC**,
-under **Oscar64** and under **vbcc**. Pick any; they share no object code.
+The same API builds under **cc65**, under **llvm-mos** and under
+**Oscar64**. Pick any; they share no object code.
 
-**cc65 and llvm-mos are level; the other three are catching up.** Both
-carry all 740 entry points across 62 headers, and llvm-mos now runs
-every test cc65 does -- all 545 names -- plus 71 of its own that exist
-only to pin the ABI down. KickC, Oscar64 and vbcc
-now have the seven KERNAL-wrapper modules and the five storage ones
-too (keyboard, mouse, clock, i2c, graph, fb, console, ringbuffer, stack,
-fileio, iec, dir); the 11 modules still marked *cc65 + llvm-mos* in the
-table below are the remaining gap. Those three
-trees stay identical to each other, and their shared API is a strict
-subset -- so code written against them compiles everywhere.
+**KickC and vbcc are FROZEN.** Their trees still build and still pass
+their own suites, and they are kept in the repository for anyone already
+using them -- but they stay at the module set they have now. New modules
+land in the three supported trees only, so do not read a gap in
+`include_kickc/` or `include_vbcc/` as work in progress.
+
+**cc65 and llvm-mos are level.** Both carry all 744 entry points across
+62 headers, and llvm-mos runs every test cc65 does plus its own that
+exist only to pin the ABI down.
+
+**Oscar64 is nearly there: 698 of those 744.** Two modules are still
+missing, both for reasons worth stating rather than hiding in a table:
+
+- `<x16/filepick.h>` (22 entries) -- not yet ported.
+- `<x16/double.h>` (25 entries) -- the software IEEE-754 binary64. Oscar64
+  has no `double` type at all, only a 32-bit `float`, so there is nothing
+  to bind the module to and it needs the whole 8-byte format implemented
+  in software. Until then use `<x16/float.h>` for the ROM's 5-byte float
+  or `<x16/fixed.h>` for scaled integers.
+
+Everything else is present and tested there, so code that avoids those
+two headers compiles on all three.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      543 tests
 include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  659 tests
-include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   317 tests
-include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests
+include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests  (frozen)
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   430 tests
+include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests  (frozen)
 examples/       doc/        emulator/      tools/             shared
 ```
 
@@ -39,7 +51,7 @@ examples/       doc/        emulator/      tools/             shared
 .\build_ca65.ps1 -Test                 # cc65:     543/543
 .\build_llvm.ps1 -Test                 # llvm-mos: 659/659
 .\build_kickc.ps1 -Test                # KickC:    318/318
-.\build_oscar64.ps1 -Test              # Oscar64:  317/317
+.\build_oscar64.ps1 -Test              # Oscar64:  430/430
 .\build_vbcc.ps1 -Test                 # vbcc:     250/250
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
@@ -47,9 +59,9 @@ examples/       doc/        emulator/      tools/             shared
 The trees hold the *same* assembly for the internal routines --
 `tools/ca65_to_llvm.py`, `tools/ca65_to_kickc.py` and
 `tools/ca65_to_vbcc.py` translate the mechanical half from the assembly,
-and `tools/kickc_to_oscar64.py` derives the fourth tree from the third --
-and completely different C entry points, because the calling conventions
-have nothing in common:
+and `tools/kickc_to_oscar64.py` derived the Oscar64 tree from the KickC
+one -- and completely different C entry points, because the calling
+conventions have nothing in common:
 
 |  | cc65 | llvm-mos | KickC | Oscar64 | vbcc |
 |---|---|---|---|---|---|
@@ -168,17 +180,17 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/graph.h` | **the KERNAL GRAPH API: lines, rects, ovals, images, fonts** |
 | `x16/fb.h` | **the KERNAL framebuffer driver: pixel cursor, spans, filters** |
 | `x16/console.h` | **the KERNAL console: wrapping, paging, line input** |
-| `x16/spi.h` | **the VERA SPI master: select, clock, byte exchange, block moves** *(cc65 + llvm-mos)* |
-| `x16/serial.h` | **the serial / WiFi card's 16C550 UARTs, polled** *(cc65 + llvm-mos)* |
-| `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** *(cc65 + llvm-mos)* |
-| `x16/int16.h` | 16-bit helpers: divmod with remainder, integer sqrt, sign-correct compares *(cc65 + llvm-mos)* |
-| `x16/int32.h` | the same at 32 bits *(cc65 + llvm-mos)* |
-| `x16/double.h` | **software IEEE-754 float64**: arithmetic, compares, transcendentals, string I/O *(cc65 + llvm-mos)* |
-| `x16/audiorom.h` | **the AUDIO ROM: FM and PSG notes, play strings, four pitch spaces** *(cc65 + llvm-mos)* |
-| `x16/wavfile.h` | **RIFF/WAV header parsing**, feeding the PCM streamer *(cc65 + llvm-mos)* |
-| `x16/zsm.h` | **ZSM music streams** *(cc65 + llvm-mos)* |
-| `x16/vdc.h` | **VERA's display composer**: scale, layers, border, active window *(cc65 + llvm-mos)* |
-| `x16/filepick.h` | **a full-screen file browser**, bankable *(cc65 + llvm-mos)* |
+| `x16/spi.h` | **the VERA SPI master: select, clock, byte exchange, block moves** |
+| `x16/serial.h` | **the serial / WiFi card's 16C550 UARTs, polled** |
+| `x16/zimodem.h` | **ZiModem: AT commands and the hex transfer channel** |
+| `x16/int16.h` | 16-bit helpers: divmod with remainder, integer sqrt, sign-correct compares |
+| `x16/int32.h` | the same at 32 bits |
+| `x16/double.h` | **software IEEE-754 float64**: arithmetic, compares, transcendentals, string I/O *(cc65 + llvm-mos only)* |
+| `x16/audiorom.h` | **the AUDIO ROM: FM and PSG notes, play strings, four pitch spaces** |
+| `x16/wavfile.h` | **RIFF/WAV header parsing**, feeding the PCM streamer |
+| `x16/zsm.h` | **ZSM music streams** |
+| `x16/vdc.h` | **VERA's display composer**: scale, layers, border, active window |
+| `x16/filepick.h` | **a full-screen file browser**, bankable *(cc65 + llvm-mos only)* |
 | `x16/verafx_utils.h` | the raw VERA FX register knobs |
 
 Several of those are things the machine can do that nothing else exposes
@@ -753,9 +765,18 @@ fragments -- is in [tutorial/kickc_guide.md](tutorial/kickc_guide.md).
 
 ## Porting notes: KickC to Oscar64
 
-The fourth tree is derived from the third, not from the assembly: the
-KickC port had already turned every module into C functions whose
-bodies are inline asm reading parameters by name, which is exactly
+**This route applied to the modules KickC has.** The nine that landed in
+the 2026-07 resync were written straight into Oscar64's idiom instead,
+because KickC -- now frozen -- never had them, so the converter had no
+input. ca65's `.s` was the semantic reference, and the balance shifted:
+plain C for logic, `__asm` only where the hardware demands exact
+instructions (a `BIT`/`BMI` poll an optimiser must not hoist, a YM
+register write that needs `sei` and three cycles of settling, the
+three inline bytes of a JSRFAR).
+
+For the earlier modules, the tree is derived from the KickC one, not from
+the assembly: that port had already turned every module into C functions
+whose bodies are inline asm reading parameters by name, which is exactly
 Oscar64's shape. `tools/kickc_to_oscar64.py` does the mechanical half
 -- `$9f25` to `0x9f25`, `.byte` to `byt`, one instruction per line,
 `/*name*/` comment folding -- and downgrades the 65C02 to NMOS, because
