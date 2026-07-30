@@ -68,7 +68,15 @@ def parse(path):
             m = re.search(r'x16/\w+\.h\s*--\s*(.+)$', l)
             if m:
                 title = m.group(1).strip()
-                intro = dedent(b[i + 1:])
+                # shapes.h wraps its title onto a second line; taking
+                # only the first left the entry ending on a stray slash.
+                j = i + 1
+                while (j < len(b) and b[j].strip()
+                       and not re.match(r'\s*$', b[j])
+                       and title.rstrip().endswith(("/", ",", "and"))):
+                    title = title.rstrip() + " " + b[j].strip()
+                    j += 1
+                intro = dedent(b[j:])
                 break
         else:
             intro = dedent(b)
@@ -177,11 +185,24 @@ for group, mods in ORDER:
 
 io.open('_ug_sections.md', 'w', encoding='utf-8', newline='').write(
     '\n'.join(chunks))
+def anchor(heading):
+    """GitHub's slug rule, which is not the obvious one.
+
+    Punctuation is DROPPED, not replaced -- so "I/O" is "io", not "i-o".
+    Underscores SURVIVE, so `VERA_2` is "vera_2". And each space becomes
+    one hyphen without collapsing runs, which is why "` — `" yields two.
+    Getting this wrong left eight entries in the guide pointing nowhere.
+    """
+    s = re.sub(r'[^a-z0-9 _-]', '', heading.lower())
+    return s.strip().replace(' ', '-')
+
+
+# Numbered, continuing the guide's existing 1..26 list rather than
+# starting a second one in bullets.
 io.open('_ug_toc.md', 'w', encoding='utf-8', newline='').write(
-    '\n'.join('- [`x16/%s.h` — %s](#x16%sh--%s)'
-              % (m, t, m,
-                 re.sub(r'[^a-z0-9]+', '-', t.lower()).strip('-'))
-              for m, t in toc) + '\n')
+    '\n'.join('%d. [`x16/%s.h` — %s](#%s)'
+              % (i, m, t, anchor('`x16/%s.h` — %s' % (m, t)))
+              for i, (m, t) in enumerate(toc, 27)) + '\n')
 
 print('%d modules, %d KB of sections'
       % (len(chunks), os.path.getsize('_ug_sections.md') // 1024))
