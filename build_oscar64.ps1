@@ -109,7 +109,7 @@ if ($Test -and -not $PSBoundParameters.ContainsKey('Source')) {
                 'test_oscar64\runner8.c', 'test_oscar64\runner9.c',
                 'test_oscar64\runner10.c', 'test_oscar64\runner11.c',
                 'test_oscar64\runner12.c', 'test_oscar64\runner13.c',
-                'test_oscar64\runner15.c')
+                'test_oscar64\runner14.c', 'test_oscar64\runner15.c')
 } else {
     $suites = @($Source)
 }

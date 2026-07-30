@@ -1,53 +1,25 @@
 // =====================================================================
 // x16clib :: x16/filepick.c -- a file browser on a panel
 // =====================================================================
-// ONE CHECK SHORT. 15 of the 16 ported checks pass. Not wired into
-// <x16/x16.h>, not in the README's supported set, and runner14.c is not
-// in build_oscar64.ps1's suite list until it is 16/16. Run it with
+// All 16 checks ported from test_ca65/runner11.c pass. Two of them took
+// finding, and both were worth the trouble to record:
 //
-//      build_oscar64.ps1 -Test -Source test_oscar64/runner14.c
+// x16_screen_blit() FOLDS PETSCII TO SCREEN CODES ITSELF. fp_puts_at()
+// used to convert first, so every character was folded TWICE and the
+// panel's text vanished -- while its row fills landed, because those go
+// through blitfill(), which folds once and was never wrong. That
+// asymmetry (fills yes, text no) is the tell, and three other
+// hypotheses died before it was believed: that __asm cannot address a C
+// local (true, but not the cause here), that a local staging array broke
+// the pointer handed to blit, and that scode() mishandled lowercase.
+// What settled it was calling addr+blit straight from the TEST with
+// nothing of this module involved, and then asking the HARDWARE
+// ($9F34/$9F35) whether the test's own address model was right. It was.
 //
-// FP_DRAW is the one. row_has_ink(3) reads all spaces across the panel's
-// span of the header row, so no TEXT is landing -- while the row FILLS
-// clearly do, which is why FP_SAVEUNDER's "covered" check passes (a body
-// row painted with spaces over the test's sentinel). Every fp_puts_at()
-// call is suspect and every fp_fill_row() call is fine.
-//
-// THREE HYPOTHESES RULED OUT, each by changing the code and re-running:
-//   * that __asm cannot address a C local (the trap that cost nine tests
-//     in double.c). The four VRAM cache accessors did read a block-scope
-//     local from asm; they are plain volatile C now and it survived.
-//   * that the screen-code staging buffer being a LOCAL ARRAY broke the
-//     pointer handed to x16_screen_blit(). Module buffer now; survived.
-//   * that fp_puts_at's screen-code conversion was at fault.
-//     x16_screen_scode() answers non-space for lowercase ASCII, checked
-//     directly from the test.
-//
-// AND THE SUSPICION IS NOW INVERTED, which is where the next session
-// should start. A probe run FROM THE TEST -- x16_screen_addr(7, 10) then
-// x16_screen_blit() of three known screen codes, read back with
-// t_vpeek -- ALSO FAILED. Those are the same two primitives fp_puts_at
-// uses, called with nothing of this module involved. So either
-// screen.c's addressing is wrong, or the TEST'S ADDRESS MODEL IS.
-//
-// The test hardcodes map base $1B000 and a 256-byte row stride;
-// x16__screen_addr_calc() derives both from the LIVE VERA registers
-// (L1_MAPBASE, and MAP_WIDTH out of L1_CONFIG). The library is right by
-// construction and the constant is an assumption -- and FP_PRIM_FILE
-// already turned out to be the test rather than the module. So read
-// $9F34/$9F35 in the test and compare before touching filepick again;
-// if they disagree with $1B000/256, FP_DRAW has been reading the wrong
-// cells all along and this module may have been drawing correctly the
-// whole time.
-//
-// FP_PRIM_FILE: FIXED, and it was never a module bug. Dumping the
-// listing cache ($12000, 32 bytes an entry) showed the panel listing
-// five or more entries under a "*.*" filter -- entry 0 is ".", entry 1
-// another directory, entry 4 non-empty -- because this suite's fsroot
-// carries strays ca65's does not, which lands extra files BETWEEN the
-// two the test owns and makes counting keystrokes meaningless. The test
-// now filters "*.bin;*.txt", which shows primaries-before-data just as
-// well and cannot be shifted by a stray.
+// The other was not a bug here at all: under a "*.*" filter the panel
+// lists whatever else the shared fsroot holds, which lands between the
+// two files the test owns and makes counting keystrokes meaningless.
+// The test filters "*.bin;*.txt" now.
 //
 // =====================================================================
 // Written in C over this tree's own modules -- dir.c for the listing,
@@ -349,27 +321,24 @@ static void fp_scan(void) {
 // Drawing. Everything goes through screen.c's text-map blitter, which
 // writes character/colour pairs at the address x16_screen_addr() set.
 // =====================================================================
-// The screen-code staging buffer is a MODULE global, not a local. It is
-// handed to x16_screen_blit() as a pointer, and a pointer into Oscar64's
-// stack frame is not something the library's inline asm can walk -- the
-// same trap that cost nine tests in double.c, one step removed.
-static char fp_sc[96];
-
+// x16_screen_blit() folds PETSCII to screen codes ITSELF, so what goes
+// in here is the string as it stands. Converting first and letting blit
+// convert again folds every character TWICE, which is what made the
+// panel's text vanish while its row fills landed -- the fills go through
+// blitfill, which folds once and was never wrong.
 static void fp_puts_at(unsigned char row, unsigned char col,
                        const char *s, unsigned char max,
                        unsigned char color) {
-    unsigned char i;
     unsigned char n = 0;
 
-    for (i = 0; i < max && s[i] != 0; ++i) {
-        fp_sc[n] = (char)x16_screen_scode((unsigned char)s[i]);
+    while (n < max && s[n] != 0) {
         ++n;
     }
     if (n == 0) {
         return;
     }
     x16_screen_addr(row, col);
-    x16_screen_blit(fp_sc, n, color);
+    x16_screen_blit(s, n, color);
 }
 
 static void fp_fill_row(unsigned char row, unsigned char color) {

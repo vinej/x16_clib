@@ -105,6 +105,7 @@
 #include <x16/int16.h>             /* 16-bit helpers and composites */
 #include <x16/int32.h>             /* 32-bit helpers and composites */
 
+#include <x16/filepick.h>          /* the file browser on a panel */
 #include <x16/x16zp.h>             /* the zero-page diagnostic */
 
 /* NOT pulled in by this umbrella, and deliberately: <x16/double.h>.

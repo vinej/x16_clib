@@ -26,21 +26,18 @@ land in the three supported trees only, so do not read a gap in
 exist only to pin the ABI down.
 
 **Oscar64 now carries all 744 too**, including the software IEEE-754
-binary64 of `<x16/double.h>`. Two notes on it:
-
-- `<x16/double.h>` is NOT pulled in by `<x16/x16.h>` -- include it
-  yourself. It claims four of the nine bytes in Oscar64's zero-page
-  region, and three other modules already claim eight between them, so
-  the umbrella header does not spend that on every program.
-- `<x16/filepick.h>` compiles and passes 14 of its 16 checks, so it is
-  committed but left unwired rather than advertised as done. See the
-  banner in `src_oscar64/x16/filepick.c`.
+binary64 of `<x16/double.h>` and the file browser of
+`<x16/filepick.h>`. One note: `<x16/double.h>` is NOT pulled in by
+`<x16/x16.h>` -- include it yourself. It claims four of the nine bytes in
+Oscar64's zero-page region, and three other modules already claim eight
+between them, so the umbrella header does not spend that on every
+program.
 
 ```
 include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      543 tests
 include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  659 tests
 include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests  (frozen)
-src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   444 tests
+src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   460 tests
 include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests  (frozen)
 examples/       doc/        emulator/      tools/             shared
 ```
@@ -49,7 +46,7 @@ examples/       doc/        emulator/      tools/             shared
 .\build_ca65.ps1 -Test                 # cc65:     543/543
 .\build_llvm.ps1 -Test                 # llvm-mos: 659/659
 .\build_kickc.ps1 -Test                # KickC:    318/318
-.\build_oscar64.ps1 -Test              # Oscar64:  444/444
+.\build_oscar64.ps1 -Test              # Oscar64:  460/460
 .\build_vbcc.ps1 -Test                 # vbcc:     250/250
 .\build_llvm.ps1 -Source examples\bounce.c -Run
 ```
@@ -188,7 +185,7 @@ all**, and only enable-toggles for sprites and layers.
 | `x16/wavfile.h` | **RIFF/WAV header parsing**, feeding the PCM streamer |
 | `x16/zsm.h` | **ZSM music streams** |
 | `x16/vdc.h` | **VERA's display composer**: scale, layers, border, active window |
-| `x16/filepick.h` | **a full-screen file browser**, bankable *(cc65 + llvm-mos only)* |
+| `x16/filepick.h` | **a full-screen file browser**, bankable |
 | `x16/verafx_utils.h` | the raw VERA FX register knobs |
 
 Several of those are things the machine can do that nothing else exposes
