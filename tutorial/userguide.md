@@ -1,11 +1,27 @@
 # x16clib User Guide
 
 A function-by-function guide to **x16clib**, the C library for the
-Commander X16. Every function in the library is listed here with its
-parameters and a small example.
+Commander X16: each function with its parameters and a small example.
 
 For background, design notes and hardware pitfalls, see the
 [README](../README.md). This guide is about *using* the API.
+
+> **COVERAGE, honestly stated.** This guide documents the 25 modules
+> listed below, out of the library's 61. It has not kept pace with the
+> library: everything added since it was written is missing, which is
+> most of the drawing engines (`bitmap2h`, `bitmap2l`, `bitmap4h`,
+> `bitmap4l`, `bitmap8h`, `shapes`), the whole string/util group
+> (`string`, `sort`, `bcd`, `bits`, `number`, `tscrunch`), storage
+> (`fileio`, `iec`, `dir`, `ringbuffer`, `stack`), the KERNAL wrappers
+> (`keyboard`, `mouse`, `clock`, `i2c`, `console`, `graph`, `fb`),
+> comms (`spi`, `serial`, `zimodem`), audio and video (`audiorom`,
+> `wavfile`, `zsm`, `vdc`), the numeric modules (`int16`, `int32`,
+> `double`), `filepick` and `verafx_utils`.
+>
+> Those modules are not undocumented -- **their headers carry the full
+> contract**, and the headers are the authority in this library
+> regardless. `include_ca65/x16/*.h` (or `src_oscar64/x16/*.h`) is the
+> place to look until this guide catches up.
 
 ---
 

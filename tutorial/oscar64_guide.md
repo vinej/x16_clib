@@ -176,7 +176,7 @@ Oscar64 string and char literals stay ASCII unless told otherwise —
 the right default for the X16 KERNAL after `x16_screen_mode()`, and the
 reason the test harness needed no `#pragma encoding` dance. `'S'` is
 $53. (cc65's `-t cx16` PETSCII-ifies literals by default;
-this port inherits their explicit-hex habit anyway so the four trees
+this port inherits that explicit-hex habit anyway so the three trees
 match byte for byte.)
 
 ## 6. The standard library Oscar64 ships
@@ -212,7 +212,7 @@ helpers were not trustworthy in this version — the library's own
 
   ```powershell
   .\build_oscar64.ps1 -Source examples\bounce.c -Run
-  .\build_oscar64.ps1 -Test              # 119 tests, three PRGs
+  .\build_oscar64.ps1 -Test              # 460 tests, fifteen PRGs
   .\build_oscar64.ps1 -Test -Windowed    # with live video and IRQs
   ```
 

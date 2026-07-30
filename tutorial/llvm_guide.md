@@ -218,10 +218,12 @@ is the same, and the same advice applies:
 - No `__fastcall__` anywhere — the headers are plain C, the convention
   is the compiler's.
 - Link `dist_llvm\libx16c.a`. The API is identical to the cc65 build's:
-  the same 29 modules, the same hand-written 6502 underneath, different
-  C entry shims.
-- The regression suite (`.\build_llvm.ps1 -Test`) runs 46 tests on the
-  r49 emulator; library constants are transcribed from the r49 ROM.
+  the same 61 modules and 744 entry points, the same hand-written 6502
+  underneath, different C entry shims.
+- The regression suite (`.\build_llvm.ps1 -Test`) runs 659 tests across
+  fourteen programs on the r49 emulator -- every check the cc65 suite
+  makes plus its own ABI tests; library constants are transcribed from
+  the r49 ROM.
 
 ## 8. Gotcha checklist
 

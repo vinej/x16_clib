@@ -239,9 +239,9 @@ none of this well:
   function's address or write assembly against it.
 - Link `dist_ca65\x16c.lib`; ld65 pulls only the modules you call.
   `#include <x16/x16.h>` costs nothing at run time.
-- The regression suite (`.\build_ca65.ps1 -Test`) runs 158 tests on the
-  r49 emulator; the library's constants are transcribed from the r49
-  ROM.
+- The regression suite (`.\build_ca65.ps1 -Test`) runs 543 tests across
+  eleven programs on the r49 emulator; the library's constants are
+  transcribed from the r49 ROM.
 
 ## 8. Gotcha checklist
 
