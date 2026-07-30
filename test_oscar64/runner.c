@@ -1,17 +1,17 @@
 /* =====================================================================
- * x16clib :: test_kickc/runner.c -- on-machine regression suite
+ * x16clib :: test_oscar64/runner.c -- on-machine regression suite
  * =====================================================================
- * Runs under `.\build_kickc.ps1 -Test`, which boots x16emu headless
+ * Runs under `.\build_oscar64.ps1 -Test`, which boots x16emu headless
  * (-testbench -warp -echo) and fails the build on any FAIL, a pass count
  * that disagrees with the total, a missing DONE line, or a timeout.
  *
  * The tests are ports of the util-module cases in test_ca65/runner.c,
- * adjusted only for KickC's dialect: no `static`, struct locals become
+ * adjusted only for this dialect: no `static`, struct locals become
  * globals initialised field by field, and the expected values are
  * written in decimal where cc65 needed casts of hex literals.
  *
  * The cc65 suite's ABI_* tests guard shims that pop arguments off a
- * stack in a hand-written order. KickC's asm reads each parameter BY
+ * stack in a hand-written order. The asm reads each parameter BY
  * NAME, so that failure mode does not exist here; what stands in for it
  * is that every multi-argument test below uses distinct values per
  * argument, so a swapped name still turns the test red.
@@ -24,7 +24,7 @@
 /* ------------------------------------------------------------------ */
 /* VRAM access for verification, independent of the library's path.
 **
-** The cc65 suite verified through cc65's vpeek()/vpoke(); KickC has no
+** The cc65 suite verified through cc65's vpeek()/vpoke(); there is no
 ** equivalent worth trusting, so these do the same job: point port 0
 ** with NO increment and touch the data register once. None of the
 ** library's increment/DECR marshalling is involved, so an
@@ -817,7 +817,7 @@ void test_gfx8l_line(void) {
             "GFX8L_LINE");
 }
 
-/* Down-right, with literal endpoints. The KickC build hung here: its
+/* Down-right, with literal endpoints. An earlier port hung here: its
  * constant folder dropped the negation in `dy = 0 - dy`, err started at
  * dx+|dy|, and the walk never reached its end point. This source has the
  * same shape, so the case is worth pinning on every compiler that folds
@@ -1105,7 +1105,7 @@ unsigned int hz_top = 20000;
 
 unsigned int psg_hz_of(unsigned int hz) {
     /* X16_PSG_HZ's arithmetic, in steps: the one-expression macro form
-    ** trips a KickC 0.8.6 internal error ("Cannot cast declared type")
+    ** tripped an earlier compiler's internal error ("Cannot cast declared type")
     ** when its argument is a variable. Literal arguments fold fine.
     */
     unsigned long t = (unsigned long)hz;

@@ -1,18 +1,18 @@
 /* =====================================================================
- * x16clib :: test_kickc/runner7.c -- UTIL modules: sort, bcd, bits,
+ * x16clib :: test_oscar64/runner7.c -- UTIL modules: sort, bcd, bits,
  *                                    number, tscrunch
  * =====================================================================
  * The seventh PRG of the suite, mirroring ca65's runner5.c check for
  * check (32 of them). Run it with
  *
- *      .\build_kickc.ps1 -Test -Source test_kickc\runner7.c
+ *      .\build_oscar64.ps1 -Test -Source test_oscar64\runner7.c
  *
  * The TSCrunch fixtures are the upstream x16_library's own: the packed
  * bytes are the literal output of Antonio Savona's `tscrunch` tool over
  * the phrase and RLE payloads, so this checks our decoder against the
  * real encoder, not against a hand-built stream.
  *
- * KickC dialect notes vs the ca65 original: no function-static data
+ * Dialect notes vs the ca65 original: no function-static data
  * (fixtures live at file scope), every t_check condition is wrapped in
  * (expr) ? 1 : 0, and the comparator dereferences through same-width
  * locals (a direct *pa < *pb compare has no ASM fragment in 0.8.6).

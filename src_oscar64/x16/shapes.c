@@ -136,7 +136,7 @@ void x16__shp_walk(unsigned int r, unsigned char fill) {
             x16__shp_plot4(oy, ox);
         }
         oy++;
-        // explicit int steps: KickC lacks fragments for mixed-width
+        // explicit int steps: this avoids mixed-width
         // expressions like ((int)oy - ox) << 1
         if (err >= 0) {
             ox--;
@@ -330,7 +330,7 @@ int x16__by[4];
 int x16__wx[4];
 int x16__wy[4];
 
-// 65536/n for n=3..24; the 6502 has no divide and kickc no runtime one, so
+// 65536/n for n=3..24; the 6502 has no divide and no runtime one is used, so
 // the polygon's angular step is a table rather than a division.
 const unsigned int x16__pstep[25] = {
     0, 0, 0, 21845, 16384, 13107, 10922, 9362, 8192, 7281, 6553, 5957,
@@ -339,7 +339,7 @@ const unsigned int x16__pstep[25] = {
 };
 
 // signed Bresenham line through the bound pset. dx is kept as |dx| and dy
-// as -|dy|, both formed by SUBTRACTION not `0 - d`: kickc folds `0 - d`
+// as -|dy|, both formed by SUBTRACTION not `0 - d`: a constant folder
 // away, which would leave err = dx+|dy| and the walk would never end (the
 // same trap x16_gfx2h_line documents).
 void x16__shp_line(int x0, int y0, int x1, int y1) {
@@ -359,20 +359,20 @@ void x16__shp_line(int x0, int y0, int x1, int y1) {
 }
 
 // base + round(r * t / 128). t is the RAW byte returned by cos8/sin8:
-// kickc does not sign-extend signed char, so `(int)t < 0` never fires and
+// signed char is not reliably sign-extended, so `(int)t < 0` may not fire and
 // every negative offset silently became positive. The sign is read from
 // the byte itself (>= 128 => negative), the magnitude from the unsigned
 // multiply fragment (rounded via the free >>8), and the sign applied with
-// base - mag (a two-variable subtract, which kickc does compile; it only
+// base - mag (a two-variable subtract, which compiles cleanly; only
 // mangles `0 - var`).
 int x16__coord(int base, unsigned char r, unsigned char t) {
     int tv, r2, off;
-    // t is the RAW byte from cos8/sin8. kickc does not reliably sign-extend
+    // t is the RAW byte from cos8/sin8. Do not rely on sign-extension
     // signed char, so sign-extend by hand (byte-256 is a plain subtract, not
-    // the `0 - var`/`const - var` forms kickc mangles).
+    // the `0 - var`/`const - var` forms a folder can mangle).
     if (t >= 128) { tv = (int)t - 256; } else { tv = (int)t; }
     // off = r*t/128 (floored) via the SIGNED multiply fragment:
-    // x16_mul88(2r, t) == (2r*t)>>8. No rounding step -- kickc's `>>1` on a
+    // x16_mul88(2r, t) == (2r*t)>>8. No rounding step -- a `>>1` on a
     // negative int shifts logically, which corrupts the sign; the 1px inset
     // that flooring costs is invisible in a filled shape. 2r by addition.
     r2 = (int)r; r2 = r2 + r2;
@@ -404,7 +404,7 @@ void x16__poly_outline(unsigned char n) {
 }
 
 // The convex-polygon fill is done by OUTLINE + FLOOD, not a scanline span
-// buffer: kickc cannot reliably compile `int_array[variable_index] = value`
+// buffer: `int_array[variable_index] = value` is avoided
 // (the store silently mis-selects a fragment), and a per-row min/max span
 // buffer is built entirely on that. Flooding from the centre -- always
 // interior to a convex polygon -- reuses only primitives that do work here
@@ -521,7 +521,7 @@ void x16__arc(unsigned char r, unsigned char a0, unsigned char a1,
     }
     // the pie wedge: close it with the two bounding radii, then flood the
     // inside from a seed at half-radius on the mid angle (same reason the
-    // polygon fill floods -- kickc cannot do the span-buffer fill).
+    // polygon fill floods -- there is no span-buffer fill here).
     if (pie != 0) {
         x16__arc_point(r, a0);
         x16__shp_line(cx, cy, x16__ax, x16__ay);

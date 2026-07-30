@@ -143,7 +143,7 @@ void x16_screen_locate(unsigned char rowv, unsigned char col) {
     }
 }
 
-// `rowp`, not `row`: `row` collided with KickC's inline-asm grammar,
+// `rowp`, not `row`: `row` collided with an inline-asm grammar,
 // and the name is kept so all the ports read alike.
 void x16_screen_get_cursor(unsigned char *rowp, unsigned char *colp) {
     __asm {

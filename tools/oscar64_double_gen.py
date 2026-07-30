@@ -17,7 +17,7 @@ So the body needs exactly two downgrades, `stz` and `bra`, plus the
 usual syntax mapping.
 
 THE stz RULE, and why it is the conservative one. `stz addr` leaves the
-flags alone; `lda #0 / sta addr` does not. The earlier KickC-to-Oscar64
+flags alone; `lda #0 / sta addr` does not. An earlier Oscar64
 wave was bitten by exactly this, where an original relied on stz not
 touching N/Z. Rather than audit 45 sites by eye, each becomes a
 sequence that is transparent by construction:

@@ -26,7 +26,7 @@ volatile unsigned char w_lo;
 void x16__fb_tramp(void);
 void x16__fb_thunk(void);
 
-// Pointer scratch, pinned in zero page (KickC ignores __zp on
+// Pointer scratch, pinned in zero page (a plain __zp is ignored on
 // parameters; see x16/zpsafe.h).
 unsigned int* volatile x16__fb_p0;
 unsigned int* volatile x16__fb_p1;
@@ -34,7 +34,7 @@ unsigned int* volatile x16__fb_p1;
 volatile unsigned char x16__fb_v;
 
 // The filter bridge. The ROM hands each colour over in A and wants the
-// replacement back in A, but KickC decides for itself where a C
+// replacement back in A, but a compiler decides for itself where a C
 // function's argument lives, so the ROM cannot call one directly. The
 // asm trampoline parks the colour here and calls a C thunk that takes
 // NO arguments and reads it -- a convention both sides can agree on.
@@ -272,8 +272,8 @@ void x16_fb_fill_pixels(unsigned int count,
 // bytes did not help (the call then read back 0), and __noinline on the
 // filter changed nothing.
 //
-// The KickC build, which uses the same two-hop bridge, is correct; so is
-// cc65, llvm-mos and vbcc. The test is skipped rather than asserted at
+// The same two-hop bridge is correct elsewhere: so are
+// cc65 and llvm-mos. The test is skipped rather than asserted at
 // the wrong value -- see test_oscar64/runner8.c.
 //
 // Run `filter` over count pixels from the cursor: it receives each
@@ -319,7 +319,7 @@ void x16__fb_tramp(void) {
     }
 }
 
-// The C half of the bridge: no arguments, so KickC and the trampoline
+// The C half of the bridge: no arguments, so the compiler and the trampoline
 // agree on where the colour is.
 // KNOWN BROKEN ON OSCAR64 -- see the note above x16_fb_filter_pixels.
 void x16__fb_thunk(void) {

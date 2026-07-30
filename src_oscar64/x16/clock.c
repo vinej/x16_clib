@@ -21,10 +21,10 @@
 
 #include <x16/clock.h>
 
-// Pointer scratch, pinned in zero page (KickC ignores __zp on
+// Pointer scratch, pinned in zero page (a plain __zp is ignored on
 // parameters; see x16/zpsafe.h). The cc65 build used ptr1.
 
-// The timer's four bytes, low first. KickC has no runtime 32-bit shift,
+// The timer's four bytes, low first. No runtime 32-bit shift is used,
 // so the long is assembled and taken apart with one dword move through
 // this buffer -- the same trick bcd.c uses for its 32-bit operands.
 volatile unsigned char x16__ck_b4[4];

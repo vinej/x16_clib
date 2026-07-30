@@ -14,7 +14,7 @@
 // NOT SAFE ACROSS AN INTERRUPT -- see the note in ringbuffer.c.
 //
 // WRITTEN IN C, for the same reason ringbuffer.c is: the ca65 version
-// shares helper routines between its entry points and KickC asm labels
+// shares helper routines between its entry points, and asm labels
 // do not reach across function bodies. The index arithmetic is identical
 // and so are the results.
 // =====================================================================

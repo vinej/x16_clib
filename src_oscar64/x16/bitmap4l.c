@@ -284,7 +284,7 @@ void x16_gfx4l_line(unsigned int x0, unsigned char y0, unsigned int x1,
     lx1 = (int)x1;
     ly1 = (int)y1;
 
-    // Subtractions rather than `d = 0 - d`: see x16/bitmap2h.c -- KickC
+    // Subtractions rather than `d = 0 - d`: see x16/bitmap2h.c -- the
     // constant-folds a literal call and drops the negation otherwise.
     dx = lx1 - lx0;
     if (dx < 0) {

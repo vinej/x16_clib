@@ -1,11 +1,11 @@
 /* =====================================================================
- * x16clib :: test_kickc/runner2.c -- the compute half of the suite
+ * x16clib :: test_oscar64/runner2.c -- the compute half of the suite
  * =====================================================================
  * THE SUITE IS BUILT TWICE, like the cc65 suite -- there for program
- * RAM, here for zero page. KickC never coalesces a variable that inline
+ * RAM, here for zero page. An earlier compiler never coalesced a variable that inline
  * asm references, and the full test set plus the whole library holds
  * more of those than the $22-$7F user window (see x16/zpsafe.h). Past
- * the window's edge KickC 0.8.6 does not fail; it silently allocates
+ * the window's edge it did not fail; it silently allocated
  * into the reserved ranges, and the KERNAL corrupts whatever lands
  * there. Two smaller programs keep both compiles comfortably inside.
  *
@@ -379,7 +379,7 @@ x16_float fa;
 x16_float fb;
 char fbuf[X16_FP_STRLEN];
 
-/* KickC has no strcmp to lean on; three-byte answers at most. */
+/* No strcmp to lean on here; three-byte answers at most. */
 unsigned char f_streq(const char *p, const char *q) {
     unsigned char i;
     for (i = 0; i < 8; i++) {

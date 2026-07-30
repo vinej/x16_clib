@@ -4,7 +4,7 @@
  * =====================================================================
  * Standalone suite:
  *
- *      .\build_oscar64.ps1 -Test -Source test_kickc\runner9.c
+ *      .\build_oscar64.ps1 -Test -Source test_oscar64\runner9.c
  *
  * Same independent-path principle as the other suites: drive the library
  * one way and verify the other way. A file written byte-by-byte through
@@ -13,10 +13,10 @@
  * loader; the banked ring and stack are checked against a pattern the
  * test computes for itself.
  *
- * WRITTEN IN KickC's IDIOM (shared with the Oscar64 tree) rather than transliterated from ca65's
+ * WRITTEN IN THIS TREE'S IDIOM rather than transliterated from ca65's
  * runner6.c, which is what the other four suites are. That port kept
  * running into dialect gaps that have nothing to do with the library:
- * KickC will not assign a bool to a char, has no `&&` fragment over
+ * That dialect would not assign a bool to a char, had no `&&` fragment over
  * non-trivial operands, no 16- or 32-bit compare against a constant, no
  * `i-- > 0` in a for-condition, and answers a bare "Not implemented!"
  * to some combinations with no line number at all. Each is avoidable one
@@ -44,7 +44,7 @@
 
 #define FIO_LEN     32
 
-/* KickC has no <string.h>. */
+/* No <string.h> here. */
 char t_strcmp8(const char *a, const char *b) {
     unsigned char i;
     for (i = 0; ; ++i) {
@@ -225,7 +225,7 @@ void test_stack_fill_drain(void) {
     if (sz != 0) { ok = 0; }
     if (x16_stack_isempty() != 0) { ok = 0; }
 
-    /* Counted forwards and indexed backwards: KickC has no `i-- > 0`. */
+    /* Counted forwards and indexed backwards: avoids `i-- > 0`. */
     for (i = 0; i < 8191; ++i) {
         if (x16_stack_pop() != pat(8190 - i)) { ok = 0; }
     }
@@ -280,7 +280,7 @@ void test_fio_write(void) {
 
     /* The 32 bytes just written show up in the captured output. Nothing
     ** is wrong: the emulator's -echo reports every byte CHROUT is handed,
-    ** and these went to the FILE, not the screen. The ca65 and vbcc
+    ** and these went to the FILE, not the screen. The ca65
     ** suites echo their own pattern the same way. Only the line break
     ** matters here -- without it the run lands on the end of the previous
     ** PASS line and the harness's own count check trips ("36 PASS lines

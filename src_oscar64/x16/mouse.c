@@ -9,7 +9,7 @@
 //
 // Unlike input.c, which pins its out-param pointers so inline asm can
 // store through them, this module only pins the four bytes MOUSE_GET
-// insists on and lets KickC do the pointer stores in C. Three out-params
+// insists on and lets C do the pointer stores. Three out-params
 // plus that scratch would not fit in the eight bytes at $78-$7F, and
 // there is no reason for them to: the asm here does not need them.
 // =====================================================================
@@ -22,12 +22,12 @@
 // $7C-$7F is the library's, reserved in x16/zpsafe.h, and input.c pins
 // the same four for the same call; the two are never live at once. This
 // module names the address NUMERICALLY rather than declaring a second
-// __address() variable, because KickC has no linker: two blocks at one
+// pinned variable, because there is no linker: two blocks at one
 // address are rejected outright, and two at different addresses make
 // KickAssembler emit a PRG that overwrites zero page as it loads --
 // which crashes before main() is even reached.
 // The four bytes copied out of that zero-page area, so C can read them
-// without KickC deciding to re-place anything.
+// without the compiler deciding to re-place anything.
 volatile unsigned char x16__ms_copy[4];
 
 volatile unsigned char x16__ms_btn;
@@ -80,7 +80,7 @@ signed char x16_mse_get(unsigned int *x,
         lda 0x7f
         sta x16__ms_copy+3
     }
-    /* Byte stores, not `*x = lo | hi << 8`: KickC has no fragment for
+    /* Byte stores, not `*x = lo | hi << 8`: this avoids a fragment for
     ** storing a computed 16-bit value through a pointer parameter. */
     xb = (unsigned char *)x;
     xb[0] = x16__ms_copy[0];

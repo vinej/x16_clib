@@ -325,7 +325,7 @@ void test_curve_arc2(void) {
     x16_vera_addr0(X16_INC_1, 0x00000);
     x16_vera_fill(0x00, 160 * 41);
     x16_gfx2h_arc(40, 20, 15, 0, 64, 3);             /* east -> south */
-    /* the rim is at radius 14 or 15 (kickc floors the r*sin/cos scale by up
+    /* the rim is at radius 14 or 15 (the r*sin/cos scale floors by up
     ** to 1px), so accept either -- what matters is the arc is drawn east and
     ** south and NOT west. */
     t_check(((x16_gfx2h_read(55, 20) == 3 || x16_gfx2h_read(54, 20) == 3) &&

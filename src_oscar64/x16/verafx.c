@@ -98,7 +98,7 @@ void x16_fx_off(void) {
 // port would risk a stale latch.
 // ---------------------------------------------------------------------
 // `ma`/`mb`, not `a`/`b`: `a` reads as the accumulator to an inline
-// assembler (KickC crashed outright on `lda a`; the rename stays).
+// assembler (an earlier one crashed outright on `lda a`; the rename stays).
 long x16_fx_mult(int ma, int mb) {
     __asm {
         lda 0x9f25                       /* vera_dcsel 2 */
@@ -116,7 +116,7 @@ long x16_fx_mult(int ma, int mb) {
         sta 0x9f25
         /* A READ of 0x9F29 clears the accumulator. `bit`, not `lda`: */
         /* the value is unused, and `bit` performs the same bus read */
-        /* without looking like a dead load to any optimizer (KickC */
+        /* without looking like a dead load to any optimizer      */
         /* 0.8.6 crashed eliminating the lda form). */
         bit 0x9f29                      /* VERA_FX_ACCUM_RESET */
         lda ma
@@ -357,7 +357,7 @@ void x16_fx_copy(unsigned long src, unsigned long dst,
         iny
     fcp_quad:
         /* four reads fill the cache; `bit`, not `lda`: an optimizer */
-        /* that collapses the "redundant" loads to one (KickC's did) */
+        /* that collapses the "redundant" loads to one            */
         /* leaves three cache bytes unlatched. Any DATA1 read works. */
         bit 0x9f24                      /* VERA_DATA1 */
         bit 0x9f24
@@ -1324,7 +1324,7 @@ void x16_fx_triangle(const x16_point *pa, const x16_point *pb,
 // addresses (each 2 KB ALIGNED -- the registers hold address bits 16:11
 // only), the map size code (0=2x2, 1=8x8, 2=32x32, 3=128x128 tiles) and
 // the clip flag (bit 0: 1 = outside the map reads tile 0, 0 = wrap).
-// `tmap`, not `map`: KickC's inline assembler owns that word, and the
+// `tmap`, not `map`: an inline assembler can own that word, and the
 // rename stays so all the source ports match.
 // ---------------------------------------------------------------------
 void x16_fx_affine_on(unsigned long tiles, unsigned long tmap,

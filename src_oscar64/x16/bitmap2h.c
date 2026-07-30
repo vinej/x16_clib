@@ -47,7 +47,7 @@ volatile char x16__g2_pb1;
 
 // Blit operands. No pinned source pointer here: Oscar64 keeps pointer
 // PARAMETERS in zero page, so the blits below indirect `src` directly
-// -- the KickC build's __address() slot has nothing to do.
+// -- there is no pinned zero-page slot to keep in step.
 volatile char x16__g2_n;          // rows / columns counter
 
 // The tables the ca65 module carries. Indexed from asm, so they are
@@ -178,7 +178,8 @@ void x16__gfx2h_aim1(unsigned char incr) {
 // Internal: is (g2_x, g2_y) on screen? Sets g2_off.
 //
 // C, not asm: a label that ends a procedure has nothing to attach to
-// and KickC drops it, which leaves any branch to it dangling. Two
+// and an unreferenced label can be dropped, leaving a branch to it
+// dangling. Two
 // unsigned compares are not a hot path worth fighting that over.
 // ---------------------------------------------------------------------
 void x16__gfx2h_onscreen(void) {
@@ -496,7 +497,7 @@ void x16_gfx2h_line(unsigned int x0, unsigned int y0, unsigned int x1,
     lx1 = (int)x1;
     ly1 = (int)y1;
 
-    // Written as subtractions rather than `d = 0 - d`: KickC constant-
+    // Written as subtractions rather than `d = 0 - d`: the constant-
     // folds a call with literal endpoints, and folding `0 - d` drops the
     // negation -- err then starts at dx+|dy| instead of dx-|dy| and the
     // walk never reaches its end point. Same value, folded correctly.
@@ -657,7 +658,7 @@ void x16_gfx2h_pattern_rect(unsigned int x, unsigned int y, unsigned int w,
 //
 // The op is dispatched in C so each inner loop is its own asm block:
 // a block that ended in a shared `done` label would end the procedure
-// on a label, which KickC drops.
+// on a label, which can be dropped.
 // ---------------------------------------------------------------------
 void x16_gfx2h_blit(unsigned int x, unsigned int y, unsigned char wbytes,
                    unsigned char h, const unsigned char *src,

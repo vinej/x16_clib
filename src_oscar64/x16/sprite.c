@@ -9,7 +9,7 @@
 //
 // Parameter names differ from the header in places (`xpos` for `x`,
 // `zv` for `z`): single-letter register names read as registers to an
-// inline assembler, so the KickC port's renames are kept.
+// inline assembler, so an earlier port's renames are kept.
 // =====================================================================
 
 #include <x16/sprite.h>

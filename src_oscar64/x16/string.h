@@ -13,7 +13,7 @@
  * so those come in pairs -- x16_str_upper() for PETSCII bytes,
  * x16_str_upper_iso() for ISO bytes -- and the two genuinely swap
  * directions (PETSCII "lower" is numerically ISO "upper"; that is the
- * charset, not a bug). Mind KickC's side of the same trap: its default
+ * charset, not a bug). Mind the same trap elsewhere: a default
  * #pragma encoding is petscii_mixed, so a C string literal may not hold
  * the bytes you typed -- build test data for the _iso routines from
  * explicit bytes, not literals.

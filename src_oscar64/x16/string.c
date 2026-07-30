@@ -9,13 +9,13 @@
 // asm's `iny / bne` had.
 //
 // Every compared byte is an explicit value, exactly as the ca65 port
-// wrote them: KickC's default encoding is petscii_mixed, and a library
+// wrote them: a default encoding may be petscii_mixed, and a library
 // must not depend on which #pragma encoding the including program has
 // in effect. The PETSCII/ISO case and ctype bounds are FIXED BYTE
 // RANGES from the upstream assembly, not reasoned from ASCII.
 //
 // One deliberate deviation: str_pattern_match. The ca65 matcher
-// recurses on '*' (4 bytes of CPU stack per star); KickC's phi-call
+// recurses on '*' (4 bytes of CPU stack per star); an earlier port's
 // convention cannot recurse, so this is the standard iterative
 // greedy-with-backtracking wildcard matcher -- same language ('?' one
 // char, '*' any run including none), same verdicts.
@@ -500,7 +500,8 @@ unsigned char x16_str_find_eol(const char *s) {
 
 // The matcher's five indices live at module scope, not as locals. As
 // locals they are mutually-dependent loop variables -- si and pi are
-// each reassigned from star_si/star_pi inside the loop -- and KickC's
+// each reassigned from star_si/star_pi inside the loop -- and an
+// earlier port's
 // SSA pass throws a bare NullPointerException on the resulting phis,
 // with no file, line or hint. Reduced to a 30-line standalone case to
 // confirm it is the cross-assignment and not this module.

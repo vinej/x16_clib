@@ -2,7 +2,7 @@
 // x16clib :: x16/number.c -- number formatting and parsing
 // =====================================================================
 // The same routines as src_ca65/util/number.s, in plain C: decimal by
-// repeated subtraction against a powers-of-ten table (KickC has no
+// repeated subtraction against a powers-of-ten table (this avoids a
 // runtime division to lean on, and neither did the asm), fixed-width
 // hex and binary, and the overflow-checked decimal parser.
 //
@@ -55,7 +55,7 @@ char *x16_s16_to_dec(int v) {
     }
     m = (unsigned int)v;                // two's-complement magnitude,
     m = (m ^ 0xFFFF) + 1;               // safe for -32768. XOR, not ~:
-                                        // KickC has no fragment for a
+                                        // this avoids a fragment for a
                                         // 16-bit bitwise NOT.
     x16_u16_to_dec(m);                  // format the magnitude
     len = 0;

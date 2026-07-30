@@ -18,7 +18,7 @@
 // WRITTEN IN C, unlike most of this library. The ca65 version
 // (src_ca65/storage/ringbuffer.s) threads the head and tail through
 // zero-page pointer pairs and shares six helper routines between its
-// entry points -- and KickC asm labels do not reach across function
+// entry points -- and asm labels do not reach across function
 // bodies, so those helpers cannot be shared the same way. The
 // arithmetic is plain 16-bit index work either way, the banked window is
 // just a pointer, and the results are identical; bcd.c made the same
@@ -30,7 +30,7 @@
 #define X16_RNG_CAP  8192U               // the bank window, $A000-$BFFF
 #define X16_RNG_MAX  8191U               // ...one short, so full != empty
 
-// RAM_BANK ($00) is switched in asm: KickC will not parse a deref of a
+// RAM_BANK ($00) is switched in asm rather than a deref of a
 // cast literal, and would make a second load block --
 // which is fatal here (see input.c). bank.c does the same.
 

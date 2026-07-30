@@ -20,7 +20,7 @@
 
 #include <x16/dir.h>
 
-// No pointer relay, unlike the KickC build: Oscar64's inline asm
+// No pointer relay is needed here: Oscar64's inline asm
 // indirects a pointer PARAMETER directly and puts it where (zp),y can
 // reach it (see screen.c). A plain global would NOT be in zero page.
 volatile unsigned char x16__di_plo;

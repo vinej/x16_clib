@@ -2,7 +2,7 @@
 // x16clib :: x16/bcd.c -- packed-BCD add and subtract
 // =====================================================================
 // The ca65 version (src_ca65/util/bcd.s) runs the 65C02's decimal mode;
-// KickC-compiled C cannot set the D flag mid-expression, so this is the
+// C cannot set the D flag mid-expression, so this is the
 // same arithmetic done BYTEWISE in C: per byte, add/subtract each
 // nibble with decimal adjust and thread the carry (the asm's sed/adc
 // chain, spelled out). For valid packed BCD the results are
@@ -11,7 +11,7 @@
 // interrupt handler's binary arithmetic.
 //
 // The 32-bit forms stage the operand through a 4-byte buffer with one
-// dword store -- KickC has no runtime 32-bit shifts, and the buffer
+// dword store -- no runtime 32-bit shift is wanted here, and the buffer
 // mirrors the asm's bcd_b anyway.
 // =====================================================================
 

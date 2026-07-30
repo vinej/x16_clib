@@ -47,7 +47,7 @@
 typedef unsigned char x16_float[X16_FP_SIZE];
 
 /* The operand parameters below are spelled `unsigned char *` rather
-** than `x16_float` -- a rename the KickC port needed (its compiler
+** than `x16_float` -- a rename an earlier port needed (its compiler
 ** crashed on array-typed parameters) and this port keeps. An x16_float
 ** argument decays to exactly this pointer, so call sites read the same
 ** in every toolchain.

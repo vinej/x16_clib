@@ -13,7 +13,7 @@
 
 #include <x16/graph.h>
 
-// No pointer relay here, unlike the KickC build: Oscar64's inline asm
+// No pointer relay is needed here: Oscar64's inline asm
 // indirects a pointer PARAMETER directly and places it where (zp),y can
 // reach it, the way screen.c does.
 

@@ -3,7 +3,7 @@
 // =====================================================================
 // The same hand-written loops as src_ca65/video/vera.s. Symbolic
 // constants are inlined as literals -- a convention inherited from the
-// KickC port, whose preprocessor could not reach inside asm blocks --
+// earlier port, whose preprocessor could not reach inside asm blocks --
 // and each carries its name in a comment.
 //
 // Cross-module note: the ca65 build exported the internal vera_fill for

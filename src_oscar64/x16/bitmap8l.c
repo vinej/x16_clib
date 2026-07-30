@@ -327,7 +327,7 @@ void x16__gfx8l_glyph(unsigned char code) {
 // ---------------------------------------------------------------------
 void x16_gfx8l_char(unsigned int x, unsigned char y, unsigned char color,
                   unsigned char code) {
-    unsigned int row;                   /* int: the KickC port found a
+    unsigned int row;                   /* int: an earlier port found a
                                         ** char here miscompiled, and the
                                         ** wider type costs nothing */
     unsigned char col;
@@ -467,7 +467,7 @@ void x16_gfx8l_pattern_rect(unsigned int x, unsigned int y, unsigned int w,
 // Rows of pixel bytes from RAM. op: 0 copy, 1 OR, 2 AND, 3 XOR. The
 // read-modify-write ops read the screen back through the same port,
 // which costs a re-point per pixel here -- the assembly builds use a
-// second VERA port for it, but KickC has no way to say that in C.
+// second VERA port for it, but C has no way to say that.
 void x16_gfx8l_blit(unsigned int x, unsigned int y, unsigned char w,
                   unsigned char h, const char *src, unsigned char op) {
     unsigned char i;

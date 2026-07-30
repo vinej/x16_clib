@@ -20,7 +20,7 @@
 // preserves ADDRSEL (lda CTRL / and #1 / ora #n<<1), and the two
 // read-triggered registers use `bit`, not `lda`, so no optimizer ever
 // mistakes the bus read for a dead load. Oscar64's inline assembler is
-// NMOS-only, so KickC's stz/tsb/trb become lda/sta and read-modify-
+// NMOS-only, so stz/tsb/trb become lda/sta and read-modify-
 // write triples here.
 // =====================================================================
 

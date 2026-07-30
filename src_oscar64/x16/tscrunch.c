@@ -94,13 +94,13 @@ void *x16_tsc_decompress(const void *src, void *dst) {
         // output (matches may overlap their destination).
         lenop = (unsigned char)(t >> 2);
         if ((t & 2) != 0) {
-            lo = get[1];                // lifted: KickC has no
+            lo = get[1];                // lifted: this avoids
             back = put - lo;            // fragment for ptr - arr[i]
             get += 2;
         } else {
             // long: 15-bit offset; its top bit is one more length bit.
             // Every get[] byte used in arithmetic is lifted into a local
-            // first: KickC has no fragments for shifting or subtracting a
+            // first: this avoids shifting or subtracting a
             // pointer-indexed byte in place, and the build fails outright
             // rather than miscompiling.
             hi = get[2];

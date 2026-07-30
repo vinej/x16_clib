@@ -6,7 +6,7 @@
 // here each typed entry carries its comparison inline -- what the asm's
 // sort_cmp_u8/s8/u16/s16 did -- and x16_sort() is the 2-byte-element
 // engine calling the C comparator through a real function pointer
-// (proven to work on KickC 0.8.6 with true runtime indirection).
+// (proven to work with true runtime indirection).
 //
 // All variants sort ascending, in place, and are stable: the shift only
 // happens while the earlier element is strictly greater.
@@ -50,7 +50,7 @@ void x16_sort_s8(signed char *arr, unsigned int count) {
     unsigned int j;
     signed char key;
     signed char aj;
-    /* KickC has no signed-compare fragment at either width, so the
+    /* No signed-compare fragment is relied on at either width, so the
     ** loop compares the operands biased by their sign bit: as
     ** unsigned, x ^ SIGN orders exactly as x does signed. */
     unsigned char bkey;
@@ -111,7 +111,7 @@ void x16_sort_s16(int *arr, unsigned int count) {
     unsigned int j;
     int key;
     int aj;
-    /* KickC has no signed-compare fragment at either width, so the
+    /* No signed-compare fragment is relied on at either width, so the
     ** loop compares the operands biased by their sign bit: as
     ** unsigned, x ^ SIGN orders exactly as x does signed. */
     unsigned int bkey;

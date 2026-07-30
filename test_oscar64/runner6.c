@@ -1,10 +1,10 @@
 /* =====================================================================
- * x16clib :: test_kickc/runner6.c -- the string library, standalone
+ * x16clib :: test_oscar64/runner6.c -- the string library, standalone
  * =====================================================================
  * The sixth PRG of the suite: x16/string.c, mirroring ca65's runner4.c
  * check for check (37 of them). Run it with
  *
- *     .\build_kickc.ps1 -Test -Source test_kickc\runner6.c
+ *     .\build_oscar64.ps1 -Test -Source test_oscar64\runner6.c
  *
  * ENCODINGS, because every byte here is an assertion. testlib.h sets
  * #pragma encoding(ascii) globally, so every C literal in this file
@@ -15,9 +15,9 @@
  * ...), and the ISO tests from explicit ISO bytes, so no encoding can
  * silently change what is being tested.
  *
- * KickC dialect notes vs the ca65 original: no function-static data
+ * Dialect notes vs the ca65 original: no function-static data
  * (test fixtures live at file scope), and every t_check condition is
- * wrapped in (expr) ? 1 : 0 because KickC bools do not convert.
+ * wrapped in (expr) ? 1 : 0 because bools do not convert.
  * =====================================================================
  */
 

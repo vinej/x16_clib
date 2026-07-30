@@ -1,5 +1,5 @@
 /* =====================================================================
- * x16clib :: test_kickc/runner3.c -- the storage and audio half
+ * x16clib :: test_oscar64/runner3.c -- the storage and audio half
  * =====================================================================
  * The third PRG of the suite: banked RAM, the KERNAL block ops, load/
  * save, the DOS command channel, BMX, PCM and ADPCM. Split from the
@@ -873,7 +873,7 @@ void test_adpcm(void) {
     x16_adpcm_block(ad_packed, ad_out, 8);
 
     for (i = 0; i < 16; i++) {
-        got = ad_out[i];                /* via locals: KickC has no code */
+        got = ad_out[i];                /* via locals: avoids a code    */
         want = ad_expect[i];            /* fragment for int[] == int[] */
         if (got != want) ok = 0;
     }
