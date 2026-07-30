@@ -13,21 +13,32 @@
 // row painted with spaces over the test's sentinel). Every fp_puts_at()
 // call is suspect and every fp_fill_row() call is fine.
 //
-// TWO HYPOTHESES RULED OUT, each by changing the code and re-running:
+// THREE HYPOTHESES RULED OUT, each by changing the code and re-running:
 //   * that __asm cannot address a C local (the trap that cost nine tests
 //     in double.c). The four VRAM cache accessors did read a block-scope
-//     local from asm; they are plain volatile C now and the failure
-//     survived.
+//     local from asm; they are plain volatile C now and it survived.
 //   * that the screen-code staging buffer being a LOCAL ARRAY broke the
-//     pointer handed to x16_screen_blit(). It is a module buffer now and
-//     the failure survived that too.
+//     pointer handed to x16_screen_blit(). Module buffer now; survived.
+//   * that fp_puts_at's screen-code conversion was at fault.
+//     x16_screen_scode() answers non-space for lowercase ASCII, checked
+//     directly from the test.
 //
-// So look at fp_puts_at itself next: whether x16_screen_scode() is
-// returning what is expected for lowercase ASCII (the heading is "files
-// in "), and whether x16_screen_blit() writes where x16_screen_addr()
-// pointed. Prove it from the TEST first -- call screen_addr + blit
-// directly on a known row and vpeek it -- so the answer does not depend
-// on anything this module does.
+// AND THE SUSPICION IS NOW INVERTED, which is where the next session
+// should start. A probe run FROM THE TEST -- x16_screen_addr(7, 10) then
+// x16_screen_blit() of three known screen codes, read back with
+// t_vpeek -- ALSO FAILED. Those are the same two primitives fp_puts_at
+// uses, called with nothing of this module involved. So either
+// screen.c's addressing is wrong, or the TEST'S ADDRESS MODEL IS.
+//
+// The test hardcodes map base $1B000 and a 256-byte row stride;
+// x16__screen_addr_calc() derives both from the LIVE VERA registers
+// (L1_MAPBASE, and MAP_WIDTH out of L1_CONFIG). The library is right by
+// construction and the constant is an assumption -- and FP_PRIM_FILE
+// already turned out to be the test rather than the module. So read
+// $9F34/$9F35 in the test and compare before touching filepick again;
+// if they disagree with $1B000/256, FP_DRAW has been reading the wrong
+// cells all along and this module may have been drawing correctly the
+// whole time.
 //
 // FP_PRIM_FILE: FIXED, and it was never a module bug. Dumping the
 // listing cache ($12000, 32 bytes an entry) showed the panel listing

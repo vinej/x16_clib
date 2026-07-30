@@ -38,6 +38,7 @@
 #include <x16/load.h>
 #include <x16/dos.h>
 #include <x16/dir.h>
+#include <x16/screen.h>
 
 /* The 80x60 text map: map base $1B000, 128-tile map width = 256-byte
 ** row stride, two bytes (char, colour) per cell. Bank 1 holds $1xxxx.
