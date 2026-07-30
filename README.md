@@ -271,13 +271,12 @@ Swap `build_ca65.ps1` for `build_llvm.ps1` or `build_oscar64.ps1` to do
 the same with the other toolchains; `hello.c`, `bounce.c` and
 `numbers.c` build unchanged under all three.
 
-For a function-by-function guide -- each routine, its parameters, and a
-small example -- see [tutorial/userguide.md](tutorial/userguide.md). It
-covers 25 of the 61 modules and has not kept pace with the library; it
-says so at the top and names what is missing. **The headers are the
-authority** either way: every module's contract is written in
-`include_ca65/x16/*.h` (or `src_oscar64/x16/*.h`), which is where the
-guide's text came from in the first place.
+For a function-by-function guide -- every module, every entry point,
+with its signature and what it does -- see
+[tutorial/userguide.md](tutorial/userguide.md). All 61 modules and all
+744 entry points are in it. **The headers remain the authority**: the
+guide's text is lifted from `include_ca65/x16/*.h`, so if the two ever
+disagree, the header is right.
 
 Each toolchain also has a language-and-traps guide:
 [ca65_guide.md](tutorial/ca65_guide.md),
