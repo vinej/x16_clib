@@ -28,12 +28,14 @@ exist only to pin the ABI down.
 **Oscar64 is nearly there: 698 of those 744.** Two modules are still
 missing, both for reasons worth stating rather than hiding in a table:
 
-- `<x16/filepick.h>` (22 entries) -- not yet ported.
+- `<x16/filepick.h>` (22 entries) -- ported but unfinished: it compiles
+  and passes 14 of its 16 checks, so it is committed and left unwired
+  rather than advertised. See the banner in `src_oscar64/x16/filepick.c`.
 - `<x16/double.h>` (25 entries) -- the software IEEE-754 binary64. Oscar64
-  has no `double` type at all, only a 32-bit `float`, so there is nothing
-  to bind the module to and it needs the whole 8-byte format implemented
-  in software. Until then use `<x16/float.h>` for the ROM's 5-byte float
-  or `<x16/fixed.h>` for scaled integers.
+  has no `double` type, so the C entries cannot be a thin binding the way
+  they are elsewhere; the arithmetic itself is self-contained assembly
+  and ports whole. Until it lands, use `<x16/float.h>` for the ROM's
+  5-byte float or `<x16/fixed.h>` for scaled integers.
 
 Everything else is present and tested there, so code that avoids those
 two headers compiles on all three.
