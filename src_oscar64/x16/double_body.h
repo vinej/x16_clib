@@ -3,15 +3,15 @@
     /* Internal routines (the upstream x16_library body, verbatim) */
     /* ===================================================================== */
 
-    D_SIZE = 8
 
-    D_ZERO = 0
-    D_NORM = 1
-    D_INF  = 2
-    D_NAN  = 3
 
-    d_ptr    = X16_TPTR0        /* operand pointer (shared scratch) */
-    dstr_ptr = X16_TPTR1        /* d_from_str's string pointer (survives the */
+
+
+
+
+
+
+
     /* inner d_* calls, which only touch TPTR0) */
 
     /* --------------------------------------------------------------------- */
@@ -3402,18 +3402,29 @@ double_dpk_nan:
     /* Constants: packed binary64 values the algorithms lean on. */
     /* --------------------------------------------------------------------- */
 
-d_ten:    .byte 0x00,0x00,0x00,0x00,0x00,0x00,0x24,0x40        /* 10.0 */
-d_one:    .byte 0x00,0x00,0x00,0x00,0x00,0x00,0xF0,0x3F        /* 1.0 */
-d_half:   .byte 0x00,0x00,0x00,0x00,0x00,0x00,0xE0,0x3F        /* 0.5 */
+d_ten:
+    byt 0x00,0x00,0x00,0x00,0x00,0x00,0x24,0x40
+d_one:
+    byt 0x00,0x00,0x00,0x00,0x00,0x00,0xF0,0x3F
+d_half:
+    byt 0x00,0x00,0x00,0x00,0x00,0x00,0xE0,0x3F
 
-d_ln2:    .byte 0xEF,0x39,0xFA,0xFE,0x42,0x2E,0xE6,0x3F        /* ln 2  = 0.6931471805599453 */
-d_log2e:  .byte 0xFE,0x82,0x2B,0x65,0x47,0x15,0xF7,0x3F        /* 1/ln2 = 1.4426950408889634 */
-d_1p5:    .byte 0x00,0x00,0x00,0x00,0x00,0x00,0xF8,0x3F        /* 1.5 */
-d_pihalf: .byte 0x18,0x2D,0x44,0x54,0xFB,0x21,0xF9,0x3F        /* pi/2 = 1.5707963267948966 */
-d_pi6:    .byte 0x66,0x73,0x2D,0x38,0x52,0xC1,0xE0,0x3F        /* pi/6 = 0.5235987755982988 */
-d_sqrt3:  .byte 0xAA,0x4C,0x58,0xE8,0x7A,0xB6,0xFB,0x3F        /* sqrt3 = 1.7320508075688772 */
-d_tan15:  .byte 0x56,0xCD,0x9E,0x5E,0x14,0x26,0xD1,0x3F        /* tan(pi/12) = 0.26794919243112270 */
-d_hyp20:  .byte 0x00,0x00,0x00,0x00,0x00,0x00,0x34,0x40        /* 20.0 (tanh saturation cutoff) */
+d_ln2:
+    byt 0xEF,0x39,0xFA,0xFE,0x42,0x2E,0xE6,0x3F
+d_log2e:
+    byt 0xFE,0x82,0x2B,0x65,0x47,0x15,0xF7,0x3F
+d_1p5:
+    byt 0x00,0x00,0x00,0x00,0x00,0x00,0xF8,0x3F
+d_pihalf:
+    byt 0x18,0x2D,0x44,0x54,0xFB,0x21,0xF9,0x3F
+d_pi6:
+    byt 0x66,0x73,0x2D,0x38,0x52,0xC1,0xE0,0x3F
+d_sqrt3:
+    byt 0xAA,0x4C,0x58,0xE8,0x7A,0xB6,0xFB,0x3F
+d_tan15:
+    byt 0x56,0xCD,0x9E,0x5E,0x14,0x26,0xD1,0x3F
+d_hyp20:
+    byt 0x00,0x00,0x00,0x00,0x00,0x00,0x34,0x40
 
     /* --------------------------------------------------------------------- */
     /* State. crt0 zeroes BSS, so d_ac starts as +0.0 -- the same value the */
@@ -3421,76 +3432,141 @@ d_hyp20:  .byte 0x00,0x00,0x00,0x00,0x00,0x00,0x34,0x40        /* 20.0 (tanh sat
     /* before it is read. */
     /* --------------------------------------------------------------------- */
 
-d_ac:     .res 8        /* the packed accumulator */
+d_ac:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
 
-dac_c:    .res 1
-dac_s:    .res 1
-dac_e:    .res 2
-dac_m:    .res 8
+dac_c:
+    byt 0
+dac_s:
+    byt 0
+dac_e:
+    byt 0, 0
+dac_m:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
 
-dbf_c:    .res 1
-dbf_s:    .res 1
-dbf_e:    .res 2
-dbf_m:    .res 8
+dbf_c:
+    byt 0
+dbf_s:
+    byt 0
+dbf_e:
+    byt 0, 0
+dbf_m:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
 
-d_ub:     .res 8
-d_work:   .res 8
-d_cnt:    .res 2
-d_bias:   .res 2
-d_t0:     .res 1
-d_t1:     .res 1
-d_sticky: .res 1
-d_rsign:  .res 1
-d_prod:   .res 16
-d_rem:    .res 8
-d_diff:   .res 8
+d_ub:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_work:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_cnt:
+    byt 0, 0
+d_bias:
+    byt 0, 0
+d_t0:
+    byt 0
+d_t1:
+    byt 0
+d_sticky:
+    byt 0
+d_rsign:
+    byt 0
+d_prod:
+    byt 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+d_rem:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_diff:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
 
-d_sqv:    .res 8
-d_sqg:    .res 8
-d_sqi:    .res 1
+d_sqv:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_sqg:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_sqi:
+    byt 0
 
-d_tv:     .res 8        /* transcendental scratch */
-d_tr:     .res 8
-d_tt:     .res 8
-d_tsum:   .res 8
-d_tterm:  .res 8
-d_tk:     .res 8
-d_tn16:   .res 2
-d_tkc:    .res 1
-d_powx:   .res 8
-d_powyp:  .res 2
-d_scq:    .res 1
-d_tanx:   .res 8
-d_tans:   .res 8
-d_tanc:   .res 8
-d_atflags: .res 1
-d_atx:    .res 8
-d_atn:    .res 8
-d_atd:    .res 8
-d_hypx:   .res 8
-d_hypa:   .res 8
-d_hypb:   .res 8
-d_hypn:   .res 8
-d_hypd:   .res 8
+d_tv:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tr:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tt:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tsum:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tterm:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tk:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tn16:
+    byt 0, 0
+d_tkc:
+    byt 0
+d_powx:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_powyp:
+    byt 0, 0
+d_scq:
+    byt 0
+d_tanx:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tans:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_tanc:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_atflags:
+    byt 0
+d_atx:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_atn:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_atd:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_hypx:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_hypa:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_hypb:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_hypn:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_hypd:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
 
-dstr_len:   .res 1
-dstr_i:     .res 1
-dstr_neg:   .res 1
-dstr_frac:  .res 1
-dstr_esign: .res 1
-dstr_exp:   .res 2
-dstr_t:     .res 2
-dstr_cnt:   .res 2
-dstr_acc:   .res 8
+dstr_len:
+    byt 0
+dstr_i:
+    byt 0
+dstr_neg:
+    byt 0
+dstr_frac:
+    byt 0
+dstr_esign:
+    byt 0
+dstr_exp:
+    byt 0, 0
+dstr_t:
+    byt 0, 0
+dstr_cnt:
+    byt 0, 0
+dstr_acc:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
 
-dts_bx:    .res 1
-dts_di:    .res 1
-dts_ndig:  .res 1
-dts_lead:  .res 1
-dts_e:     .res 2
-dts_p:     .res 2
-dts_dig:   .res 18
-dts_val:   .res 8
-dts_digd:  .res 8
-d_strbuf:  .res 26
+dts_bx:
+    byt 0
+dts_di:
+    byt 0
+dts_ndig:
+    byt 0
+dts_lead:
+    byt 0
+dts_e:
+    byt 0, 0
+dts_p:
+    byt 0, 0
+dts_dig:
+    byt 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+dts_val:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+dts_digd:
+    byt 0, 0, 0, 0, 0, 0, 0, 0
+d_strbuf:
+    byt 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
