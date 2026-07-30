@@ -30,6 +30,8 @@
 
         .globl  x16_gfx8l_init
         .globl  x16_gfx8l_clear
+        .globl  x16_gfx8l_setptr
+        .globl  x16_gfx8l_read
         .globl  x16_gfx8l_pset
         .globl  x16_gfx8l_hline
         .globl  x16_gfx8l_vline
@@ -92,6 +94,42 @@ gfx8l_clear:
         ldx     #<(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
         ldy     #>(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
         jmp     vera_fill
+
+; ---------------------------------------------------------------------
+; void x16_gfx8l_setptr(unsigned char inc, unsigned int x,
+;                      unsigned char y)
+;
+; The packed planes return x's position within the byte; at 8bpp a pixel
+; IS a byte, so there is nothing to hand back and this is void.
+; No clipping -- the caller keeps (x,y) on screen.
+; ---------------------------------------------------------------------
+; Measured, not inferred: inc -> A, x lo -> X, x hi -> __rc2, y -> __rc3.
+; The 16-bit x is split across X and __rc2 because arguments fill A, X,
+; then __rc2.. one BYTE at a time; only a pointer takes an aligned pair.
+x16_gfx8l_setptr:
+        pha                             ; inc -- gfx8l_setptr reads it in A
+        stx     mos8(X16_P0)            ; x lo
+        lda     mos8(__rc2)
+        sta     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc3)
+        sta     mos8(X16_P2)            ; y
+        pla                             ; inc back
+        jmp     gfx8l_setptr
+
+; ---------------------------------------------------------------------
+; unsigned char x16_gfx8l_read(unsigned int x, unsigned char y)
+;
+; Unclipped, unlike the packed planes' read(): off-screen coordinates
+; read whatever VRAM the wrapped address lands on.
+; ---------------------------------------------------------------------
+; x -> A/X, y -> __rc2. Returns the colour in A; llvm-mos returns a
+; one-byte value in A alone, so there is no high byte to zero.
+x16_gfx8l_read:
+        sta     mos8(X16_P0)            ; x lo
+        stx     mos8(X16_P1)            ; x hi
+        lda     mos8(__rc2)
+        sta     mos8(X16_P2)            ; y
+        jmp     gfx8l_read
 
 ; ---------------------------------------------------------------------
 ; void __fastcall__ x16_gfx8l_pset(unsigned int x, unsigned char y,

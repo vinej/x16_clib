@@ -33,7 +33,7 @@ void x16_gfx2h_init (void);
 void __fastcall__ x16_gfx2h_clear (unsigned char color);
 
 /* Point VERA data port 0 at the byte holding (x,y) with the given
-** increment index (X16_VERA_INC_*); returns x & 3, the pixel's
+** increment index (X16_INC_*); returns x & 3, the pixel's
 ** position within that byte. The escape hatch for custom inner loops.
 */
 unsigned char __fastcall__ x16_gfx2h_setptr (unsigned char inc,

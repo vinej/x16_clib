@@ -27,8 +27,8 @@ trees stay identical to each other, and their shared API is a strict
 subset -- so code written against them compiles everywhere.
 
 ```
-include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      539 tests
-include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  655 tests
+include_ca65/   src_ca65/   test_ca65/     build_ca65.ps1     cc65      543 tests
+include_llvm/   src_llvm/   test_llvm/     build_llvm.ps1     llvm-mos  659 tests
 include_kickc/  src_kickc/  test_kickc/    build_kickc.ps1    KickC     318 tests
 src_oscar64/    (headers inside)  test_oscar64/  build_oscar64.ps1  Oscar64   317 tests
 include_vbcc/   src_vbcc/   test_vbcc/     build_vbcc.ps1     vbcc      250 tests
@@ -36,8 +36,8 @@ examples/       doc/        emulator/      tools/             shared
 ```
 
 ```powershell
-.\build_ca65.ps1 -Test                 # cc65:     539/539
-.\build_llvm.ps1 -Test                 # llvm-mos: 655/655
+.\build_ca65.ps1 -Test                 # cc65:     543/543
+.\build_llvm.ps1 -Test                 # llvm-mos: 659/659
 .\build_kickc.ps1 -Test                # KickC:    318/318
 .\build_oscar64.ps1 -Test              # Oscar64:  317/317
 .\build_vbcc.ps1 -Test                 # vbcc:     250/250
@@ -504,9 +504,9 @@ next deep call; the wrapper copies it into yours before returning.
 ## Tests
 
 ```powershell
-.\build_ca65.ps1 -Test           # cc65:     539 across 11 suites, 19 skipped
+.\build_ca65.ps1 -Test           # cc65:     543 across 11 suites, 19 skipped
 .\build_ca65.ps1 -Test -Windowed # ...with video, so the raster tests run too
-.\build_llvm.ps1 -Test           # llvm-mos: 655 across 14 suites, 24 skipped
+.\build_llvm.ps1 -Test           # llvm-mos: 659 across 14 suites, 24 skipped
 .\build_kickc.ps1 -Test          # KickC:    266 in seven PRGs
 .\build_oscar64.ps1 -Test        # Oscar64:  the same 266
 .\build_vbcc.ps1 -Test           # vbcc:     196 across 5 suites

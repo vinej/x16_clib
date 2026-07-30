@@ -26,6 +26,8 @@
 
         .export         _x16_gfx8l_init
         .export         _x16_gfx8l_clear
+        .export         _x16_gfx8l_setptr
+        .export         _x16_gfx8l_read
         .export         _x16_gfx8l_pset
         .export         _x16_gfx8l_hline
         .export         _x16_gfx8l_vline
@@ -87,6 +89,38 @@ gfx8l_clear:
         ldx     #<(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
         ldy     #>(GFX8L_WIDTH * GFX8L_HEIGHT / 2)
         jmp     vera_fill
+
+; ---------------------------------------------------------------------
+; void __fastcall__ x16_gfx8l_setptr(unsigned char inc, unsigned int x,
+;                                  unsigned char y)
+;
+; The packed planes return x's position within the byte; at 8bpp a pixel
+; IS a byte, so there is nothing to hand back and this is void.
+; No clipping -- the caller keeps (x,y) on screen.
+; ---------------------------------------------------------------------
+_x16_gfx8l_setptr:
+        sta     X16_P2                  ; y
+        jsr     popax
+        sta     X16_P0                  ; x
+        stx     X16_P1
+        jsr     popa                    ; increment index
+        jmp     gfx8l_setptr
+
+; ---------------------------------------------------------------------
+; unsigned char __fastcall__ x16_gfx8l_read(unsigned int x,
+;                                         unsigned char y)
+;
+; Unclipped, unlike the packed planes' read(): off-screen coordinates
+; read whatever VRAM the wrapped address lands on.
+; ---------------------------------------------------------------------
+_x16_gfx8l_read:
+        sta     X16_P2                  ; y
+        jsr     popax
+        sta     X16_P0                  ; x
+        stx     X16_P1
+        jsr     gfx8l_read
+        ldx     #0
+        rts
 
 ; ---------------------------------------------------------------------
 ; void __fastcall__ x16_gfx8l_pset(unsigned int x, unsigned char y,

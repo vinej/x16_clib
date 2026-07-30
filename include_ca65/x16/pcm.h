@@ -75,6 +75,20 @@ void __fastcall__ x16_pcm_write (const void *src, unsigned int count);
 void __fastcall__ x16_pcm_stream_start (const void *data, unsigned int count,
                                         unsigned char rate);
 
+/* The same, for a sample living in banked RAM -- which is where anything
+** longer than a sound effect has to live.
+**
+** `offset` is 0-8191 within the bank window; `count` is a 24-bit byte
+** total, so a whole song spanning many banks is one call, and the top
+** byte of the long is ignored. `bank` is where the sample starts; the
+** refiller rolls $C000 back to $A000 and steps the bank as it goes, and
+** always restores the interrupted code's bank before returning.
+*/
+void __fastcall__ x16_pcm_stream_start_bank (unsigned int offset,
+                                        unsigned long count,
+                                        unsigned char bank,
+                                        unsigned char rate);
+
 /* Stop refilling. Whatever is already queued keeps playing; call
 ** x16_pcm_reset() for immediate silence.
 */

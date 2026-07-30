@@ -889,6 +889,52 @@ static void test_gfx8l_pset(void)
     t_check(vpeek(PIXEL(10, 5)) == 0x42, "GFX8L_PSET");
 }
 
+/* read() against the independent vpeek path. y > 127 matters: y is a
+** single byte here, and a shim that sign-extended it would land on the
+** wrong row.
+*/
+static void test_gfx8l_read(void)
+{
+    vpoke(0x5A, PIXEL(50, 11));
+    vpoke(0xC3, PIXEL(319, 200));
+
+    t_check(x16_gfx8l_read(50, 11) == 0x5A &&
+            x16_gfx8l_read(319, 200) == 0xC3,
+            "GFX8L_READ");
+}
+
+/* setptr leaves the data port walking from (x,y) at the increment asked
+** for, which is what a custom inner loop wants. Three consecutive reads
+** through the port must see three consecutive pixels -- and with
+** X16_INC_320 the port steps a column instead.
+**
+** This one earns its keep on llvm-mos: setptr's 16-bit x is split across
+** X and __rc2 while `inc` sits in A, so the shim has to carry A past two
+** loads. Swapping any of that still assembles.
+*/
+static void test_gfx8l_setptr(void)
+{
+    static unsigned char back[3];
+
+    vpoke(0x11, PIXEL(40, 9));
+    vpoke(0x22, PIXEL(41, 9));
+    vpoke(0x33, PIXEL(42, 9));
+    vpoke(0x44, PIXEL(40, 10));
+    back[0] = back[1] = back[2] = 0;
+
+    x16_gfx8l_setptr(X16_INC_1, 40, 9);
+    x16_mem_copy(X16_VERA_DATA0, back, 3);
+
+    t_check(back[0] == 0x11 && back[1] == 0x22 && back[2] == 0x33,
+            "GFX8L_SETPTR");
+
+    x16_gfx8l_setptr(X16_INC_320, 40, 9);
+    back[0] = back[1] = 0;
+    x16_mem_copy(X16_VERA_DATA0, back, 2);
+
+    t_check(back[0] == 0x11 && back[1] == 0x44, "GFX8L_SETPTR_INC");
+}
+
 /* x >= 320 and y >= 240 are off screen. Unclipped, pset(320, 0) would
 ** land on pixel (0,1) and pset(0, 240) at offset 76800 -- so poison both
 ** and check they stayed clean.
@@ -2236,6 +2282,77 @@ static void test_pcm_stream(void)
             stopped_ien == 0 && stopped_active == 0 &&
             sml_active == 0 && sml_ien == 0 && sml_queued,
             "PCM_STREAM");
+}
+
+/* The banked entry point. Priming is synchronous, so all of this runs
+** headless -- no interrupt needed.
+**
+** Four contracts:
+**   - a count past the FIFO leaves the stream active with AFLOW armed
+**   - a count that fits primes outright and never arms AFLOW
+**   - RAM_BANK comes back exactly as the caller left it, even though the
+**     refiller switched banks to read the sample
+**   - the count really is 24-bit. 65568 has low sixteen bits of 32, so a
+**     16-bit count would hand over 32 bytes and call the stream finished.
+**     Staying active is the whole point of the banked entry: samples that
+**     do not fit in low RAM do not fit in a 16-bit length either.
+**
+** NOT covered, and measured rather than assumed: `bank` and `rate` are
+** invisible from here. The FIFO is write-only, so the bytes the refiller
+** read cannot be checked, and the emulator's audio engine does not run in
+** testbench mode -- rate 128 leaves the FIFO as full as rate 0 does, so
+** even "did the DAC start" is unobservable.
+**
+** That matters more on llvm-mos than on cc65: bank and rate arrive in
+** adjacent slots (__rc6, __rc7), tools/llvm_abi_audit.py cannot tell a
+** shim that reads both but crosses them, and crossing them was tried --
+** this test stays green. What pins those two is the disassembly of the
+** shim against the compiler's own argument setup, recorded in the shim.
+*/
+static void test_pcm_stream_bank(void)
+{
+    unsigned char caller_bank, after_bank;
+    unsigned char big_active, big_ien;
+    unsigned char sml_active, sml_ien, sml_queued;
+    unsigned char wide_active;
+
+    x16_pcm_rate(0);
+    x16_pcm_ctrl(X16_PCM_VOLUME(15));
+    x16_pcm_reset();
+
+    x16_bank_set(7);                    /* the bank the caller owns */
+    caller_bank = x16_bank_get();
+
+    /* 5120 bytes from bank 1: more than the 4 KB FIFO takes. */
+    x16_pcm_stream_start_bank(0, 5120UL, 1, 0);
+    big_active = x16_pcm_stream_active();
+    big_ien = VERA_IEN_REG & 0x08;      /* AFLOW enable */
+    after_bank = x16_bank_get();
+
+    x16_pcm_stream_stop();
+    x16_pcm_reset();
+
+    x16_pcm_stream_start_bank(0, 64UL, 1, 0);   /* fits outright */
+    sml_active = x16_pcm_stream_active();
+    sml_ien = VERA_IEN_REG & 0x08;
+    sml_queued = !x16_pcm_empty();
+
+    x16_pcm_stream_stop();
+    x16_pcm_reset();
+
+    x16_pcm_stream_start_bank(0, 65568UL, 1, 0);
+    wide_active = x16_pcm_stream_active();
+
+    x16_pcm_stream_stop();
+    x16_pcm_reset();
+    x16_irq_remove();
+    x16_bank_set(caller_bank);
+
+    t_check(big_active == 1 && big_ien != 0 &&
+            after_bank == caller_bank &&
+            sml_active == 0 && sml_ien == 0 && sml_queued &&
+            wide_active == 1,
+            "PCM_STREAM_BANK");
 }
 
 /* Play a real stream to the end, and check the refill interrupt turned
@@ -4812,6 +4929,8 @@ int main(void)
 
     test_gfx8l_clear();           /* first: it repaints the whole framebuffer */
     test_gfx8l_pset();
+    test_gfx8l_read();
+    test_gfx8l_setptr();
     test_gfx8l_clip();
     test_gfx8l_hline();
     test_gfx8l_vline();
@@ -4874,6 +4993,7 @@ int main(void)
     test_psg_note_off();
     test_pcm_rate_clamp();
     test_pcm_stream();
+    test_pcm_stream_bank();
     test_pcm_stream_empty();
     test_pcm_stream_exhaust();
     test_ym_write();
