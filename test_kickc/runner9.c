@@ -279,12 +279,13 @@ void test_fio_write(void) {
     }
     x16_fio_close_named(2);
 
-    /* The 32 bytes just written also reach the screen -- the KERNAL
-    ** echoes them somewhere on the way through the channel, and the
-    ** emulator's -echo reports whatever CHROUT was handed. Harmless in
-    ** itself, but without this newline they land on the end of the
-    ** previous PASS line and the harness's PASS-count check trips
-    ** ("36 PASS lines but DONE says 37"). */
+    /* The 32 bytes just written show up in the captured output. Nothing
+    ** is wrong: the emulator's -echo reports every byte CHROUT is handed,
+    ** and these went to the FILE, not the screen. The ca65 and vbcc
+    ** suites echo their own pattern the same way. Only the line break
+    ** matters here -- without it the run lands on the end of the previous
+    ** PASS line and the harness's own count check trips ("36 PASS lines
+    ** but DONE says 37"). */
     t_chrout(10);
 
     if (x16_fs_load("FIOTEST.SEQ", 11, X16_DEVICE_SD, X16_SA_RAW,
